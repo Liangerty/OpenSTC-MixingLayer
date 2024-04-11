@@ -114,6 +114,42 @@ void cfd::Parameter::read_one_file(std::ifstream &file) {
     } else if (type == "struct") {
       auto the_struct = read_struct(file);
       struct_array[key] = the_struct;
+    } else if (type == "range") {
+      std::string name{temp};
+      line >> temp >> temp; // {
+      if (key == "real") {
+        std::vector<real> arr;
+        while (read_line_to_array(line, arr)) {
+          gxl::getline_to_stream(file, input, line);
+        }
+        auto num = arr.size();
+        if (num == 2) {
+          real_range[name] = Range<real>(arr[0], arr[1]);
+        } else if (num == 4) {
+          real_range[name] = Range<real>(arr[0], arr[1], arr[2], arr[3]);
+        } else if (num == 6) {
+          real_range[name] = Range<real>(arr[0], arr[1], arr[2], arr[3], arr[4], arr[5]);
+        } else {
+          fmt::print("The number of values in the range {} is not correct.\n", name);
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+      } else if (key == "int") {
+        std::vector<int> arr;
+        while (read_line_to_array(line, arr)) {
+          gxl::getline_to_stream(file, input, line);
+        }
+        auto num = arr.size();
+        if (num == 2) {
+          int_range[name] = Range<int>(arr[0], arr[1]);
+        } else if (num == 4) {
+          int_range[name] = Range<int>(arr[0], arr[1], arr[2], arr[3]);
+        } else if (num == 6) {
+          int_range[name] = Range<int>(arr[0], arr[1], arr[2], arr[3], arr[4], arr[5]);
+        } else {
+          fmt::print("The number of values in the range {} is not correct.\n", name);
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+      }
     }
   }
   file.close();
@@ -225,11 +261,75 @@ void cfd::Parameter::deduce_known_info() {
 
 void cfd::Parameter::setup_default_settings() {
   int_parameters["problem_type"] = 0;
+
+  real_parameters["gridScale"] = 1.0;
+  int_parameters["if_compute_wall_distance"] = 0;
+
+  bool_parameters["steady"] = true; // Steady simulation is the default choice
+  int_parameters["implicit_method"] = 0; // Explicit is used by default
+  int_parameters["DPLUR_inner_step"] = 3; // The default DPLUR inner iterations.
+  real_parameters["convergence_criteria"] = 1e-8; // The criteria of convergence
+
+  // If we conduct transient simulations, the following parameters are used by default.
+  int_parameters["temporal_scheme"] = 3; // RK3 is used by default
+  bool_parameters["fixed_time_step"] = false; // The time step is computed with CFL condition.
+
+  // If dual-time stepping is used, the following parameters are needed.
+  int_parameters["inner_iteration"] = 20;
+  int_parameters["max_inner_iteration"] = 30;
+  int_parameters["iteration_adjust_step"] = 20;
+
+  // For spatial discretization
+  int_parameters["inviscid_scheme"] = 3; // AUSM+
+  int_parameters["reconstruction"] = 2; // MUSCL
+  int_parameters["limiter"] = 0; //minmod
+  real_parameters["entropy_fix_factor"] = 0.125; // For Roe scheme, we need an entropy fix factor.
+  int_parameters["viscous_order"] = 2; // Default viscous order is 2.
+  bool_parameters["gradPInDiffusionFlux"] = false;
+
+  // When WENO is used, pp limiter is a choice
+  bool_parameters["positive_preserving"] = false;
+
+  int_parameters["species"] = 0;
+  int_parameters["reaction"] = 0;
+  string_parameters["therm_file"] = "chemistry/therm.dat";
+  string_parameters["transport_file"] = "chemistry/tran.dat";
+  int_parameters["chemSrcMethod"] = 0; // explicit treatment of the chemical source term is used by default.
+  real_parameters["c_chi"] = 1;
+
+  bool_parameters["turbulence"] = false;// laminar
+  int_parameters["turbulence_method"] = 1;// 1-RAS, 2-DES
+  int_parameters["RANS_model"] = 2; // 1-SA, 2-SST
+  int_parameters["turb_implicit"] = 1; // turbulent source term is treated implicitly by default
+  int_parameters["compressibility_correction"] = 0; // No compressibility correction is added by default
+  int_parameters["des_scale_method"] = 0; // How to compute the grid scale in DES simulations. 0 - cubic root of cell volume, 1 - max of cell dimension
+
   int_parameters["n_profile"] = 0;
+
+  int_parameters["groups_init"] = 1;
+  string_parameters["default_init"] = "freestream";
+
+  int_parameters["diffusivity_method"] = 1;
+  real_parameters["schmidt_number"] = 0.5;
+  real_parameters["prandtl_number"] = 0.72;
+  real_parameters["turbulent_prandtl_number"] = 0.9;
+  real_parameters["turbulent_schmidt_number"] = 0.9;
+
+  bool_parameters["if_collect_statistics"] = false;
+  bool_parameters["if_continue_collect_statistics"] = false;
+  int_parameters["start_collect_statistics_iter"] = 0;
+  bool_parameters["perform_spanwise_average"] = false;
+
+  int_array["post_process"] = {};
+  int_array["output_bc"] = {};
+
+  int_parameters["if_monitor"] = 0; // 0 - no monitor, 1 - monitor
+  string_parameters["monitor_file"] = "input/monitor_points.txt";
+  string_array["monitor_var"] = {"density", "u", "v", "w", "pressure", "temperature"};
+
   int_parameters["n_inflow_fluctuation"] = 0;
   int_array["need_rng"] = {};
   bool_parameters["perform_spanwise_average"] = false;
-  int_parameters["if_compute_wall_distance"] = 0;
   bool_parameters["positive_preserving"] = false;
 }
 

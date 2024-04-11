@@ -17,7 +17,7 @@ FlameletLib::FlameletLib(const Parameter &parameter) : n_spec{parameter.get_int(
 }
 
 void FlameletLib::read_ACANS_flamelet(const Parameter &parameter) {
-  const auto flamelet_file_name{"input_files/" + parameter.get_string("flamelet_file_name")};
+  const auto flamelet_file_name{"input/" + parameter.get_string("flamelet_file_name")};
   std::ifstream file{flamelet_file_name};
   std::string input;
   std::istringstream line;
@@ -41,7 +41,7 @@ void FlameletLib::read_ACANS_flamelet(const Parameter &parameter) {
   }
   file.close();
 
-  file.open("input_files/chemistry/erf.txt");
+  file.open("input/chemistry/erf.txt");
   gxl::getline_to_stream(file, input, line);
   line >> fzst;
   fz.resize(n_z + 1);

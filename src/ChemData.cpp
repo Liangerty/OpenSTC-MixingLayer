@@ -11,7 +11,7 @@
 cfd::Species::Species(Parameter &parameter) {
   parameter.update_parameter("n_spec", 0);
   if (parameter.get_int("species")) {
-    std::ifstream file("./input_files/" + parameter.get_string("mechanism_file"));
+    std::ifstream file("./input/" + parameter.get_string("mechanism_file"));
     std::string input{};
     while (file >> input) {
       if (input[0] == '!') {
@@ -75,13 +75,13 @@ cfd::Species::Species(Parameter &parameter) {
 
     if (!has_therm) {
       file.close();
-      file.open("./input_files/" + parameter.get_string("therm_file"));
+      file.open("./input/" + parameter.get_string("therm_file"));
     }
     bool has_trans = read_therm(file, has_therm);
 
     if (!has_trans) {
       file.close();
-      file.open("input_files/" + parameter.get_string("transport_file"));
+      file.open("input/" + parameter.get_string("transport_file"));
     }
     read_tran(file);
 
@@ -498,7 +498,7 @@ cfd::Reaction::Reaction(Parameter &parameter, const Species &species) {
   if (parameter.get_int("reaction") != 1) {
     return;
   }
-  std::ifstream file("./input_files/" + parameter.get_string("mechanism_file"));
+  std::ifstream file("./input/" + parameter.get_string("mechanism_file"));
   std::string input{};
   const std::vector<std::string> reac_candidate{"REACTIONS", "REAC"};
   gxl::read_until(file, input, reac_candidate, gxl::Case::keep);

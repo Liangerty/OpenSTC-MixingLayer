@@ -1,3 +1,93 @@
 bool parallel = 0      // specify the mode of computation. 0 - serial, 1 - parallel.
 
 int  problem_type = 1  // the type of problem. 0 - general problem, 1 - mixing layer.
+
+// Grid info
+real gridScale = 2e-4    // grid scale(m)
+range real coreRegion = {  // The core region of computation. Only grids in core regions are monitored or probed.
+  0  650   // x1,x2
+  -60 60   // y1,y2
+  -20 20   // z1,z2
+}
+
+// controls
+int initial = 0          // 0 - new case, 1 - continue from a previous case.
+int total_step = 100000  // total number of steps
+int output_file = 10000  // frequency of output files
+int output_screen = 1000 // frequency of screen output
+
+// flow info.
+// for mixing layer computations(problem type=1), specify the following info.
+real ma_c = 0.62            // the convective Mach number Ma_c
+real delta_omega = 2e-4     // the inlet vorticity thickness(m)
+struct upper_stream = {
+    real temperature = 300
+    real pressure = 100000
+    real H2 = 0.1
+    real N2 = 0.9
+    real mixture_fraction = 1
+}
+struct lower_stream = {
+    real mach = 1.1
+    real temperature = 1100
+    real pressure = 100000
+    real O2 = 0.232
+    real N2 = 0.768
+    real mixture_fraction = 0
+}
+bool upper_faster = 1   // 1 - upper stream has larger mach number, 0 - lower stream has larger mach number.
+
+// numerics
+// temporal scheme
+bool steady = 0                         // 0 - unsteady, 1 - steady
+real cfl = 1                            // CFL number
+int	 temporal_scheme = 3                // Temporal scheme for transient sims: 2-Dual-time iteration with DPLUR; 3-SSPRK
+bool fixed_time_step   = 0              // If the time step is fixed(1), then the time step should be given; otherwise(0), the time step is determined by CFL number.
+real dt = 5e-9                          // In unsteady simulation, the time step should be given
+real total_simulation_time = 5.761e-4   // In unsteady simulation, how long physical time to be simulated 2.2154e-3
+
+// spatial discretization
+int inviscid_scheme = 52                // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
+bool positive_preserving = 1            // If the Positive-preserving limiter is activated, only implemented for 51/52
+int viscous_order = 2                   // Default: 2nd order central discretization. Other choices: 0(inviscid)
+
+// chemical info
+int species = 1  // If there is species involved. 0 - Air as perfect gas; 1 - Species involved; 2 - Species + mixture fraction + mixture fraction variance are solved
+int reaction = 0 //0-No reaction; 1-Finite rate chemistry; 2-Flamelet model. Even no reactions are involved, the mechanism file should exit to clarify the species
+string mechanism_file = chemistry/H2_mech_mixing.inp  // H2_mech_mixing.inp
+
+// turbulent sim info
+bool turbulence = 0 // 0 - laminar/DNS, 1 - turbulent
+
+// bc info
+array string boundary_conditions {
+ freestream outflow
+}
+string  reference_state =   freestream  // Specify the reference state for the simulation. The reference state is used to calculate the stagnation enthalpy and the stagnation pressure.
+struct  freestream {
+    string  type            =   inflow
+    int     label           =   5
+    int     inflow_type     =   1 // 0 for constant inflow, 1 for mixing-layer-type inflow, other types may be added(such as 2 for self-similar inflow)
+    int     fluctuation_type    =  1       // Specify the type of fluctuation. 0 for no fluctuation, 1 for fluctuation in velocity with white noise.
+    real    fluctuation_intensity    =   0.01    // Specify the intensity of fluctuation in velocity. The intensity is defined as the ratio of the standard deviation of the fluctuation to the mean value of the velocity.
+}
+struct outflow {
+    string type = outflow
+    int label   =   6
+}
+struct  periodic  {
+    string type = periodic
+    int label = 8
+}
+
+// statistical choice
+bool if_collect_statistics = 0
+bool if_continue_collect_statistics = 0
+bool perform_spanwise_average = 1
+
+// monitor info
+int if_monitor = 1 // Monitor some points
+string monitor_file = input/monitor_points.txt
+array string monitor_var {
+    density u   v  w  pressure temperature H2 O2 N2
+}

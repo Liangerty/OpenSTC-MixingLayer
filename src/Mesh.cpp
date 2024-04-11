@@ -668,7 +668,7 @@ const cfd::Block &cfd::Mesh::operator[](const size_t i) const {
 }
 
 void cfd::Mesh::read_grid(const integer myid, const Parameter &parameter) {
-  std::ifstream grd(fmt::format("./input_files/grid/grid{:>4}.grd", myid), std::ios::in);
+  std::ifstream grd(fmt::format("./input/grid/grid{:>4}.grd", myid), std::ios::in);
   std::string input;
   std::getline(grd, input);
   n_block = std::stoi(input); //	Read number of grid blocks
@@ -757,7 +757,7 @@ void cfd::Mesh::read_grid(const integer myid, const Parameter &parameter) {
 }
 
 void cfd::Mesh::read_boundary(integer myid/*, const integer ngg*/) {
-  std::ifstream grd(fmt::format("./input_files/boundary_condition/boundary{:>4}.txt", myid), std::ios::in);
+  std::ifstream grd(fmt::format("./input/boundary_condition/boundary{:>4}.txt", myid), std::ios::in);
   std::string input{};
   for (integer blk = 0; blk < n_block; ++blk) {
     std::getline(grd, input);
@@ -779,7 +779,7 @@ void cfd::Mesh::read_boundary(integer myid/*, const integer ngg*/) {
 }
 
 void cfd::Mesh::read_inner_interface(const integer myid/*, integer ngg*/) {
-  std::ifstream grd(fmt::format("./input_files/boundary_condition/inner{:>4}.txt", myid), std::ios::in);
+  std::ifstream grd(fmt::format("./input/boundary_condition/inner{:>4}.txt", myid), std::ios::in);
   std::string input{};
   // Read how many inner faces there are in each block and store them in @n_face.
   std::getline(grd, input);
@@ -813,7 +813,7 @@ void cfd::Mesh::read_inner_interface(const integer myid/*, integer ngg*/) {
 }
 
 void cfd::Mesh::read_parallel_interface(const integer myid/*, integer ngg*/) {
-  std::ifstream grd(fmt::format("./input_files/boundary_condition/parallel{:>4}.txt", myid), std::ios::in);
+  std::ifstream grd(fmt::format("./input/boundary_condition/parallel{:>4}.txt", myid), std::ios::in);
   std::string input{};
   integer blk_num1{0}, tot_face{0};
   //Read block number of the process first to see if it matches the grid file information.

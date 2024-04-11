@@ -11,17 +11,22 @@
 
 namespace cfd {
 
-class MpiParallel;
+template<typename T>
+struct Range{
+  T xs, xe, ys, ye, zs, ze;
+};
 
 class Parameter {
-  std::unordered_map<std::string, integer> int_parameters{};
+  std::unordered_map<std::string, int> int_parameters{};
   std::unordered_map<std::string, real> real_parameters{};
   std::unordered_map<std::string, bool> bool_parameters{};
   std::unordered_map<std::string, std::string> string_parameters{};
   std::unordered_map<std::string, std::vector<int>> int_array{};
   std::unordered_map<std::string, std::vector<real>> real_array{};
   std::unordered_map<std::string, std::vector<std::string>> string_array{};
-  std::unordered_map<std::string, std::map<std::string, std::variant<std::string, integer, real>>> struct_array;
+  std::unordered_map<std::string, std::map<std::string, std::variant<std::string, int, real>>> struct_array;
+  std::unordered_map<std::string, Range<int>> int_range{};
+  std::unordered_map<std::string, Range<real>> real_range{};
 public:
   explicit Parameter(int *argc, char ***argv);
 
@@ -69,7 +74,7 @@ public:
 
   void update_parameter(const std::string &name, const real new_value) { real_parameters[name] = new_value; }
 
-  void update_parameter(const std::string &name, const std::vector<integer> &new_value) { int_array[name] = new_value; }
+  void update_parameter(const std::string &name, const std::vector<int> &new_value) { int_array[name] = new_value; }
 
   void update_parameter(const std::string &name, const std::vector<real> &new_value) { real_array[name] = new_value; }
 
@@ -90,9 +95,12 @@ private:
   void read_one_file(std::ifstream &file);
 
   template<typename T>
-  integer read_line_to_array(std::istringstream &line, std::vector<T> &arr);
+  int read_line_to_array(std::istringstream &line, std::vector<T> &arr);
 
-  static std::map<std::string, std::variant<std::string, integer, real>> read_struct(std::ifstream &file);
+  static std::map<std::string, std::variant<std::string, int, real>> read_struct(std::ifstream &file);
+
+  template<typename T>
+  static std::unordered_map<std::string, Range<T>> read_range(std::ifstream &file);
 
   void setup_default_settings();
 

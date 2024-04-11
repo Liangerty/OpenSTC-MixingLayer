@@ -1,0 +1,3 @@
+           0
+           0
+ imin  imax  jmin  jmax  kmin  kmax   id
