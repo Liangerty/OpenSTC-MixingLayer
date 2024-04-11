@@ -79,7 +79,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
   IOManager<mix_model, turb> ioManager(driver.myid, mesh, field, parameter, driver.spec, 0);
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
 
-  Monitor monitor(parameter, driver.spec);
+  Monitor monitor(parameter, driver.spec, mesh);
   const integer if_monitor{parameter.get_int("if_monitor")};
 
   integer step{parameter.get_int("step")};

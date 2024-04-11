@@ -7,6 +7,7 @@
 namespace cfd {
 
 struct Field;
+class Mesh;
 
 struct DeviceMonitorData {
   integer n_bv{0}, n_sv{0}, n_var{0};
@@ -19,11 +20,13 @@ struct DeviceMonitorData {
 
 class Monitor {
 public:
-  explicit Monitor(const Parameter &parameter, const Species &species);
+  explicit Monitor(const Parameter &parameter, const Species &species, const Mesh& mesh_);
 
   void monitor_point(integer step, real physical_time, std::vector<cfd::Field> &field);
 
   void output_data();
+
+  void output_slices(const Parameter &parameter, std::vector<cfd::Field> &field, int step, real t);
 
   ~Monitor();
 
@@ -41,8 +44,12 @@ private:
   ggxl::Array3DHost<real> mon_var_h;
   DeviceMonitorData *h_ptr, *d_ptr{nullptr};
   std::vector<FILE *> files;
-//  ggxl::Array3D<real> mon_var_d, h_ptr_to_mon_var;
 
+  const Mesh& mesh;
+  int slice_counter{0};
+  int n_iSlice{0};
+  std::vector<int> iSlice, iSliceInBlock;
+  std::vector<int> iSlice_js, iSlice_je, iSlice_ks, iSlice_ke;
 
 private:
   // Utility functions

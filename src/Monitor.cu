@@ -3,12 +3,13 @@
 #include <filesystem>
 #include "Parallel.h"
 #include "Field.h"
+#include "Mesh.h"
+#include "gxl_lib/MyAlgorithm.h"
 
 namespace cfd {
-Monitor::Monitor(const Parameter &parameter, const Species &species) : if_monitor{parameter.get_int("if_monitor")},
-                                                                       output_file{parameter.get_int("output_file")},
-                                                                       n_block{parameter.get_int("n_block")},
-                                                                       n_point(n_block, 0) {
+Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh &mesh_) : if_monitor{
+    parameter.get_int("if_monitor")}, output_file{parameter.get_int("output_file")}, n_block{
+    parameter.get_int("n_block")}, n_point(n_block, 0), mesh(mesh_) {
   if (!if_monitor) {
     return;
   }
@@ -91,7 +92,8 @@ Monitor::Monitor(const Parameter &parameter, const Species &species) : if_monito
   files.resize(n_point_total, nullptr);
   for (integer l = 0; l < n_point_total; ++l) {
     std::string file_name{
-        "/monitor_" + std::to_string(myid) + '_' + std::to_string(bs_h[l]) + '_' + std::to_string(is_h[l]) + '_' + std::to_string(js_h[l]) + '_' +
+        "/monitor_" + std::to_string(myid) + '_' + std::to_string(bs_h[l]) + '_' + std::to_string(is_h[l]) + '_' +
+        std::to_string(js_h[l]) + '_' +
         std::to_string(ks_h[l]) + ".dat"};
     std::filesystem::path whole_name_path{out_dir.string() + file_name};
     if (!exists(whole_name_path)) {
@@ -103,6 +105,126 @@ Monitor::Monitor(const Parameter &parameter, const Species &species) : if_monito
       fprintf(files[l], "time\n");
     } else {
       files[l] = fopen(whole_name_path.string().c_str(), "a");
+    }
+  }
+
+  // For slices.
+  const int n_proc{parameter.get_int("n_proc")};
+  auto xSlice = parameter.get_real_array("xSlice");
+  // Here, we assume the points with the same i index have the same x coordinate.
+  if (!xSlice.empty()) {
+    const real gridScale{parameter.get_real("gridScale")};
+    auto distance_smallest = new real[n_proc];
+    for (auto xThis: xSlice) {
+      int iThis{0}, bThis{0};
+      real dist{1e+6};
+      real xx = xThis * parameter.get_real("gridScale");
+      for (int b = 0; b < n_block; ++b) {
+        auto &x = mesh[b].x;
+        for (int i = 0; i < mesh[b].mx; ++i) {
+          if (abs(xx - x(i, 0, 0)) < dist) {
+            dist = abs(xx - x(i, 0, 0));
+            iThis = i;
+            bThis = b;
+          }
+        }
+      }
+      // We have found the nearest block and i index to the slice in current process.
+      // Next, we need to communicate among all processes to find the nearest.
+      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Allgather(&dist, 1, MPI_REAL, distance_smallest, 1, MPI_REAL, MPI_COMM_WORLD);
+      bool this_smallest{true};
+      for (int p = 0; p < n_proc; ++p) {
+        if (p == myid)
+          continue;
+        if (distance_smallest[p] < dist) {
+          this_smallest = false;
+          break;
+        }
+      }
+      if (this_smallest) {
+        iSlice.push_back(iThis);
+        iSliceInBlock.push_back(bThis);
+        ++n_iSlice;
+        printf("Process %d monitors block %d, iSlice %d with x = %f.\n", myid, bThis, iThis, xx);
+      }
+    }
+    delete[] distance_smallest;
+
+    // If the slice is found, we need to monitor the slice.
+    if (n_iSlice > 0) {
+      auto core_range{parameter.get_real_range("coreRegion")};
+      Range<real> core_region{core_range.xs * gridScale, core_range.xe * gridScale,
+                              core_range.ys * gridScale, core_range.ye * gridScale,
+                              core_range.zs * gridScale, core_range.ze * gridScale};
+      int MY{1}, MZ{1};
+      for (int s = 0; s < n_iSlice; ++s) {
+        // We need to find the region excluding the buffer layers.
+        int i = iSlice[s];
+        const auto &b = mesh[iSliceInBlock[s]];
+        MY = std::max(b.my, MY);
+        MZ = std::max(b.mz, MZ);
+
+        int js = 0, je = b.my - 1, ks = 0, ke = b.mz - 1;
+        int jd = 1, kd = 1;
+        if (b.y(i, 0, 0) > b.y(i, 1, 0))
+          jd = -1;
+        if (b.z(i, 0, 0) > b.z(i, 0, 1))
+          kd = -1;
+        for (int j = 0; j < b.my; ++j) {
+          for (int k = 0; k < b.mz; ++k) {
+            if (b.y(i, j, k) < core_region.ys) {
+              js = j + jd;
+            }
+            if (b.y(i, j, k) > core_region.ye) {
+              je = j - jd;
+            }
+            if (b.z(i, j, k) < core_region.zs) {
+              ks = k + kd;
+            }
+            if (b.z(i, j, k) > core_region.ze) {
+              ke = k - kd;
+            }
+          }
+        }
+        if (mesh.dimension == 2) {
+          ks = 0;
+          ke = 0;
+        }
+        iSlice_js.push_back(js);
+        iSlice_je.push_back(je);
+        iSlice_ks.push_back(ks);
+        iSlice_ke.push_back(ke);
+        // Here, we should first output the slices' coordinates.
+        MPI_File fp;
+        char file_name[1024];
+        sprintf(file_name, "%s/xSlice_%f_coordinates.bin", out_dir.string().c_str(),
+                b.x(iSlice[s], 0, 0) / parameter.get_real("gridScale"));
+        MPI_File_open(MPI_COMM_WORLD, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
+        MPI_Status status;
+        MPI_Offset offset{0};
+        const auto ny{je - js + 1}, nz{ke - ks + 1};
+        int nnv=parameter.get_int("n_var") + 1;
+        MPI_File_write_at(fp, offset, &nnv, 1, MPI_INT, &status);
+        offset += 4;
+        MPI_File_write_at(fp, offset, &ny, 1, MPI_INT, &status);
+        offset += 4;
+        MPI_File_write_at(fp, offset, &nz, 1, MPI_INT, &status);
+        offset += 4;
+
+        MPI_Datatype ty;
+        int l_size[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
+        int small_size[3]{1, ny, nz};
+        const auto mem_sz = ny * nz * 8;
+        integer start_idx[3]{b.ngg + iSlice[s], b.ngg + iSlice_js[s], b.ngg + iSlice_ks[s]};
+        MPI_Type_create_subarray(3, l_size, small_size, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+        MPI_Type_commit(&ty);
+        MPI_File_write_at(fp, offset, b.y.data(), 1, ty, &status);
+        offset += mem_sz;
+        MPI_File_write_at(fp, offset, b.z.data(), 1, ty, &status);
+        offset += mem_sz;
+        MPI_File_close(&fp);
+      }
     }
   }
 }
@@ -222,6 +344,69 @@ void Monitor::output_data() {
     }
   }
   counter_step = 0;
+}
+
+void Monitor::output_slices(const Parameter &parameter, std::vector<cfd::Field> &field, int step, real t) {
+  if (n_iSlice <= 0) {
+    return;
+  }
+  std::vector<int> blk_read{};
+  const std::filesystem::path out_dir("output/monitor");
+  for (int s = 0; s < n_iSlice; ++s) {
+    auto blk = iSliceInBlock[s];
+    const auto &b = mesh[iSliceInBlock[s]];
+    const int64_t size = (b.mx + 2 * b.ngg) * (b.my + 2 * b.ngg) * (b.mz + 2 * b.ngg);
+    auto &f = field[blk];
+    if (!gxl::exists(blk_read, blk)) {
+      cudaMemcpy(f.bv.data(), f.h_ptr->bv.data(), sizeof(real) * size * 6, cudaMemcpyDeviceToHost);
+      cudaMemcpy(f.sv.data(), f.h_ptr->sv.data(), sizeof(real) * size * parameter.get_int("n_scalar"),
+                 cudaMemcpyDeviceToHost);
+      blk_read.push_back(blk);
+    }
+
+    MPI_Datatype ty;
+    int l_size[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
+    auto ny{iSlice_je[s] - iSlice_js[s] + 1}, nz{iSlice_ke[s] - iSlice_ks[s] + 1};
+    int small_size[3]{1, ny, nz};
+    const auto mem_sz = ny * nz * 8;
+    integer start_idx[3]{b.ngg + iSlice[s], b.ngg + iSlice_js[s], b.ngg + iSlice_ks[s]};
+    MPI_Type_create_subarray(3, l_size, small_size, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+    MPI_Type_commit(&ty);
+
+    MPI_File fp;
+    char file_name[1024];
+    sprintf(file_name, "%s/xSlice_%f_%d_t=%e.bin", out_dir.string().c_str(),
+            b.x(iSlice[s], 0, 0) / parameter.get_real("gridScale"), slice_counter, t);
+    MPI_File_open(MPI_COMM_WORLD, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
+    MPI_Status status;
+    MPI_Offset offset{0};
+    MPI_File_write_at(fp, offset, &t, 1, MPI_DOUBLE, &status);
+    offset += 8;
+    MPI_File_write_at(fp, offset, &parameter.get_int("n_var") + 1, 1, MPI_INT, &status);
+    offset += 4;
+    MPI_File_write_at(fp, offset, &ny, 1, MPI_INT, &status);
+    offset += 4;
+    MPI_File_write_at(fp, offset, &nz, 1, MPI_INT, &status);
+    offset += 4;
+    MPI_File_write_at(fp, offset, f.bv[0], 1, ty, &status);
+    offset += mem_sz;
+    MPI_File_write_at(fp, offset, f.bv[1], 1, ty, &status);
+    offset += mem_sz;
+    MPI_File_write_at(fp, offset, f.bv[2], 1, ty, &status);
+    offset += mem_sz;
+    MPI_File_write_at(fp, offset, f.bv[3], 1, ty, &status);
+    offset += mem_sz;
+    MPI_File_write_at(fp, offset, f.bv[4], 1, ty, &status);
+    offset += mem_sz;
+    MPI_File_write_at(fp, offset, f.bv[5], 1, ty, &status);
+    offset += mem_sz;
+    for (int l = 0; l < parameter.get_int("n_scalar"); ++l) {
+      MPI_File_write_at(fp, offset, f.sv[l], 1, ty, &status);
+      offset += mem_sz;
+    }
+    MPI_File_close(&fp);
+  }
+  ++slice_counter;
 }
 
 __global__ void

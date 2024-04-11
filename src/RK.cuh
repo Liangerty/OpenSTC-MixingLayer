@@ -57,7 +57,7 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
   IOManager<mix_model, turb> ioManager(driver.myid, mesh, field, parameter, driver.spec, 0);
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
 
-  Monitor monitor(parameter, driver.spec);
+  Monitor monitor(parameter, driver.spec, mesh);
   const integer if_monitor{parameter.get_int("if_monitor")};
 
   integer step{parameter.get_int("step")};
@@ -104,7 +104,7 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
 
     // Rk inner iteration
     for (integer rk = 0; rk < 3; ++rk) {
-      for (auto b = 0; b < n_block; ++b){
+      for (auto b = 0; b < n_block; ++b) {
         // Set dq to 0
         cudaMemset(field[b].h_ptr->dq.data(), 0, field[b].h_ptr->dq.size() * n_var * sizeof(real));
 
@@ -185,6 +185,9 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
     }
     if (if_monitor) {
       monitor.monitor_point(step, physical_time, field);
+      if (step % parameter.get_int("slice_frequency") == 0) {
+        monitor.output_slices(parameter, field, step, physical_time);
+      }
     }
     if (if_collect_statistics && step > collect_statistics_iter_start) {
       statistics_collector.template collect_data<mix_model, turb>(param);

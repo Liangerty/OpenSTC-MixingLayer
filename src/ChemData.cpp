@@ -461,7 +461,7 @@ integer cfd::Species::is_polar(real dipole_moment) {
   return dipole_moment == 0 ? 0 : 1;
 }
 
-real cfd::Species::compute_xi(integer j, integer k, real *dipole_moment, real *sigma, real *eps_kb, real *alpha) {
+real cfd::Species::compute_xi(integer j, integer k, real *dipole_moment, real *sigma, real *eps_kb, const real *alpha) {
   // labels for n(non-polar), p(polar)
   integer n{0}, p{0};
   if (is_polar(dipole_moment[j])) {
@@ -478,7 +478,7 @@ real cfd::Species::compute_xi(integer j, integer k, real *dipole_moment, real *s
   return xi;
 }
 
-real cfd::Species::compute_reduced_dipole_moment(integer i, real *dipole_moment, real *eps_kb, real *sigma) {
+real cfd::Species::compute_reduced_dipole_moment(integer i, real *dipole_moment, const real *eps_kb, const real *sigma) {
   if (!is_polar(dipole_moment[i])) {
     return 0;
   }

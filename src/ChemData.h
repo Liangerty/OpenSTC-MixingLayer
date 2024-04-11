@@ -44,9 +44,9 @@ private:
 
   static integer is_polar(real dipole_moment);
 
-  real compute_xi(integer j, integer k, real *dipole_moment, real *sigma, real *eps_kb, real *alpha);
+  real compute_xi(integer j, integer k, real *dipole_moment, real *sigma, real *eps_kb, const real *alpha);
 
-  real compute_reduced_dipole_moment(integer i, real *dipole_moment, real *eps_kb, real *sigma);
+  real compute_reduced_dipole_moment(integer i, real *dipole_moment, const real *eps_kb, const real *sigma);
 };
 
 struct Reaction {

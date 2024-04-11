@@ -12,7 +12,7 @@
 namespace cfd {
 
 template<typename T>
-struct Range{
+struct Range {
   T xs, xe, ys, ye, zs, ze;
 };
 
@@ -67,6 +67,8 @@ public:
   [[nodiscard]] const auto &get_real_array(const std::string &name) const { return real_array.at(name); }
 
   [[nodiscard]] const auto &get_int_array(const std::string &name) const { return int_array.at(name); }
+
+  [[nodiscard]] const auto &get_real_range(const std::string &name) const { return real_range.at(name); }
 
   [[nodiscard]] bool has_int_array(const std::string &name) const { return int_array.find(name) != int_array.end(); }
 
