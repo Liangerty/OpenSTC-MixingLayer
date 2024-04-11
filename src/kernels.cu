@@ -1,7 +1,9 @@
+#include "kernels.cuh"
 #include "Parallel.h"
 #include <cstdio>
 
-void cfd::MpiParallel::setup_gpu_device() const {
+namespace cfd{
+void setup_gpu_device(int n_proc, int myid) {
   int deviceCount{0};
   cudaGetDeviceCount(&deviceCount);
 
@@ -9,11 +11,12 @@ void cfd::MpiParallel::setup_gpu_device() const {
     printf("Not enough GPU devices.\n"
            "We want %d GPUs but only %d GPUs are available.\n"
            " Stop computing.\n", n_proc, deviceCount);
-    exit();
+    MpiParallel::exit();
   }
 
   cudaDeviceProp prop{};
-  cudaGetDeviceProperties(&prop,my_id);
-  cudaSetDevice(my_id);
-  printf("Process %d will compute on device %s.\n", my_id, prop.name);
+  cudaGetDeviceProperties(&prop, myid);
+  cudaSetDevice(myid);
+  printf("Process %d will compute on device %s.\n", myid, prop.name);
+}
 }

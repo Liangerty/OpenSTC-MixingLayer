@@ -23,7 +23,7 @@ class Parameter {
   std::unordered_map<std::string, std::vector<std::string>> string_array{};
   std::unordered_map<std::string, std::map<std::string, std::variant<std::string, integer, real>>> struct_array;
 public:
-  explicit Parameter(const MpiParallel &mpi_parallel);
+  explicit Parameter(int *argc, char ***argv);
 
   explicit Parameter(const std::string &filename);
 
@@ -79,19 +79,8 @@ public:
   ~Parameter() = default;
 
 private:
-  const std::array<std::string, 12> file_names{
-      "./input_files/setup/default_settings.txt",
-      "./input_files/setup/0_global_control.txt",   //basic information about the simulation
-      "./input_files/setup/1_grid_information.txt", //the information about grid
-      "./input_files/setup/2_scheme.txt",
-      "./input_files/setup/3_species_reactions.txt",
-      "./input_files/setup/4_laminar_turbulent.txt",
-      "./input_files/setup/5_boundary_condition.txt",
-      "./input_files/setup/6_post_process.txt",
-      "./input_files/setup/7_output_control.txt",
-      "./input_files/setup/8_initialization.txt",
-      "./input_files/setup/9_transport_property.txt",
-      "./input_files/setup/10_statistics.txt"
+  const std::array<std::string, 1> file_names{
+      "./input/setup.txt"
   };
 
   void read_param_from_file();
@@ -105,7 +94,9 @@ private:
 
   static std::map<std::string, std::variant<std::string, integer, real>> read_struct(std::ifstream &file);
 
-  void setup_default_settings(const MpiParallel &mpi_parallel);
+  void setup_default_settings();
+
+  void diagnose_parallel_info();
 };
 
 }

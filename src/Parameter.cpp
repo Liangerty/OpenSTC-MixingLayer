@@ -1,13 +1,23 @@
 #include "Parameter.h"
 #include <fstream>
 #include <sstream>
-#include "Parallel.h"
 #include <filesystem>
 #include "gxl_lib/MyString.h"
+#include <fmt/format.h>
+#include "kernels.cuh"
 
-cfd::Parameter::Parameter(const MpiParallel &mpi_parallel) {
-  setup_default_settings(mpi_parallel);
+cfd::Parameter::Parameter(int *argc, char ***argv) {
+  int myid, n_proc;
+  MPI_Init(argc, argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+  MPI_Comm_size(MPI_COMM_WORLD, &n_proc);
+  int_parameters["myid"] = myid;
+  int_parameters["n_proc"] = n_proc;
+
+  setup_default_settings();
   read_param_from_file();
+  diagnose_parallel_info();
+  setup_gpu_device(n_proc, myid);
 }
 
 cfd::Parameter::Parameter(const std::string &filename) {
@@ -207,21 +217,40 @@ void cfd::Parameter::deduce_known_info() {
 //  update_parameter("inviscid_tag", inviscid_tag);
   update_parameter("inviscid_type", inviscid_type);
 
-  if (int_parameters["temporal_scheme"]==3){
+  if (int_parameters["temporal_scheme"] == 3) {
     // RK-3, the chemical source should be treated explicitly.
     update_parameter("chemSrcMethod", 0);
   }
 }
 
-void cfd::Parameter::setup_default_settings(const MpiParallel &mpi_parallel) {
+void cfd::Parameter::setup_default_settings() {
   int_parameters["problem_type"] = 0;
-  int_parameters["myid"] = mpi_parallel.my_id;
-  int_parameters["n_proc"] = mpi_parallel.n_proc;
-  bool_parameters["parallel"] = cfd::MpiParallel::parallel;
   int_parameters["n_profile"] = 0;
   int_parameters["n_inflow_fluctuation"] = 0;
   int_array["need_rng"] = {};
   bool_parameters["perform_spanwise_average"] = false;
   int_parameters["if_compute_wall_distance"] = 0;
   bool_parameters["positive_preserving"] = false;
+}
+
+void cfd::Parameter::diagnose_parallel_info() {
+  if (int_parameters["myid"] == 0) {
+    const bool parallel = bool_parameters["parallel"];
+    const int n_proc = int_parameters["n_proc"];
+    if (parallel) {
+      if (n_proc == 1) {
+        fmt::print("You chose parallel computation, but the number of processes is equal to 1.\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+      }
+      fmt::print("Parallel computation chosen! Number of processes: {}. \n", n_proc);
+    } else {
+      if (n_proc > 1) {
+        fmt::print("You chose serial computation, but the number of processes is not equal to 1, n_proc={}.\n",
+                   n_proc);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+      }
+      fmt::print("Serial computation chosen!\n");
+    }
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
 }

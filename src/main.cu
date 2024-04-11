@@ -1,5 +1,4 @@
 ﻿#include <cstdio>
-#include "Parallel.h"
 #include "Parameter.h"
 #include "Mesh.h"
 #include "Driver.cuh"
@@ -7,9 +6,7 @@
 #include "SST.cuh"
 
 int main(int argc, char *argv[]) {
-  cfd::MpiParallel mpi_parallel(&argc, &argv);
-
-  cfd::Parameter parameter(mpi_parallel);
+  cfd::Parameter parameter(&argc, &argv);
 
   cfd::Mesh mesh(parameter);
 
