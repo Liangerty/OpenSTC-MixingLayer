@@ -262,6 +262,7 @@ void cfd::Parameter::deduce_known_info() {
 void cfd::Parameter::setup_default_settings() {
   int_parameters["problem_type"] = 0;
 
+  int_parameters["mesh_file_type"] = 0;
   real_parameters["gridScale"] = 1.0;
   int_parameters["if_compute_wall_distance"] = 0;
 

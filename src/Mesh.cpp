@@ -668,51 +668,62 @@ const cfd::Block &cfd::Mesh::operator[](const size_t i) const {
 }
 
 void cfd::Mesh::read_grid(const integer myid, const Parameter &parameter) {
-  std::ifstream grd(fmt::format("./input/grid/grid{:>4}.grd", myid), std::ios::in);
-  std::string input;
-  std::getline(grd, input);
-  n_block = std::stoi(input); //	Read number of grid blocks
-  for (integer i = 0; i < n_block; ++i) {
-    //	Read grid number in three directions of each block
+  if (parameter.get_int("mesh_file_type") == 1) {
+    // This is a binary plot3d file(not treated by readGrid preprocessor), we need to read it and get its info on our own.
+    // Not implemented.
+    auto file_name = "./input/"+parameter.get_string("mesh_prefix")+".dat";
+    MPI_File file;
+    MPI_File_open(MPI_COMM_WORLD, file_name.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &file);
+    MPI_File_close(&file);
+  } else {
+    // mesh_file_type == 0: the default method, which reads the file from readGrid preprocessor.
+    std::ifstream grd(fmt::format("./input/grid/grid{:>4}.grd", myid), std::ios::in);
+    std::string input;
     std::getline(grd, input);
-    std::istringstream line(input);
-    integer mx = 0, my = 0, mz = 0;
-    line >> mx >> my >> mz;
-    block.emplace_back(mx, my, mz, ngg, i, parameter);
-  }
-  if (block[0].mz == 1) {
-    dimension = 2;
-  }
-  block.shrink_to_fit();
-  n_grid = 0;
-  for (auto &i: block) {
-    n_grid += i.n_grid;
-  } //compute the total grid number in this process
-  for (integer blk = 0; blk < n_block; ++blk) {
-    //read grid coordinates
-    for (integer k = 0; k < block[blk].mz; ++k) {
-      for (integer j = 0; j < block[blk].my; ++j) {
-        for (integer i = 0; i < block[blk].mx; ++i) {
-          grd >> block[blk].x(i, j, k);
+    n_block = std::stoi(input); //	Read number of grid blocks
+    for (integer i = 0; i < n_block; ++i) {
+      //	Read grid number in three directions of each block
+      std::getline(grd, input);
+      std::istringstream line(input);
+      integer mx = 0, my = 0, mz = 0;
+      line >> mx >> my >> mz;
+      block.emplace_back(mx, my, mz, ngg, i, parameter);
+    }
+    if (block[0].mz == 1) {
+      dimension = 2;
+    }
+    block.shrink_to_fit();
+    n_grid = 0;
+    for (auto &i: block) {
+      n_grid += i.n_grid;
+    } //compute the total grid number in this process
+    for (integer blk = 0; blk < n_block; ++blk) {
+      //read grid coordinates
+      for (integer k = 0; k < block[blk].mz; ++k) {
+        for (integer j = 0; j < block[blk].my; ++j) {
+          for (integer i = 0; i < block[blk].mx; ++i) {
+            grd >> block[blk].x(i, j, k);
+          }
+        }
+      }
+      for (integer k = 0; k < block[blk].mz; ++k) {
+        for (integer j = 0; j < block[blk].my; ++j) {
+          for (integer i = 0; i < block[blk].mx; ++i) {
+            grd >> block[blk].y(i, j, k);
+          }
+        }
+      }
+      for (integer k = 0; k < block[blk].mz; ++k) {
+        for (integer j = 0; j < block[blk].my; ++j) {
+          for (integer i = 0; i < block[blk].mx; ++i) {
+            grd >> block[blk].z(i, j, k);
+          }
         }
       }
     }
-    for (integer k = 0; k < block[blk].mz; ++k) {
-      for (integer j = 0; j < block[blk].my; ++j) {
-        for (integer i = 0; i < block[blk].mx; ++i) {
-          grd >> block[blk].y(i, j, k);
-        }
-      }
-    }
-    for (integer k = 0; k < block[blk].mz; ++k) {
-      for (integer j = 0; j < block[blk].my; ++j) {
-        for (integer i = 0; i < block[blk].mx; ++i) {
-          grd >> block[blk].z(i, j, k);
-        }
-      }
-    }
+    grd.close();
   }
-  grd.close();
+
   fmt::print("Grid number in process {} is {}.\n", myid, n_grid);
   MPI_Barrier(MPI_COMM_WORLD);
   //Sum grid number in all processes to the root process
