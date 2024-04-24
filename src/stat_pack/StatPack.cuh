@@ -8,7 +8,47 @@ namespace cfd {
 struct DZone;
 struct DParameter;
 
-struct mixtureFractionMixingLayer{
+struct ThermRMS {
+  static constexpr integer n_collect = 3;
+  static constexpr std::array<std::string_view, n_collect> namelistCollect{"rho2", "p2", "T2"};
+  static constexpr integer n_stat = 3;
+  static constexpr std::array<std::string_view, n_stat> namelistStat{"rho<sub>rms</sub>", "p<sub>rms</sub>",
+                                                                     "T<sub>rms</sub>"};
+
+  __device__ static void
+  collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k, integer collect_idx);
+
+  __device__ static void
+  compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j, integer k,
+          integer counter, integer stat_idx, integer collected_idx);
+
+  __device__ static void
+  compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j,
+                           integer mz,
+                           integer counter, integer stat_idx, integer collected_idx);
+
+};
+
+struct StrainRateSquared {
+  static constexpr integer n_collect = 1;
+  static constexpr std::array<std::string_view, n_collect> namelistCollect{"SijSij"};
+  static constexpr integer n_stat = 1;
+  static constexpr std::array<std::string_view, n_stat> namelistStat{"<S_ij S_ij>_F"};
+
+  __device__ static void
+  collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k, integer collect_idx);
+
+  __device__ static void
+  compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j, integer k,
+          integer counter, integer stat_idx, integer collected_idx);
+
+  __device__ static void
+  compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j,
+                           integer mz,
+                           integer counter, integer stat_idx, integer collected_idx);
+};
+
+struct mixtureFractionMixingLayer {
   static constexpr integer n_collect = 1;
   static constexpr std::array<std::string_view, n_collect> namelistCollect{"Z"};
   static constexpr integer n_stat = 1;
@@ -22,8 +62,9 @@ struct mixtureFractionMixingLayer{
           integer counter, integer stat_idx, integer collected_idx);
 
   __device__ static void
-  compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j, integer k,
-          integer counter, integer stat_idx, integer collected_idx);
+  compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j,
+                           integer mz,
+                           integer counter, integer stat_idx, integer collected_idx);
 };
 
 struct turbulent_dissipation_rate {
@@ -43,8 +84,9 @@ struct turbulent_dissipation_rate {
           integer counter, integer stat_idx, integer collected_idx);
 
   __device__ static void
-  compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j, integer k,
-          integer counter, integer stat_idx, integer collected_idx);
+  compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j,
+                           integer mz,
+                           integer counter, integer stat_idx, integer collected_idx);
 };
 
 struct velFluc_scalarFluc_correlation {

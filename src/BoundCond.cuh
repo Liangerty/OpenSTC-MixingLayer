@@ -260,6 +260,8 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
         real rms = inflow->fluctuation_intensity;
 
         u += curand_normal_double(&rng_state) * rms * vel;
+//        v += curand_normal_double(&rng_state) * rms * vel;
+//        w += curand_normal_double(&rng_state) * rms * vel;
         vel = sqrt(u * u + v * v + w * w);
       }
     }

@@ -241,4 +241,101 @@ __device__ void turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone 
   stat(i, j, 0, stat_idx) = add / mz;
   stat(i, j, 0, stat_idx + 1) = add_kolmogorov / mz;
 }
+
+__device__ void StrainRateSquared::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k,
+                                           integer collect_idx) {
+  auto &collect = zone->userCollectForStat;
+  const auto &bv = zone->bv;
+
+  const auto &m = zone->metric(i, j, k);
+  const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
+  const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
+  const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
+  const real u_x = 0.5 * (xi_x * (bv(i + 1, j, k, 1) - bv(i - 1, j, k, 1)) +
+                          eta_x * (bv(i, j + 1, k, 1) - bv(i, j - 1, k, 1)) +
+                          zeta_x * (bv(i, j, k + 1, 1) - bv(i, j, k - 1, 1)));
+  const real u_y = 0.5 * (xi_y * (bv(i + 1, j, k, 1) - bv(i - 1, j, k, 1)) +
+                          eta_y * (bv(i, j + 1, k, 1) - bv(i, j - 1, k, 1)) +
+                          zeta_y * (bv(i, j, k + 1, 1) - bv(i, j, k - 1, 1)));
+  const real u_z = 0.5 * (xi_z * (bv(i + 1, j, k, 1) - bv(i - 1, j, k, 1)) +
+                          eta_z * (bv(i, j + 1, k, 1) - bv(i, j - 1, k, 1)) +
+                          zeta_z * (bv(i, j, k + 1, 1) - bv(i, j, k - 1, 1)));
+  const real v_x = 0.5 * (xi_x * (bv(i + 1, j, k, 2) - bv(i - 1, j, k, 2)) +
+                          eta_x * (bv(i, j + 1, k, 2) - bv(i, j - 1, k, 2)) +
+                          zeta_x * (bv(i, j, k + 1, 2) - bv(i, j, k - 1, 2)));
+  const real v_y = 0.5 * (xi_y * (bv(i + 1, j, k, 2) - bv(i - 1, j, k, 2)) +
+                          eta_y * (bv(i, j + 1, k, 2) - bv(i, j - 1, k, 2)) +
+                          zeta_y * (bv(i, j, k + 1, 2) - bv(i, j, k - 1, 2)));
+  const real v_z = 0.5 * (xi_z * (bv(i + 1, j, k, 2) - bv(i - 1, j, k, 2)) +
+                          eta_z * (bv(i, j + 1, k, 2) - bv(i, j - 1, k, 2)) +
+                          zeta_z * (bv(i, j, k + 1, 2) - bv(i, j, k - 1, 2)));
+  const real w_x = 0.5 * (xi_x * (bv(i + 1, j, k, 3) - bv(i - 1, j, k, 3)) +
+                          eta_x * (bv(i, j + 1, k, 3) - bv(i, j - 1, k, 3)) +
+                          zeta_x * (bv(i, j, k + 1, 3) - bv(i, j, k - 1, 3)));
+  const real w_y = 0.5 * (xi_y * (bv(i + 1, j, k, 3) - bv(i - 1, j, k, 3)) +
+                          eta_y * (bv(i, j + 1, k, 3) - bv(i, j - 1, k, 3)) +
+                          zeta_y * (bv(i, j, k + 1, 3) - bv(i, j, k - 1, 3)));
+  const real w_z = 0.5 * (xi_z * (bv(i + 1, j, k, 3) - bv(i - 1, j, k, 3)) +
+                          eta_z * (bv(i, j + 1, k, 3) - bv(i, j - 1, k, 3)) +
+                          zeta_z * (bv(i, j, k + 1, 3) - bv(i, j, k - 1, 3)));
+  const real S12 = 0.5 * (u_y + v_x);
+  const real S13 = 0.5 * (u_z + w_x);
+  const real S23 = 0.5 * (v_z + w_y);
+  collect(i, j, k, collect_idx) += u_x * u_x + v_y * v_y + w_z * w_z + 2 * S12 * S12 + 2 * S13 * S13 + 2 * S23 * S23;
+}
+
+__device__ void
+StrainRateSquared::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud,
+                                            integer i, integer j, integer k, integer counter, integer stat_idx,
+                                            integer collected_idx) {
+}
+
+__device__ void
+StrainRateSquared::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j,
+                           integer k, integer counter, integer stat_idx, integer collected_idx) {
+
+}
+
+__device__ void
+ThermRMS::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k, integer collect_idx) {
+  auto &collect = zone->userCollectForStat;
+  const auto &bv = zone->bv;
+
+  collect(i, j, k, collect_idx) += bv(i, j, k, 0) * bv(i, j, k, 0);
+  collect(i, j, k, collect_idx + 1) += bv(i, j, k, 4) * bv(i, j, k, 4);
+  collect(i, j, k, collect_idx + 2) += bv(i, j, k, 0) * bv(i, j, k, 5) * bv(i, j, k, 5);
+}
+
+__device__ void
+ThermRMS::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i,
+                                   integer j, integer mz, integer counter, integer stat_idx, integer collected_idx) {
+  auto &stat = zone->user_defined_statistical_data;
+  auto &collect = zone->userCollectForStat;
+  auto &firstOrderMoment = zone->firstOrderMoment;
+
+  const real counter_inv{1.0 / counter};
+  real add_rho{0}, add_p{0}, add_T{0};
+  for (int k = 0; k < mz; ++k) {
+    add_rho += collect(i, j, k, collected_idx) * counter_inv;
+    add_p += collect(i, j, k, collected_idx + 1) * counter_inv;
+    add_T += collect(i, j, k, collected_idx + 2) / firstOrderMoment(i, j, k, 0);
+  }
+  auto &mean = zone->mean_value;
+  stat(i, j, 0, stat_idx) = add_rho / mz - mean(i, j, 0, 0) * mean(i, j, 0, 0);
+  stat(i, j, 0, stat_idx + 1) = add_p / mz - mean(i, j, 0, 4) * mean(i, j, 0, 4);
+  stat(i, j, 0, stat_idx + 2) = add_T / mz - mean(i, j, 0, 5) * mean(i, j, 0, 5);
+}
+
+__device__ void
+ThermRMS::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j, integer k,
+                  integer counter, integer stat_idx, integer collected_idx) {
+  auto &stat = zone->user_defined_statistical_data;
+  auto &collect = zone->userCollectForStat;
+  const real counter_inv{1.0 / counter};
+  auto &mean = zone->mean_value;
+  stat(i, j, k, stat_idx) = collect(i, j, k, collected_idx) * counter_inv - mean(i, j, k, 0) * mean(i, j, k, 0);
+  stat(i, j, k, stat_idx + 1) = collect(i, j, k, collected_idx + 1) * counter_inv - mean(i, j, k, 4) * mean(i, j, k, 4);
+  stat(i, j, k, stat_idx + 2) =
+      collect(i, j, k, collected_idx + 2) * counter_inv / mean(i, j, k, 0) - mean(i, j, k, 5) * mean(i, j, k, 5);
+}
 }
