@@ -37,7 +37,7 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.
     // Should be done after knowing the order of species.
-    for (auto [name, idx]: species.spec_list) {
+    for (const auto& [name, idx]: species.spec_list) {
       if (upper.find(name) != upper.cend()) {
         yk_upper[idx] = std::get<real>(upper.at(name));
       }
