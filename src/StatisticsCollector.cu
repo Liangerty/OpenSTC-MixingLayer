@@ -471,9 +471,9 @@ __global__ void compute_statistical_data(DZone *zone, DParameter *param, integer
 
   auto &rey_tensor = zone->reynolds_stress_tensor;
   auto &vel2ndMoment = zone->velocity2ndMoment;
-  rey_tensor(i, j, k, 0) = vel2ndMoment(i, j, k, 0) * den - mean(i, j, k, 1) * mean(i, j, k, 1);
-  rey_tensor(i, j, k, 1) = vel2ndMoment(i, j, k, 1) * den - mean(i, j, k, 2) * mean(i, j, k, 2);
-  rey_tensor(i, j, k, 2) = vel2ndMoment(i, j, k, 2) * den - mean(i, j, k, 3) * mean(i, j, k, 3);
+  rey_tensor(i, j, k, 0) = max(vel2ndMoment(i, j, k, 0) * den - mean(i, j, k, 1) * mean(i, j, k, 1), 0.0);
+  rey_tensor(i, j, k, 1) = max(vel2ndMoment(i, j, k, 1) * den - mean(i, j, k, 2) * mean(i, j, k, 2), 0.0);
+  rey_tensor(i, j, k, 2) = max(vel2ndMoment(i, j, k, 2) * den - mean(i, j, k, 3) * mean(i, j, k, 3), 0.0);
   rey_tensor(i, j, k, 3) = vel2ndMoment(i, j, k, 3) * den - mean(i, j, k, 1) * mean(i, j, k, 2);
   rey_tensor(i, j, k, 4) = vel2ndMoment(i, j, k, 4) * den - mean(i, j, k, 1) * mean(i, j, k, 3);
   rey_tensor(i, j, k, 5) = vel2ndMoment(i, j, k, 5) * den - mean(i, j, k, 2) * mean(i, j, k, 3);
@@ -520,12 +520,12 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, intege
   for (int k = 0; k < extent[2]; ++k) {
     const auto sumRho{firstOrderStat(i, j, k, 0)};
     const auto sumRho2{sumRho * sumRho};
-    rey_tensor_add[0] +=
-        vel2ndMoment(i, j, k, 0) / sumRho - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 1) / sumRho2;
-    rey_tensor_add[1] +=
-        vel2ndMoment(i, j, k, 1) / sumRho - firstOrderStat(i, j, k, 2) * firstOrderStat(i, j, k, 2) / sumRho2;
-    rey_tensor_add[2] +=
-        vel2ndMoment(i, j, k, 2) / sumRho - firstOrderStat(i, j, k, 3) * firstOrderStat(i, j, k, 3) / sumRho2;
+    rey_tensor_add[0] += max(
+        vel2ndMoment(i, j, k, 0) / sumRho - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 1) / sumRho2, 0.0);
+    rey_tensor_add[1] += max(
+        vel2ndMoment(i, j, k, 1) / sumRho - firstOrderStat(i, j, k, 2) * firstOrderStat(i, j, k, 2) / sumRho2, 0.0);
+    rey_tensor_add[2] += max(
+        vel2ndMoment(i, j, k, 2) / sumRho - firstOrderStat(i, j, k, 3) * firstOrderStat(i, j, k, 3) / sumRho2, 0.0);
     rey_tensor_add[3] +=
         vel2ndMoment(i, j, k, 3) / sumRho - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 2) / sumRho2;
     rey_tensor_add[4] +=
@@ -537,7 +537,8 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, intege
     rey_tensor(i, j, 0, l) = rey_tensor_add[l] / extent[2];
   }
 
-  compute_user_defined_statistical_data_with_spanwise_average<USER_DEFINE_STATISTICS>(zone, param, counter_ud, i, j, extent[2], counter);
+  compute_user_defined_statistical_data_with_spanwise_average<USER_DEFINE_STATISTICS>(zone, param, counter_ud, i, j,
+                                                                                      extent[2], counter);
 }
 
 } // cfd

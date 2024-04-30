@@ -37,7 +37,7 @@ struct Inflow {
   int inflow_type = 0;
 
   // This set is used for inflow_type = 0 (constant inflow).
-  // When inflow_type = 1, this set is used as the upper part.
+  // When inflow_type = 2, this set is used as the upper part.
   real mach = -1;
   real pressure = 101325;
   real temperature = -1;
@@ -51,21 +51,27 @@ struct Inflow {
   real reynolds_number = -1;
   real mixture_fraction = -1;
 
-  // When inflow_type = 1, this set is used as the lower part.
+  // When inflow_type = 2, this set is used as the lower part.
   real p_lower = 101325;
   real t_lower = -1;
   real density_lower = -1;
   real u_lower = 1, v_lower = 0, w_lower = 0;
   real *sv_lower = nullptr;
   real mixture_fraction_lower = -1;
-
-  // When inflow_type = 1, we need the initial vorticity thickness
+  // When inflow_type = 2, we need the initial vorticity thickness
   real delta_omega = -1;
 
   integer profile_idx = 0;
 
+  // The method of fluctuation.
+  // 0 - no fluctuation
+  // 1 - random fluctuation
+  // 2 - profile with real and imaginary part acquired by stability analysis.
   integer fluctuation_type = 0;
+  // If the fluctuation type is 1, this is the intensity of the fluctuation.
   real fluctuation_intensity = 0;
+  // If the fluctuation type is 2, the following parameters should be given.
+  int fluc_prof_idx = 0;
 };
 
 struct Wall {

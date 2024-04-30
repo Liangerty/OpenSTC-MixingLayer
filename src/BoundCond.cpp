@@ -229,6 +229,34 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       if (info.find("fluctuation_intensity") != info.end()) {
         fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
       }
+    } else if (fluctuation_type == 2) {
+      // The fluctuation is given by the profile with real and imaginary parts acquired by stability analysis.
+      // Only perfect gas is supported for now.
+      if (n_spec > 0) {
+        printf("Fluctuation with profile is not supported for multi-species simulation.\n");
+        MpiParallel::exit();
+      }
+      if (parameter.has_int_array("need_fluctuation_profile")) {
+        auto need_fluctuation_profile = parameter.get_int_array("need_fluctuation_profile");
+        if (std::find(need_fluctuation_profile.begin(), need_fluctuation_profile.end(), label) ==
+            need_fluctuation_profile.end()) {
+          need_fluctuation_profile.push_back(label);
+          parameter.update_parameter("need_fluctuation_profile", need_fluctuation_profile);
+          auto fluctuation_file = parameter.get_string_array("fluctuation_profile_file");
+          fluctuation_file.push_back(std::get<std::string>(info.at("fluctuation_file")));
+          parameter.update_parameter("fluctuation_profile_file", fluctuation_file);
+          auto fluctuation_profile_related_bc_name = parameter.get_string_array("fluctuation_profile_related_bc_name");
+          fluctuation_profile_related_bc_name.push_back(inflow_name);
+          parameter.update_parameter("fluctuation_profile_related_bc_name", fluctuation_profile_related_bc_name);
+          fluc_prof_idx = (int)(need_fluctuation_profile.size()) - 1;
+        }
+      } else {
+        parameter.update_parameter("need_fluctuation_profile", std::vector<integer>{label});
+        parameter.update_parameter("fluctuation_profile_file",
+                                   std::vector<std::string>{std::get<std::string>(info.at("fluctuation_file"))});
+        parameter.update_parameter("fluctuation_profile_related_bc_name", std::vector<std::string>{inflow_name});
+        fluc_prof_idx = 0;
+      }
     }
   }
 }

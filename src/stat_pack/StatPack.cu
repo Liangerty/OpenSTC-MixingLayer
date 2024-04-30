@@ -5,161 +5,55 @@
 
 namespace cfd {
 __device__ void
-velFluc_scalarFluc_correlation::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k,
-                                        integer collect_idx) {
-  auto &stat = zone->userCollectForStat;
-  const auto &sv = zone->sv;
-  stat(i, j, k, collect_idx) += zone->bv(i, j, k, 0) * zone->bv(i, j, k, 1) * sv(i, j, k, 0);
-  stat(i, j, k, collect_idx + 1) += zone->bv(i, j, k, 0) * zone->bv(i, j, k, 2) * sv(i, j, k, 0);
-  stat(i, j, k, collect_idx + 2) += zone->bv(i, j, k, 0) * zone->bv(i, j, k, 3) * sv(i, j, k, 0);
+ThermRMS::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k, integer collect_idx) {
+  auto &collect = zone->userCollectForStat;
+  const auto &bv = zone->bv;
+
+  collect(i, j, k, collect_idx) += bv(i, j, k, 0) * bv(i, j, k, 0);
+  collect(i, j, k, collect_idx + 1) += bv(i, j, k, 4) * bv(i, j, k, 4);
+  collect(i, j, k, collect_idx + 2) += bv(i, j, k, 5) * bv(i, j, k, 5);
+  collect(i, j, k, collect_idx + 3) += bv(i, j, k, 5);
 }
 
 __device__ void
-velFluc_scalarFluc_correlation::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud,
-                                        integer i, integer j, integer k, integer counter, integer stat_idx,
-                                        integer collected_idx) {
+ThermRMS::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i,
+                                   integer j, integer mz, integer counter, integer stat_idx, integer collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
-  auto &collected_moments = zone->userCollectForStat;
-  auto &mean = zone->mean_value;
-  stat(i, j, k, stat_idx) =
-      collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] / mean(i, j, k, 0) -
-      mean(i, j, k, 6) * mean(i, j, k, 1);
-  stat(i, j, k, stat_idx + 1) =
-      collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] / mean(i, j, k, 0) -
-      mean(i, j, k, 6) * mean(i, j, k, 2);
-  stat(i, j, k, stat_idx + 2) =
-      collected_moments(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] / mean(i, j, k, 0) -
-      mean(i, j, k, 6) * mean(i, j, k, 3);
-}
-
-__device__ void
-resolved_tke::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j,
-                      integer k, integer counter, integer stat_idx, integer collected_idx) {
-  auto &stat = zone->user_defined_statistical_data;
-  auto &rey_tensor = zone->reynolds_stress_tensor;
-  auto k_res = max(0.5 * (rey_tensor(i, j, k, 0) + rey_tensor(i, j, k, 1) + rey_tensor(i, j, k, 2)), 0.0);
-  stat(i, j, k, stat_idx) = k_res;
-  stat(i, j, k, stat_idx + 1) = k_res / max((k_res + zone->sv(i, j, k, param->n_spec)), 1e-25);
-}
-
-__device__ void
-H2_variance_and_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k,
-                                          integer collect_idx) {
-  auto &stat = zone->userCollectForStat; // There may be mistakes!
-  const auto &sv = zone->sv;
-
-  // Rho*Z*Z
-  stat(i, j, k, collect_idx) += zone->bv(i, j, k, 0) * sv(i, j, k, z_idx) * sv(i, j, k, z_idx);
-  const auto &m = zone->metric(i, j, k);
-  const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
-  const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
-  const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
-  const real z_x = 0.5 * (xi_x * (sv(i + 1, j, k, z_idx) - sv(i - 1, j, k, z_idx)) +
-                          eta_x * (sv(i, j + 1, k, z_idx) - sv(i, j - 1, k, z_idx)) +
-                          zeta_x * (sv(i, j, k + 1, z_idx) - sv(i, j, k - 1, z_idx)));
-  const real z_y = 0.5 * (xi_y * (sv(i + 1, j, k, z_idx) - sv(i - 1, j, k, z_idx)) +
-                          eta_y * (sv(i, j + 1, k, z_idx) - sv(i, j - 1, k, z_idx)) +
-                          zeta_y * (sv(i, j, k + 1, z_idx) - sv(i, j, k - 1, z_idx)));
-  const real z_z = 0.5 * (xi_z * (sv(i + 1, j, k, z_idx) - sv(i - 1, j, k, z_idx)) +
-                          eta_z * (sv(i, j + 1, k, z_idx) - sv(i, j - 1, k, z_idx)) +
-                          zeta_z * (sv(i, j, k + 1, z_idx) - sv(i, j, k - 1, z_idx)));
-  const auto rhoD = zone->rho_D(i, j, k, z_idx);
-  // Rho*D*GradZ*GradZ
-  const real rhoChi = rhoD * (z_x * z_x + z_y * z_y + z_z * z_z);
-  stat(i, j, k, collect_idx + 1) += rhoChi;
-  // Rho*D*Zx
-  stat(i, j, k, collect_idx + 2) += rhoD * z_x;
-  // Rho*D*Zy
-  stat(i, j, k, collect_idx + 3) += rhoD * z_y;
-  // Rho*D*Zz
-  stat(i, j, k, collect_idx + 4) += rhoD * z_z;
-  stat(i, j, k, collect_idx + 5) += rhoD;
-}
-
-__device__ void
-H2_variance_and_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud,
-                                          integer i,
-                                          integer j, integer k, integer counter, integer stat_idx,
-                                          integer collected_idx) {
-  auto &stat = zone->user_defined_statistical_data;
-  auto &collected_moments = zone->userCollectForStat;
-  auto &mean = zone->mean_value;
-
-  // {z''z''}
-  stat(i, j, k, stat_idx) = max(
-      collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] / mean(i, j, k, 0) -
-      mean(i, j, k, 6 + z_idx) * mean(i, j, k, 6 + z_idx), 1e-30);
-
-  // chi=2/<rho>*[<rho*D*gradZ*gradZ>-2<rho*D*Zx>*{Z}_x-2<rho*D*Zy>*{Z}_y-2<rho*D*Zz>*{Z}_z+<rho*D>*grad{Z}*grad{Z}]
-  const auto &m = zone->metric(i, j, k);
-  const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
-  const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
-  const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
-  const real z_x = 0.5 * (xi_x * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
-                          eta_x * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
-                          zeta_x * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
-  const real z_y = 0.5 * (xi_y * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
-                          eta_y * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
-                          zeta_y * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
-  const real z_z = 0.5 * (xi_z * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
-                          eta_z * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
-                          zeta_z * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
-  auto chi = 2.0 / mean(i, j, k, 0) * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
-                                       2.0 * collected_moments(i, j, k, collected_idx + 2) /
-                                       counter_ud[collected_idx + 2] * z_x -
-                                       2.0 * collected_moments(i, j, k, collected_idx + 3) /
-                                       counter_ud[collected_idx + 3] * z_y -
-                                       2.0 * collected_moments(i, j, k, collected_idx + 4) /
-                                       counter_ud[collected_idx + 4] * z_z +
-                                       collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
-                                       (z_x * z_x + z_y * z_y + z_z * z_z));
-  stat(i, j, k, stat_idx + 1) = max(chi, 1e-30);
-  stat(i, j, k, stat_idx + 2) = stat(i, j, k, stat_idx) / max(chi, 1e-30);
-}
-
-__device__ void H2_variance_and_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
-                                                                           const integer *counter_ud, integer i,
-                                                                           integer j, integer mz, integer counter,
-                                                                           integer stat_idx, integer collected_idx) {
-  auto &stat = zone->user_defined_statistical_data;
-  auto &collected_moments = zone->userCollectForStat;
+  auto &collect = zone->userCollectForStat;
   auto &firstOrderMoment = zone->firstOrderMoment;
 
   const real counter_inv{1.0 / counter};
-  real add_zVar{0}, add_chi{0};
+  real add_rho{0}, add_p{0}, add_T{0};
   for (int k = 0; k < mz; ++k) {
     const real density = firstOrderMoment(i, j, k, 0) * counter_inv;
-    const real z_favre = firstOrderMoment(i, j, k, 6 + z_idx) * counter_inv / density;
-    // {z''z''}
-    add_zVar += collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] / density -
-                z_favre * z_favre;
-    // compute the surrounding 8 points' z_favre
-    const real d_zFavre_x = firstOrderMoment(i + 1, j, k, 6 + z_idx) / firstOrderMoment(i + 1, j, k, 0) -
-                            firstOrderMoment(i - 1, j, k, 6 + z_idx) / firstOrderMoment(i - 1, j, k, 0);
-    const real d_zFavre_y = firstOrderMoment(i, j + 1, k, 6 + z_idx) / firstOrderMoment(i, j + 1, k, 0) -
-                            firstOrderMoment(i, j - 1, k, 6 + z_idx) / firstOrderMoment(i, j - 1, k, 0);
-    const real d_zFavre_z = firstOrderMoment(i, j, k + 1, 6 + z_idx) / firstOrderMoment(i, j, k + 1, 0) -
-                            firstOrderMoment(i, j, k - 1, 6 + z_idx) / firstOrderMoment(i, j, k - 1, 0);
-    // compute the gradient of z
-    const auto &m = zone->metric(i, j, k);
-    const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
-    const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
-    const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
-    const real z_x = 0.5 * (xi_x * d_zFavre_x + eta_x * d_zFavre_y + zeta_x * d_zFavre_z);
-    const real z_y = 0.5 * (xi_y * d_zFavre_x + eta_y * d_zFavre_y + zeta_y * d_zFavre_z);
-    const real z_z = 0.5 * (xi_z * d_zFavre_x + eta_z * d_zFavre_y + zeta_z * d_zFavre_z);
-    // chi=2/<rho>*[<rho*D*gradZ*gradZ>-2<rho*D*Zx>*{Z}_x-2<rho*D*Zy>*{Z}_y-2<rho*D*Zz>*{Z}_z+<rho*D>*grad{Z}*grad{Z}]
-    auto chi = 2 / density * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
-                              2 * collected_moments(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] * z_x -
-                              2 * collected_moments(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3] * z_y -
-                              2 * collected_moments(i, j, k, collected_idx + 4) / counter_ud[collected_idx + 4] * z_z +
-                              collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
-                              (z_x * z_x + z_y * z_y + z_z * z_z));
-    add_chi += max(chi, 1e-30);
+    add_rho += sqrt(max(collect(i, j, k, collected_idx) / counter_ud[collected_idx] - density * density, 0.0));
+    add_p += sqrt(max(collect(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
+                      firstOrderMoment(i, j, k, 4) * firstOrderMoment(i, j, k, 4) * counter_inv * counter_inv, 0.0));
+    const real T_mean = collect(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3];
+    const real TT_mean = collect(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2];
+    const real T_favre = firstOrderMoment(i, j, k, 5) / firstOrderMoment(i, j, k, 0);
+    add_T += sqrt(max(TT_mean - 2 * T_mean * T_favre + T_favre * T_favre, 0.0));
   }
-  stat(i, j, 0, stat_idx) = add_zVar / mz;
-  stat(i, j, 0, stat_idx + 1) = add_chi / mz;
-  stat(i, j, 0, stat_idx + 2) = add_zVar / add_chi;
+  stat(i, j, 0, stat_idx) = add_rho / mz;
+  stat(i, j, 0, stat_idx + 1) = add_p / mz;
+  stat(i, j, 0, stat_idx + 2) = add_T / mz;
+}
+
+__device__ void
+ThermRMS::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j, integer k,
+                  integer counter, integer stat_idx, integer collected_idx) {
+  auto &stat = zone->user_defined_statistical_data;
+  auto &collect = zone->userCollectForStat;
+  auto &mean = zone->mean_value;
+  stat(i, j, k, stat_idx) = sqrt(
+      max(collect(i, j, k, collected_idx) / counter_ud[collected_idx] - mean(i, j, k, 0) * mean(i, j, k, 0), 0.0));
+  stat(i, j, k, stat_idx + 1) = sqrt(
+      max(collect(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] - mean(i, j, k, 4) * mean(i, j, k, 4),
+          0.0));
+  const real T_mean = collect(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3];
+  stat(i, j, k, stat_idx + 2) = sqrt(
+      max(collect(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] - 2 * T_mean * mean(i, j, k, 5) +
+          mean(i, j, k, 5) * mean(i, j, k, 5), 0.0));
 }
 
 __device__ void
@@ -337,6 +231,164 @@ __device__ void turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone 
       0.5 * (rey_tensor(i, j, 0, 0) + rey_tensor(i, j, 0, 1) + rey_tensor(i, j, 0, 2)) / stat(i, j, 0, stat_idx);
 }
 
+__device__ void
+H2_variance_and_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k,
+                                          integer collect_idx) {
+  auto &stat = zone->userCollectForStat; // There may be mistakes!
+  const auto &sv = zone->sv;
+
+  // Rho*Z*Z
+  stat(i, j, k, collect_idx) += zone->bv(i, j, k, 0) * sv(i, j, k, z_idx) * sv(i, j, k, z_idx);
+  const auto &m = zone->metric(i, j, k);
+  const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
+  const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
+  const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
+  const real z_x = 0.5 * (xi_x * (sv(i + 1, j, k, z_idx) - sv(i - 1, j, k, z_idx)) +
+                          eta_x * (sv(i, j + 1, k, z_idx) - sv(i, j - 1, k, z_idx)) +
+                          zeta_x * (sv(i, j, k + 1, z_idx) - sv(i, j, k - 1, z_idx)));
+  const real z_y = 0.5 * (xi_y * (sv(i + 1, j, k, z_idx) - sv(i - 1, j, k, z_idx)) +
+                          eta_y * (sv(i, j + 1, k, z_idx) - sv(i, j - 1, k, z_idx)) +
+                          zeta_y * (sv(i, j, k + 1, z_idx) - sv(i, j, k - 1, z_idx)));
+  const real z_z = 0.5 * (xi_z * (sv(i + 1, j, k, z_idx) - sv(i - 1, j, k, z_idx)) +
+                          eta_z * (sv(i, j + 1, k, z_idx) - sv(i, j - 1, k, z_idx)) +
+                          zeta_z * (sv(i, j, k + 1, z_idx) - sv(i, j, k - 1, z_idx)));
+  const auto rhoD = zone->rho_D(i, j, k, z_idx);
+  // Rho*D*GradZ*GradZ
+  const real rhoChi = rhoD * (z_x * z_x + z_y * z_y + z_z * z_z);
+  stat(i, j, k, collect_idx + 1) += rhoChi;
+  // Rho*D*Zx
+  stat(i, j, k, collect_idx + 2) += rhoD * z_x;
+  // Rho*D*Zy
+  stat(i, j, k, collect_idx + 3) += rhoD * z_y;
+  // Rho*D*Zz
+  stat(i, j, k, collect_idx + 4) += rhoD * z_z;
+  stat(i, j, k, collect_idx + 5) += rhoD;
+}
+
+__device__ void
+H2_variance_and_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud,
+                                          integer i,
+                                          integer j, integer k, integer counter, integer stat_idx,
+                                          integer collected_idx) {
+  auto &stat = zone->user_defined_statistical_data;
+  auto &collected_moments = zone->userCollectForStat;
+  auto &mean = zone->mean_value;
+
+  // {z''z''}
+  stat(i, j, k, stat_idx) = max(
+      collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] / mean(i, j, k, 0) -
+      mean(i, j, k, 6 + z_idx) * mean(i, j, k, 6 + z_idx), 1e-30);
+
+  // chi=2/<rho>*[<rho*D*gradZ*gradZ>-2<rho*D*Zx>*{Z}_x-2<rho*D*Zy>*{Z}_y-2<rho*D*Zz>*{Z}_z+<rho*D>*grad{Z}*grad{Z}]
+  const auto &m = zone->metric(i, j, k);
+  const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
+  const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
+  const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
+  const real z_x = 0.5 * (xi_x * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                          eta_x * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
+                          zeta_x * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
+  const real z_y = 0.5 * (xi_y * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                          eta_y * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
+                          zeta_y * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
+  const real z_z = 0.5 * (xi_z * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                          eta_z * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
+                          zeta_z * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
+  auto chi = 2.0 / mean(i, j, k, 0) * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
+                                       2.0 * collected_moments(i, j, k, collected_idx + 2) /
+                                       counter_ud[collected_idx + 2] * z_x -
+                                       2.0 * collected_moments(i, j, k, collected_idx + 3) /
+                                       counter_ud[collected_idx + 3] * z_y -
+                                       2.0 * collected_moments(i, j, k, collected_idx + 4) /
+                                       counter_ud[collected_idx + 4] * z_z +
+                                       collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
+                                       (z_x * z_x + z_y * z_y + z_z * z_z));
+  stat(i, j, k, stat_idx + 1) = max(chi, 1e-30);
+  stat(i, j, k, stat_idx + 2) = stat(i, j, k, stat_idx) / max(chi, 1e-30);
+}
+
+__device__ void H2_variance_and_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
+                                                                           const integer *counter_ud, integer i,
+                                                                           integer j, integer mz, integer counter,
+                                                                           integer stat_idx, integer collected_idx) {
+  auto &stat = zone->user_defined_statistical_data;
+  auto &collected_moments = zone->userCollectForStat;
+  auto &firstOrderMoment = zone->firstOrderMoment;
+
+  const real counter_inv{1.0 / counter};
+  real add_zVar{0}, add_chi{0};
+  for (int k = 0; k < mz; ++k) {
+    const real density = firstOrderMoment(i, j, k, 0) * counter_inv;
+    const real z_favre = firstOrderMoment(i, j, k, 6 + z_idx) * counter_inv / density;
+    // {z''z''}
+    add_zVar += collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] / density -
+                z_favre * z_favre;
+    // compute the surrounding 8 points' z_favre
+    const real d_zFavre_x = firstOrderMoment(i + 1, j, k, 6 + z_idx) / firstOrderMoment(i + 1, j, k, 0) -
+                            firstOrderMoment(i - 1, j, k, 6 + z_idx) / firstOrderMoment(i - 1, j, k, 0);
+    const real d_zFavre_y = firstOrderMoment(i, j + 1, k, 6 + z_idx) / firstOrderMoment(i, j + 1, k, 0) -
+                            firstOrderMoment(i, j - 1, k, 6 + z_idx) / firstOrderMoment(i, j - 1, k, 0);
+    const real d_zFavre_z = firstOrderMoment(i, j, k + 1, 6 + z_idx) / firstOrderMoment(i, j, k + 1, 0) -
+                            firstOrderMoment(i, j, k - 1, 6 + z_idx) / firstOrderMoment(i, j, k - 1, 0);
+    // compute the gradient of z
+    const auto &m = zone->metric(i, j, k);
+    const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
+    const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
+    const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
+    const real z_x = 0.5 * (xi_x * d_zFavre_x + eta_x * d_zFavre_y + zeta_x * d_zFavre_z);
+    const real z_y = 0.5 * (xi_y * d_zFavre_x + eta_y * d_zFavre_y + zeta_y * d_zFavre_z);
+    const real z_z = 0.5 * (xi_z * d_zFavre_x + eta_z * d_zFavre_y + zeta_z * d_zFavre_z);
+    // chi=2/<rho>*[<rho*D*gradZ*gradZ>-2<rho*D*Zx>*{Z}_x-2<rho*D*Zy>*{Z}_y-2<rho*D*Zz>*{Z}_z+<rho*D>*grad{Z}*grad{Z}]
+    auto chi = 2 / density * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
+                              2 * collected_moments(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] * z_x -
+                              2 * collected_moments(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3] * z_y -
+                              2 * collected_moments(i, j, k, collected_idx + 4) / counter_ud[collected_idx + 4] * z_z +
+                              collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
+                              (z_x * z_x + z_y * z_y + z_z * z_z));
+    add_chi += max(chi, 1e-30);
+  }
+  stat(i, j, 0, stat_idx) = add_zVar / mz;
+  stat(i, j, 0, stat_idx + 1) = add_chi / mz;
+  stat(i, j, 0, stat_idx + 2) = add_zVar / add_chi;
+}
+
+__device__ void
+velFluc_scalarFluc_correlation::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k,
+                                        integer collect_idx) {
+  auto &stat = zone->userCollectForStat;
+  const auto &sv = zone->sv;
+  stat(i, j, k, collect_idx) += zone->bv(i, j, k, 0) * zone->bv(i, j, k, 1) * sv(i, j, k, 0);
+  stat(i, j, k, collect_idx + 1) += zone->bv(i, j, k, 0) * zone->bv(i, j, k, 2) * sv(i, j, k, 0);
+  stat(i, j, k, collect_idx + 2) += zone->bv(i, j, k, 0) * zone->bv(i, j, k, 3) * sv(i, j, k, 0);
+}
+
+__device__ void
+velFluc_scalarFluc_correlation::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud,
+                                        integer i, integer j, integer k, integer counter, integer stat_idx,
+                                        integer collected_idx) {
+  auto &stat = zone->user_defined_statistical_data;
+  auto &collected_moments = zone->userCollectForStat;
+  auto &mean = zone->mean_value;
+  stat(i, j, k, stat_idx) =
+      collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] / mean(i, j, k, 0) -
+      mean(i, j, k, 6) * mean(i, j, k, 1);
+  stat(i, j, k, stat_idx + 1) =
+      collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] / mean(i, j, k, 0) -
+      mean(i, j, k, 6) * mean(i, j, k, 2);
+  stat(i, j, k, stat_idx + 2) =
+      collected_moments(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] / mean(i, j, k, 0) -
+      mean(i, j, k, 6) * mean(i, j, k, 3);
+}
+
+__device__ void
+resolved_tke::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j,
+                      integer k, integer counter, integer stat_idx, integer collected_idx) {
+  auto &stat = zone->user_defined_statistical_data;
+  auto &rey_tensor = zone->reynolds_stress_tensor;
+  auto k_res = max(0.5 * (rey_tensor(i, j, k, 0) + rey_tensor(i, j, k, 1) + rey_tensor(i, j, k, 2)), 0.0);
+  stat(i, j, k, stat_idx) = k_res;
+  stat(i, j, k, stat_idx + 1) = k_res / max((k_res + zone->sv(i, j, k, param->n_spec)), 1e-25);
+}
+
 __device__ void StrainRateSquared::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k,
                                            integer collect_idx) {
   auto &collect = zone->userCollectForStat;
@@ -391,55 +443,4 @@ StrainRateSquared::compute(cfd::DZone *zone, cfd::DParameter *param, const integ
 
 }
 
-__device__ void
-ThermRMS::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k, integer collect_idx) {
-  auto &collect = zone->userCollectForStat;
-  const auto &bv = zone->bv;
-
-  collect(i, j, k, collect_idx) += bv(i, j, k, 0) * bv(i, j, k, 0);
-  collect(i, j, k, collect_idx + 1) += bv(i, j, k, 4) * bv(i, j, k, 4);
-  collect(i, j, k, collect_idx + 2) += bv(i, j, k, 5) * bv(i, j, k, 5);
-  collect(i, j, k, collect_idx + 3) += bv(i, j, k, 5);
-}
-
-__device__ void
-ThermRMS::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i,
-                                   integer j, integer mz, integer counter, integer stat_idx, integer collected_idx) {
-  auto &stat = zone->user_defined_statistical_data;
-  auto &collect = zone->userCollectForStat;
-  auto &firstOrderMoment = zone->firstOrderMoment;
-
-  const real counter_inv{1.0 / counter};
-  real add_rho{0}, add_p{0}, add_T{0};
-  for (int k = 0; k < mz; ++k) {
-    const real density = firstOrderMoment(i, j, k, 0) * counter_inv;
-    add_rho += sqrt(max(collect(i, j, k, collected_idx) / counter_ud[collected_idx] - density * density, 0.0));
-    add_p += sqrt(max(collect(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
-                      firstOrderMoment(i, j, k, 4) * firstOrderMoment(i, j, k, 4) * counter_inv * counter_inv, 0.0));
-    const real T_mean = collect(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3];
-    const real TT_mean = collect(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2];
-    const real T_favre = firstOrderMoment(i, j, k, 5) / firstOrderMoment(i, j, k, 0);
-    add_T += sqrt(max(TT_mean - 2 * T_mean * T_favre + T_favre * T_favre, 0.0));
-  }
-  stat(i, j, 0, stat_idx) = add_rho / mz;
-  stat(i, j, 0, stat_idx + 1) = add_p / mz;
-  stat(i, j, 0, stat_idx + 2) = add_T / mz;
-}
-
-__device__ void
-ThermRMS::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j, integer k,
-                  integer counter, integer stat_idx, integer collected_idx) {
-  auto &stat = zone->user_defined_statistical_data;
-  auto &collect = zone->userCollectForStat;
-  auto &mean = zone->mean_value;
-  stat(i, j, k, stat_idx) = sqrt(
-      max(collect(i, j, k, collected_idx) / counter_ud[collected_idx] - mean(i, j, k, 0) * mean(i, j, k, 0), 0.0));
-  stat(i, j, k, stat_idx + 1) = sqrt(
-      max(collect(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] - mean(i, j, k, 4) * mean(i, j, k, 4),
-          0.0));
-  const real T_mean = collect(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3];
-  stat(i, j, k, stat_idx + 2) = sqrt(
-      max(collect(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] - 2 * T_mean * mean(i, j, k, 5) +
-          mean(i, j, k, 5) * mean(i, j, k, 5), 0.0));
-}
 }

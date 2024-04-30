@@ -21,6 +21,10 @@ void read_profile(const Boundary &boundary, const std::string &file, const Block
                   const Species &species, ggxl::VectorField3D<real> &profile,
                   const std::string &profile_related_bc_name);
 
+void read_lst_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
+                  const Species &species, ggxl::VectorField3D<real> &profile,
+                  const std::string &profile_related_bc_name);
+
 void read_dat_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
                       const Species &species, ggxl::VectorField3D<real> &profile,
                       const std::string &profile_related_bc_name);
@@ -69,6 +73,8 @@ struct DBoundCond {
   // There may be inflow with values of ghost grids also given.
   std::vector<ggxl::VectorField3D<real>> profile_hPtr_withGhost;
   ggxl::VectorField3D<real> *profile_dPtr_withGhost = nullptr;
+  // Fluctuation profiles, with real part and imaginary part given for basic variables
+  ggxl::VectorField3D<real> *fluctuation_dPtr = nullptr;
 
   curandState *rng_d_ptr = nullptr;
 
@@ -192,7 +198,7 @@ __global__ void apply_outflow(DZone *zone, integer i_face, const DParameter *par
 template<MixtureModel mix_model, class turb, bool with_cv = false>
 __global__ void
 apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggxl::VectorField3D<real> *profile_d_ptr,
-             curandState *rng_states_d_ptr) {
+             curandState *rng_states_d_ptr, ggxl::VectorField3D<real> *fluctuation_dPtr) {
   const integer ngg = zone->ngg;
   integer dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
@@ -258,6 +264,27 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
 
       u += curand_normal_double(&rng_state) * rms * vel;
       vel = sqrt(u * u + v * v + w * w);
+    } else if (inflow->fluctuation_type==2){
+      // LST fluctuation
+      int idx_fluc[3]{i, j, k};
+      idx_fluc[b.face] = 0;
+      auto&fluc_info = fluctuation_dPtr[inflow->fluc_prof_idx];
+
+      real bv_fluc_real[6], bv_fluc_imag[6];
+      bv_fluc_real[0] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 0);
+      bv_fluc_real[1] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 1);
+      bv_fluc_real[2] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 2);
+      bv_fluc_real[3] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 3);
+      bv_fluc_real[4] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 4);
+      bv_fluc_real[5] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 5);
+      bv_fluc_imag[0] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 6);
+      bv_fluc_imag[1] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 7);
+      bv_fluc_imag[2] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 8);
+      bv_fluc_imag[3] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 9);
+      bv_fluc_imag[4] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 10);
+      bv_fluc_imag[5] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 11);
+
+      real x_pos = zone->x(i, j, k), y_pos = zone->y(i, j, k), z_pos = zone->z(i, j, k);
     }
 
     // Specify the boundary value as given.
@@ -1105,7 +1132,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
       apply_inflow<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param,
-                                                            profile_dPtr_withGhost, rng_d_ptr);
+                                                            profile_dPtr_withGhost, rng_d_ptr, fluctuation_dPtr);
     }
   }
   // 7 - subsonic inflow

@@ -630,7 +630,7 @@ identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::strin
       if (n_spec > 0) {
         // We expect to find some species info. If not found, old_data_info[0] will remain 0.
         const auto &spec_name = species.spec_list;
-        for (auto [spec, sp_label]: spec_name) {
+        for (const auto &[spec, sp_label]: spec_name) {
           if (n == gxl::to_upper(spec)) {
             l = 6 + sp_label;
             break;
@@ -1091,11 +1091,297 @@ initialize_rng(curandState *rng_states, integer size, int64_t time_stamp) {
   curand_init(time_stamp + i, i, 0, &rng_states[i]);
 }
 
+void read_lst_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
+                      const Species &species, ggxl::VectorField3D<real> &profile,
+                      const std::string &profile_related_bc_name) {
+  std::ifstream file_in(file);
+  if (!file_in.is_open()) {
+    printf("Cannot open file %s\n", file.c_str());
+    MpiParallel::exit();
+  }
+  const integer direction = boundary.face;
+
+  std::string input;
+  std::vector<std::string> var_name;
+  gxl::read_until(file_in, input, "VARIABLES", gxl::Case::upper);
+  while (!(input.substr(0, 4) == "ZONE" || input.substr(0, 5) == " zone")) {
+    gxl::replace(input, '"', ' ');
+    gxl::replace(input, ',', ' ');
+    auto equal = input.find('=');
+    if (equal != std::string::npos)
+      input.erase(0, equal + 1);
+    std::istringstream line(input);
+    std::string v_name;
+    while (line >> v_name) {
+      var_name.emplace_back(v_name);
+    }
+    gxl::getline(file_in, input, gxl::Case::upper);
+  }
+  bool has_pressure{false}, has_temperature{false}, has_rho{false};
+  // Identify the labels of the variables
+  std::vector<integer> label_order;
+  const integer n_spec = species.n_spec;
+  for (auto &name: var_name) {
+    integer l = 999;
+    // The first three names are x, y and z, they are assigned value 0 and no match would be found.
+    auto n = gxl::to_upper(name);
+    if (n == "RHOR") {
+      l = 0;
+      has_rho = true;
+    } else if (n == "UR") {
+      l = 1;
+    } else if (n == "VR") {
+      l = 2;
+    } else if (n == "WR") {
+      l = 3;
+    } else if (n == "PR") {
+      l = 4;
+      has_pressure = true;
+    } else if (n == "TR") {
+      l = 5;
+      has_temperature = true;
+    } else if (n == "RHOI") {
+      l = 6;
+    } else if (n == "UI") {
+      l = 7;
+    } else if (n == "VI") {
+      l = 8;
+    } else if (n == "WI") {
+      l = 9;
+    } else if (n == "PI") {
+      l = 10;
+    } else if (n == "TI") {
+      l = 11;
+    } else {
+      if (n_spec > 0) {
+        const auto &spec_name = species.spec_list;
+        for (const auto &[spec, sp_label]: spec_name) {
+          if (n == gxl::to_upper(spec) + "R") {
+            l = 12 + sp_label;
+            break;
+          } else if (n == gxl::to_upper(spec) + "I") {
+            l = 12 + n_spec + sp_label;
+            break;
+          }
+        }
+      }
+    }
+    label_order.emplace_back(l);
+  }
+  // At least 2 of the 3 variables, pressure, temperature and density, should be given.
+  if (!has_rho) {
+    if (!has_pressure || !has_temperature) {
+      printf(
+          "The fluctuation of density, temperature or pressure is not given in the profile, please provide at least two of them!\n");
+      MpiParallel::exit();
+    }
+  } else if (!has_pressure) {
+    if (!has_temperature) {
+      printf(
+          "The fluctuation of temperature or pressure is not given in the profile when rho is given, please provide at least one of them!\n");
+      MpiParallel::exit();
+    }
+  }
+
+  integer mx, my, mz;
+  bool i_read{false}, j_read{false}, k_read{false}, packing_read{false};
+  std::string key;
+  std::string data_packing{"POINT"};
+  while (!(i_read && j_read && k_read && packing_read)) {
+    std::getline(file_in, input);
+    gxl::replace(input, '"', ' ');
+    gxl::replace(input, ',', ' ');
+    gxl::replace(input, '=', ' ');
+    std::istringstream line(input);
+    while (line >> key) {
+      if (key == "i" || key == "I") {
+        line >> mx;
+        i_read = true;
+      } else if (key == "j" || key == "J") {
+        line >> my;
+        j_read = true;
+      } else if (key == "k" || key == "K") {
+        line >> mz;
+        k_read = true;
+      } else if (key == "f" || key == "DATAPACKING" || key == "datapacking") {
+        line >> data_packing;
+        data_packing = gxl::to_upper(data_packing);
+        packing_read = true;
+      }
+    }
+  }
+
+  // This line is the DT=(double ...) line, which must exist if we output the data from Tecplot.
+  std::getline(file_in, input);
+
+  integer extent[3]{mx, my, mz};
+
+  // Then we read the variables.
+  auto nv_read = (integer) var_name.size();
+  gxl::VectorField3D<real> profile_read;
+  profile_read.resize(extent[0], extent[1], extent[2], nv_read, 0);
+
+  if (data_packing == "POINT") {
+    for (int k = 0; k < extent[2]; ++k) {
+      for (int j = 0; j < extent[1]; ++j) {
+        for (int i = 0; i < extent[0]; ++i) {
+          for (int l = 0; l < nv_read; ++l) {
+            file_in >> profile_read(i, j, k, l);
+          }
+        }
+      }
+    }
+  } else if (data_packing == "BLOCK") {
+    for (int l = 0; l < nv_read; ++l) {
+      for (int k = 0; k < extent[2]; ++k) {
+        for (int j = 0; j < extent[1]; ++j) {
+          for (int i = 0; i < extent[0]; ++i) {
+            file_in >> profile_read(i, j, k, l);
+          }
+        }
+      }
+    }
+  }
+
+  const integer n_var = parameter.get_int("n_var");
+  const auto ngg = block.ngg;
+  integer range_i[2]{-ngg, block.mx + ngg - 1},
+      range_j[2]{-ngg, block.my + ngg - 1},
+      range_k[2]{-ngg, block.mz + ngg - 1};
+  if (direction == 0) {
+    // i direction
+    ggxl::VectorField3DHost<real> profile_to_match;
+    // The 2*ngg ghost layers in x direction are not used.
+    profile_to_match.resize(1, block.my, block.mz, 2 * (n_var + 1), 0);
+    const int i = boundary.direction == 1 ? block.mx - 1 : 0;
+    // Then we interpolate the profile to the mesh.
+    for (int k = range_k[0]; k <= range_k[1]; ++k) {
+      for (int j = range_j[0]; j <= range_j[1]; ++j) {
+        real d_min = 1e+6;
+        integer i0 = 0, j0 = 0, k0 = 0;
+        for (int kk = 0; kk < extent[2]; ++kk) {
+          for (int jj = 0; jj < extent[1]; ++jj) {
+            for (int ii = 0; ii < extent[0]; ++ii) {
+              real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
+                            (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
+                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
+                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
+                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
+                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
+              if (d <= d_min) {
+                d_min = d;
+                i0 = ii;
+                j0 = jj;
+                k0 = kk;
+              }
+            }
+          }
+        }
+
+        // Assign the values in 0th order
+        for (int l = 3; l < nv_read; ++l) {
+          if (label_order[l] < 2 * (n_var + 1 + 3)) {
+            profile_to_match(0, j, k, label_order[l]) = profile_read(i0, j0, k0, l);
+          }
+        }
+      }
+    }
+    // Then we copy the data to the profile array.
+    profile.allocate_memory(1, block.my, block.mz, 2 * (n_var + 1), 0);
+    cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * 2 * (n_var + 1),
+               cudaMemcpyHostToDevice);
+    profile_to_match.deallocate_memory();
+  } else if (direction == 1) {
+    // j direction
+    ggxl::VectorField3DHost<real> profile_to_match;
+    profile_to_match.resize(block.mx, 1, block.mz, 2 * (n_var + 1), 0);
+    const int j = boundary.direction == 1 ? block.my - 1 : 0;
+    // Then we interpolate the profile to the mesh.
+    for (int k = range_k[0]; k <= range_k[1]; ++k) {
+      for (int i = range_i[0]; i <= range_i[1]; ++i) {
+        real d_min = 1e+6;
+        integer i0 = 0, j0 = 0, k0 = 0;
+        for (int kk = 0; kk < extent[2]; ++kk) {
+          for (int jj = 0; jj < extent[1]; ++jj) {
+            for (int ii = 0; ii < extent[0]; ++ii) {
+              real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
+                            (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
+                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
+                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
+                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
+                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
+              if (d <= d_min) {
+                d_min = d;
+                i0 = ii;
+                j0 = jj;
+                k0 = kk;
+              }
+            }
+          }
+        }
+
+        // Assign the values in 0th order
+        for (int l = 3; l < nv_read; ++l) {
+          if (label_order[l] < 2 * (n_var + 1)) {
+            profile_to_match(i, 0, k, label_order[l]) = profile_read(i0, j0, k0, l);
+          }
+        }
+      }
+    }
+    // Then we copy the data to the profile array.
+    profile.allocate_memory(block.mx, 1, block.mz, 2 * (n_var + 1), 0);
+    cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * 2 * (n_var + 1),
+               cudaMemcpyHostToDevice);
+    profile_to_match.deallocate_memory();
+  } else if (direction == 2) {
+    // k direction
+    ggxl::VectorField3DHost<real> profile_to_match;
+    profile_to_match.resize(block.mx, block.my, 1, 2 * (n_var + 1), 0);
+    const int k = boundary.direction == 1 ? block.mz - 1 : 0;
+    // Then we interpolate the profile to the mesh.
+    for (int j = range_j[0]; j <= range_j[1]; ++j) {
+      for (int i = range_i[0]; i <= range_i[1]; ++i) {
+        real d_min = 1e+6;
+        integer i0 = 0, j0 = 0, k0 = 0;
+        for (int kk = 0; kk < extent[2]; ++kk) {
+          for (int jj = 0; jj < extent[1]; ++jj) {
+            for (int ii = 0; ii < extent[0]; ++ii) {
+              real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
+                            (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
+                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
+                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
+                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
+                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
+              if (d <= d_min) {
+                d_min = d;
+                i0 = ii;
+                j0 = jj;
+                k0 = kk;
+              }
+            }
+          }
+        }
+
+        // Assign the values in 0th order
+        for (int l = 3; l < nv_read; ++l) {
+          if (label_order[l] < 2 * (n_var + 1)) {
+            profile_to_match(i, j, 0, label_order[l]) = profile_read(i0, j0, k0, l);
+          }
+        }
+      }
+    }
+    // Then we copy the data to the profile array.
+    profile.allocate_memory(block.mx, block.my, 1, 2 * (n_var + 1), 0);
+    cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * 2 * (n_var + 1),
+               cudaMemcpyHostToDevice);
+    profile_to_match.deallocate_memory();
+  }
+}
+
 void
 DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field) {
   if (const integer n_profile = parameter.get_int("n_profile"); n_profile > 0) {
     profile_hPtr_withGhost.resize(n_profile);
-//    profile_h_ptr.resize(n_profile);
     for (integer i = 0; i < n_profile; ++i) {
       const auto file_name = parameter.get_string_array("profile_file_names")[i];
       const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[i];
@@ -1107,7 +1393,6 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
           if (b.type_label == label) {
             read_profile(b, file_name, mesh[blk], parameter, species, profile_hPtr_withGhost[i],
                          profile_related_bc_name);
-//            read_profile(b, file_name, mesh[blk], parameter, species, profile_h_ptr[i], profile_related_bc_name);
             break;
           }
         }
@@ -1116,9 +1401,6 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
     cudaMalloc(&profile_dPtr_withGhost, sizeof(ggxl::VectorField3D<real>) * n_profile);
     cudaMemcpy(profile_dPtr_withGhost, profile_hPtr_withGhost.data(), sizeof(ggxl::VectorField3D<real>) * n_profile,
                cudaMemcpyHostToDevice);
-//    cudaMalloc(&profile_d_ptr, sizeof(ggxl::VectorField2D<real>) * n_profile);
-//    cudaMemcpy(profile_d_ptr, profile_h_ptr.data(), sizeof(ggxl::VectorField2D<real>) * n_profile,
-//               cudaMemcpyHostToDevice);
   }
 
   // Count the max number of rng needed
@@ -1151,6 +1433,32 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
     // Get the current time
     time_t time_curr;
     initialize_rng<<<BPG, TPB>>>(rng_d_ptr, size, time(&time_curr));
+  }
+
+  // Read the fluctuation profiles if needed
+  const auto need_fluctuation_profile = parameter.get_int_array("need_fluctuation_profile");
+  if (!need_fluctuation_profile.empty()) {
+    std::vector<ggxl::VectorField3D<real>> fluctuation_hPtr;
+    const int n_fluc_profile = (int) need_fluctuation_profile.size();
+    fluctuation_hPtr.resize(n_fluc_profile);
+    for (int i = 0; i < n_fluc_profile; ++i) {
+      const auto file_name = parameter.get_string_array("fluctuation_profile_file")[i];
+      auto bc_name = parameter.get_string_array("fluctuation_profile_bc_name")[i];
+      const auto &nn = parameter.get_struct(bc_name);
+      const auto label = std::get<integer>(nn.at("label"));
+      for (integer blk = 0; blk < mesh.n_block; ++blk) {
+        auto &bs = mesh[blk].boundary;
+        for (auto &b: bs) {
+          if (b.type_label == label) {
+            read_lst_profile(b, file_name, mesh[blk], parameter, species, fluctuation_hPtr[i], bc_name);
+            break;
+          }
+        }
+      }
+    }
+    cudaMalloc(&fluctuation_dPtr, sizeof(ggxl::VectorField3D<real>) * n_fluc_profile);
+    cudaMemcpy(fluctuation_dPtr, fluctuation_hPtr.data(), sizeof(ggxl::VectorField3D<real>) * n_fluc_profile,
+               cudaMemcpyHostToDevice);
   }
 }
 }
