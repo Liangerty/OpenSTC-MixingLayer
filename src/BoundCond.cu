@@ -489,7 +489,7 @@ void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &param
   delete[]sv;
   cudaMalloc(&sv, n_scalar * sizeof(real));
   cudaMemcpy(sv, h_sv, n_scalar * sizeof(real), cudaMemcpyHostToDevice);
-  if (inflow_type == 1) {
+  if (inflow_type == 2) {
     // For mixing layer flow, there are another group of sv.
     real *h_sv_lower = new real[n_scalar];
     for (integer l = 0; l < n_scalar; ++l) {
@@ -530,47 +530,63 @@ void SubsonicInflow::copy_to_gpu(cfd::SubsonicInflow *d_inflow, cfd::Species &sp
 }
 
 void initialize_profile_with_inflow(const Boundary &boundary, const Block &block, const Parameter &parameter,
-                                    const Species &species, ggxl::VectorField2D<real> &profile,
+                                    const Species &species, ggxl::VectorField3D<real> &profile,
                                     const std::string &profile_related_bc_name) {
   const integer direction = boundary.face;
   const integer extent[3]{block.mx, block.my, block.mz};
   const integer ngg = block.ngg;
-  integer range_1[2]{-ngg, block.my + ngg - 1}, range_2[2]{-ngg, block.mz + ngg - 1};
-  integer n1 = extent[1], n2 = extent[2];
-  if (direction == 1) {
-    n1 = extent[0];
-    range_1[1] = block.mx + ngg - 1;
+  integer range_0[2]{-ngg, block.mx + ngg - 1}, range_1[2]{-ngg, block.my + ngg - 1}, range_2[2]{-ngg,
+                                                                                                 block.mz + ngg - 1};
+  integer n0 = extent[0], n1 = extent[1], n2 = extent[2];
+//  if (direction == 1) {
+//    n1 = extent[0];
+//    range_1[1] = block.mx + ngg - 1;
+//  } else if (direction == 2) {
+//    n1 = extent[0];
+//    n2 = extent[1];
+//    range_1[1] = block.mx + ngg - 1;
+//    range_2[1] = block.my + ngg - 1;
+//  }
+  if (direction == 0) {
+    n0 = 1 + ngg;
+    range_0[0] = 0;
+    range_0[1] = ngg;
+  } else if (direction == 1) {
+    n1 = 1 + ngg;
+    range_1[0] = 0;
+    range_1[1] = ngg;
   } else if (direction == 2) {
-    n1 = extent[0];
-    n2 = extent[1];
-    range_1[1] = block.mx + ngg - 1;
-    range_2[1] = block.my + ngg - 1;
+    n2 = 1 + ngg;
+    range_2[0] = 0;
+    range_2[1] = ngg;
   }
 
-  ggxl::VectorField2DHost<real> profile_host;
+  ggxl::VectorField3DHost<real> profile_host;
   const integer n_var = parameter.get_int("n_var");
-  profile_host.allocate_memory(n1, n2, n_var + 1, ngg);
+  profile_host.resize(n0, n1, n2, n_var + 1, ngg);
   Inflow inflow1(profile_related_bc_name, species, parameter);
-  for (integer i1 = range_1[0]; i1 <= range_1[1]; ++i1) {
-    for (integer i2 = range_2[0]; i2 <= range_2[1]; ++i2) {
-      profile_host(i1, i2, 0) = inflow1.density;
-      profile_host(i1, i2, 1) = inflow1.u;
-      profile_host(i1, i2, 2) = inflow1.v;
-      profile_host(i1, i2, 3) = inflow1.w;
-      profile_host(i1, i2, 4) = inflow1.pressure;
-      profile_host(i1, i2, 5) = inflow1.temperature;
-      for (integer i = 0; i < species.n_spec; ++i) {
-        profile_host(i1, i2, 6 + i) = inflow1.sv[i];
+  for (int i0 = range_0[0]; i0 <= range_0[1]; ++i0) {
+    for (integer i1 = range_1[0]; i1 <= range_1[1]; ++i1) {
+      for (integer i2 = range_2[0]; i2 <= range_2[1]; ++i2) {
+        profile_host(i0, i1, i2, 0) = inflow1.density;
+        profile_host(i0, i1, i2, 1) = inflow1.u;
+        profile_host(i0, i1, i2, 2) = inflow1.v;
+        profile_host(i0, i1, i2, 3) = inflow1.w;
+        profile_host(i0, i1, i2, 4) = inflow1.pressure;
+        profile_host(i0, i1, i2, 5) = inflow1.temperature;
+        for (integer i = 0; i < species.n_spec; ++i) {
+          profile_host(i0, i1, i2, 6 + i) = inflow1.sv[i];
+        }
       }
     }
   }
-  profile.allocate_memory(n1, n2, n_var + 1, ngg);
+  profile.allocate_memory(n0, n1, n2, n_var + 1, ngg);
   cudaMemcpy(profile.data(), profile_host.data(), sizeof(real) * profile_host.size() * (n_var + 1),
              cudaMemcpyHostToDevice);
 }
 
 void read_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
-                  const Species &species, ggxl::VectorField2D<real> &profile,
+                  const Species &species, ggxl::VectorField3D<real> &profile,
                   const std::string &profile_related_bc_name) {
   if (file == "MYSELF") {
     // The profile is initialized by the inflow condition.
@@ -653,7 +669,7 @@ identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::strin
 
 void
 read_dat_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
-                 const Species &species, ggxl::VectorField2D<real> &profile,
+                 const Species &species, ggxl::VectorField3D<real> &profile,
                  const std::string &profile_related_bc_name) {
   std::ifstream file_in(file);
   if (!file_in.is_open()) {
@@ -728,10 +744,6 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
   std::getline(file_in, input);
 
   integer extent[3]{mx, my, mz};
-  if (extent[direction] != 1) {
-    printf("The profile is not a 2D profile!\n");
-    MpiParallel::exit();
-  }
 
   // Then we read the variables.
   auto nv_read = (integer) var_name.size();
@@ -767,262 +779,303 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
       range_k[2]{-ngg, block.mz + ngg - 1};
   if (direction == 0) {
     // i direction
-    range_i[0] = 0;
-    range_i[1] = 0;
-    ggxl::VectorField2DHost<real> profile_to_match;
-    profile_to_match.allocate_memory(block.my, block.mz, n_var + 1, ngg);
-    const auto i = boundary.direction == 1 ? block.mx - 1 : 0;
+    if (boundary.direction == 1) {
+      range_i[0] = block.mx - 1;
+      range_i[1] = block.mx + ngg - 1;
+    } else {
+      range_i[0] = -ngg;
+      range_i[1] = 0;
+    }
+    ggxl::VectorField3DHost<real> profile_to_match;
+    // The 2*ngg ghost layers in x direction are not used.
+    profile_to_match.resize(1 + ngg, block.my, block.mz, n_var + 1, ngg);
+    //    ggxl::VectorField2DHost<real> profile_to_match;
+    //    profile_to_match.allocate_memory(block.my, block.mz, n_var + 1, ngg);
     // Then we interpolate the profile to the mesh.
     for (int k = range_k[0]; k <= range_k[1]; ++k) {
       for (int j = range_j[0]; j <= range_j[1]; ++j) {
-        real d_min = 1e+6;
-        integer i0 = 0, j0 = 0, k0 = 0;
-        for (int kk = 0; kk < extent[2]; ++kk) {
-          for (int jj = 0; jj < extent[1]; ++jj) {
-            for (int ii = 0; ii < extent[0]; ++ii) {
-              real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
-                            (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
-                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
-                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
-                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
-                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
-              if (d <= d_min) {
-                d_min = d;
-                i0 = ii;
-                j0 = jj;
-                k0 = kk;
+        for (int ic = 0; ic <= ngg; ++ic) {
+          int i = range_i[0] + ic;
+          real d_min = 1e+6;
+          integer i0 = 0, j0 = 0, k0 = 0;
+          for (int kk = 0; kk < extent[2]; ++kk) {
+            for (int jj = 0; jj < extent[1]; ++jj) {
+              for (int ii = 0; ii < extent[0]; ++ii) {
+                real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
+                              (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
+                              (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
+                              (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
+                              (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
+                              (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
+                if (d <= d_min) {
+                  d_min = d;
+                  i0 = ii;
+                  j0 = jj;
+                  k0 = kk;
+                }
               }
             }
           }
-        }
 
-        // Assign the values in 0th order
-        for (int l = 3; l < nv_read; ++l) {
-          if (label_order[l] < n_var + 1 + 3) {
-            profile_to_match(j, k, label_order[l]) = profile_read(i0, j0, k0, l);
-          }
-        }
-
-        // If T or p is not given, compute it.
-        if (!has_temperature) {
-          real mw{mw_air};
-          if (species.n_spec > 0) {
-            mw = 0;
-            for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(j, k, 6 + l) / species.mw[l];
-            mw = 1 / mw;
-          }
-          profile_to_match(j, k, 5) = profile_to_match(j, k, 4) * mw / (R_u * profile_to_match(j, k, 0));
-        }
-        if (!has_pressure) {
-          real mw{mw_air};
-          if (species.n_spec > 0) {
-            mw = 0;
-            for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(j, k, 6 + l) / species.mw[l];
-            mw = 1 / mw;
-          }
-          profile_to_match(j, k, 4) = profile_to_match(j, k, 5) * R_u * profile_to_match(j, k, 0) / mw;
-        }
-        if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
-          // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
-          real mu{};
-          if (species.n_spec > 0) {
-            real mw = 0;
-            std::vector<real> Y;
-            for (int l = 0; l < species.n_spec; ++l) {
-              mw += profile_to_match(j, k, 6 + l) / species.mw[l];
-              Y.push_back(profile_to_match(j, k, 6 + l));
+          // Assign the values in 0th order
+          for (int l = 3; l < nv_read; ++l) {
+            if (label_order[l] < n_var + 1 + 3) {
+              profile_to_match(ic, j, k, label_order[l]) = profile_read(i0, j0, k0, l);
+//              profile_to_match(j, k, label_order[l]) = profile_read(i0, j0, k0, l);
             }
-            mw = 1 / mw;
-            mu = compute_viscosity(profile_to_match(j, k, 5), mw, Y.data(), species);
-          } else {
-            mu = Sutherland(profile_to_match(j, k, 5));
           }
-          real mut = mu * turb_viscosity_ratio;
-          const real vel2 = profile_to_match(j, k, 1) * profile_to_match(j, k, 1) +
-                            profile_to_match(j, k, 2) * profile_to_match(j, k, 2) +
-                            profile_to_match(j, k, 3) * profile_to_match(j, k, 3);
-          profile_to_match(j, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
-          profile_to_match(j, k, 6 + species.n_spec + 1) =
-              profile_to_match(j, k, 0) * profile_to_match(j, k, 6 + species.n_spec) / mut;
+
+          // If T or p is not given, compute it.
+          if (!has_temperature) {
+            real mw{mw_air};
+            if (species.n_spec > 0) {
+              mw = 0;
+              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
+//              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(j, k, 6 + l) / species.mw[l];
+              mw = 1 / mw;
+            }
+            profile_to_match(ic, j, k, 5) = profile_to_match(ic, j, k, 4) * mw / (R_u * profile_to_match(ic, j, k, 0));
+//            profile_to_match(j, k, 5) = profile_to_match(j, k, 4) * mw / (R_u * profile_to_match(j, k, 0));
+          }
+          if (!has_pressure) {
+            real mw{mw_air};
+            if (species.n_spec > 0) {
+              mw = 0;
+              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
+//              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(j, k, 6 + l) / species.mw[l];
+              mw = 1 / mw;
+            }
+            profile_to_match(ic, j, k, 4) = profile_to_match(ic, j, k, 5) * R_u * profile_to_match(ic, j, k, 0) / mw;
+//            profile_to_match(j, k, 4) = profile_to_match(j, k, 5) * R_u * profile_to_match(j, k, 0) / mw;
+          }
+          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+            // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
+            real mu{};
+            if (species.n_spec > 0) {
+              real mw = 0;
+              std::vector<real> Y;
+              for (int l = 0; l < species.n_spec; ++l) {
+                mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
+                Y.push_back(profile_to_match(ic, j, k, 6 + l));
+//                mw += profile_to_match(j, k, 6 + l) / species.mw[l];
+//                Y.push_back(profile_to_match(j, k, 6 + l));
+              }
+              mw = 1 / mw;
+              mu = compute_viscosity(profile_to_match(ic, j, k, 5), mw, Y.data(), species);
+//              mu = compute_viscosity(profile_to_match(j, k, 5), mw, Y.data(), species);
+            } else {
+              mu = Sutherland(profile_to_match(ic, j, k, 5));
+//              mu = Sutherland(profile_to_match(j, k, 5));
+            }
+            real mut = mu * turb_viscosity_ratio;
+            const real vel2 = profile_to_match(ic, j, k, 1) * profile_to_match(ic, j, k, 1) +
+                              profile_to_match(ic, j, k, 2) * profile_to_match(ic, j, k, 2) +
+                              profile_to_match(ic, j, k, 3) * profile_to_match(ic, j, k, 3);
+            profile_to_match(ic, j, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
+            profile_to_match(ic, j, k, 6 + species.n_spec + 1) =
+                profile_to_match(ic, j, k, 0) * profile_to_match(ic, j, k, 6 + species.n_spec) / mut;
+//            const real vel2 = profile_to_match(j, k, 1) * profile_to_match(j, k, 1) +
+//                              profile_to_match(j, k, 2) * profile_to_match(j, k, 2) +
+//                              profile_to_match(j, k, 3) * profile_to_match(j, k, 3);
+//            profile_to_match(j, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
+//            profile_to_match(j, k, 6 + species.n_spec + 1) =
+//                profile_to_match(j, k, 0) * profile_to_match(j, k, 6 + species.n_spec) / mut;
+          }
         }
       }
     }
     // Then we copy the data to the profile array.
-    profile.allocate_memory(block.my, block.mz, n_var + 1, ngg);
+    profile.allocate_memory(1 + ngg, block.my, block.mz, n_var + 1, ngg);
     cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * (n_var + 1),
                cudaMemcpyHostToDevice);
     profile_to_match.deallocate_memory();
   } else if (direction == 1) {
     // j direction
-    range_j[0] = 0;
-    range_j[1] = 0;
-    ggxl::VectorField2DHost<real> profile_to_match;
-    profile_to_match.allocate_memory(block.mx, block.mz, n_var + 1, ngg);
-    const auto j = boundary.direction == 1 ? block.my - 1 : 0;
+    auto face = boundary.direction;
+    if (face == 1) {
+      range_j[0] = block.my - 1;
+      range_j[1] = block.my + ngg - 1;
+    } else {
+      range_j[0] = -ngg;
+      range_j[1] = 0;
+    }
+    ggxl::VectorField3DHost<real> profile_to_match;
+    profile_to_match.resize(block.mx, 1 + ngg, block.mz, n_var + 1, ngg);
     // Then we interpolate the profile to the mesh.
     for (int k = range_k[0]; k <= range_k[1]; ++k) {
-      for (int i = range_i[0]; i <= range_i[1]; ++i) {
-        real d_min = 1e+6;
-        integer i0 = 0, j0 = 0, k0 = 0;
-        for (int kk = 0; kk < extent[2]; ++kk) {
-          for (int jj = 0; jj < extent[1]; ++jj) {
-            for (int ii = 0; ii < extent[0]; ++ii) {
-              real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
-                            (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
-                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
-                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
-                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
-                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
-              if (d <= d_min) {
-                d_min = d;
-                i0 = ii;
-                j0 = jj;
-                k0 = kk;
+      for (int jc = 0; jc <= ngg; ++jc) {
+        for (int i = range_i[0]; i <= range_i[1]; ++i) {
+          int j = range_j[0] + jc;
+          real d_min = 1e+6;
+          integer i0 = 0, j0 = 0, k0 = 0;
+          for (int kk = 0; kk < extent[2]; ++kk) {
+            for (int jj = 0; jj < extent[1]; ++jj) {
+              for (int ii = 0; ii < extent[0]; ++ii) {
+                real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
+                              (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
+                              (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
+                              (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
+                              (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
+                              (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
+                if (d <= d_min) {
+                  d_min = d;
+                  i0 = ii;
+                  j0 = jj;
+                  k0 = kk;
+                }
               }
             }
           }
-        }
 
-        // Assign the values in 0th order
-        for (int l = 3; l < nv_read; ++l) {
-          if (label_order[l] < n_var + 1) {
-            profile_to_match(i, k, label_order[l]) = profile_read(i0, j0, k0, l);
-          }
-        }
-
-        // If T or p is not given, compute it.
-        if (!has_temperature) {
-          real mw{mw_air};
-          if (species.n_spec > 0) {
-            mw = 0;
-            for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, k, 6 + l) / species.mw[l];
-            mw = 1 / mw;
-          }
-          profile_to_match(i, k, 5) = profile_to_match(i, k, 4) * mw / (R_u * profile_to_match(i, k, 0));
-        }
-        if (!has_pressure) {
-          real mw{mw_air};
-          if (species.n_spec > 0) {
-            mw = 0;
-            for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, k, 6 + l) / species.mw[l];
-            mw = 1 / mw;
-          }
-          profile_to_match(i, k, 4) = profile_to_match(i, k, 5) * R_u * profile_to_match(i, k, 0) / mw;
-        }
-        if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
-          // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
-          real mu;
-          if (species.n_spec > 0) {
-            real mw = 0;
-            std::vector<real> Y;
-            for (int l = 0; l < species.n_spec; ++l) {
-              mw += profile_to_match(i, k, 6 + l) / species.mw[l];
-              Y.push_back(profile_to_match(i, k, 6 + l));
+          // Assign the values in 0th order
+          for (int l = 3; l < nv_read; ++l) {
+            if (label_order[l] < n_var + 1) {
+              profile_to_match(i, jc, k, label_order[l]) = profile_read(i0, j0, k0, l);
             }
-            mw = 1 / mw;
-            mu = compute_viscosity(profile_to_match(i, k, 5), mw, Y.data(), species);
-          } else {
-            mu = Sutherland(profile_to_match(i, k, 5));
           }
-          real mut = mu * turb_viscosity_ratio;
-          const real vel2 = profile_to_match(i, k, 1) * profile_to_match(i, k, 1) +
-                            profile_to_match(i, k, 2) * profile_to_match(i, k, 2) +
-                            profile_to_match(i, k, 3) * profile_to_match(i, k, 3);
-          profile_to_match(i, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
-          profile_to_match(i, k, 6 + species.n_spec + 1) =
-              profile_to_match(i, k, 0) * profile_to_match(i, k, 6 + species.n_spec) / mut;
+
+          // If T or p is not given, compute it.
+          if (!has_temperature) {
+            real mw{mw_air};
+            if (species.n_spec > 0) {
+              mw = 0;
+              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, jc, k, 6 + l) / species.mw[l];
+              mw = 1 / mw;
+            }
+            profile_to_match(i, jc, k, 5) = profile_to_match(i, jc, k, 4) * mw / (R_u * profile_to_match(i, jc, k, 0));
+          }
+          if (!has_pressure) {
+            real mw{mw_air};
+            if (species.n_spec > 0) {
+              mw = 0;
+              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, jc, k, 6 + l) / species.mw[l];
+              mw = 1 / mw;
+            }
+            profile_to_match(i, jc, k, 4) = profile_to_match(i, jc, k, 5) * R_u * profile_to_match(i, jc, k, 0) / mw;
+          }
+          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+            // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
+            real mu;
+            if (species.n_spec > 0) {
+              real mw = 0;
+              std::vector<real> Y;
+              for (int l = 0; l < species.n_spec; ++l) {
+                mw += profile_to_match(i, jc, k, 6 + l) / species.mw[l];
+                Y.push_back(profile_to_match(i, jc, k, 6 + l));
+              }
+              mw = 1 / mw;
+              mu = compute_viscosity(profile_to_match(i, jc, k, 5), mw, Y.data(), species);
+            } else {
+              mu = Sutherland(profile_to_match(i, jc, k, 5));
+            }
+            real mut = mu * turb_viscosity_ratio;
+            const real vel2 = profile_to_match(i, jc, k, 1) * profile_to_match(i, jc, k, 1) +
+                              profile_to_match(i, jc, k, 2) * profile_to_match(i, jc, k, 2) +
+                              profile_to_match(i, jc, k, 3) * profile_to_match(i, jc, k, 3);
+            profile_to_match(i, jc, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
+            profile_to_match(i, jc, k, 6 + species.n_spec + 1) =
+                profile_to_match(i, jc, k, 0) * profile_to_match(i, jc, k, 6 + species.n_spec) / mut;
+          }
         }
       }
     }
     // Then we copy the data to the profile array.
-    profile.allocate_memory(block.mx, block.mz, n_var + 1, ngg);
+    profile.allocate_memory(block.mx, 1 + ngg, block.mz, n_var + 1, ngg);
     cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * (n_var + 1),
                cudaMemcpyHostToDevice);
     profile_to_match.deallocate_memory();
   } else if (direction == 2) {
     // k direction
-    range_k[0] = 0;
-    range_k[1] = 0;
-    ggxl::VectorField2DHost<real> profile_to_match;
-    profile_to_match.allocate_memory(block.mx, block.my, n_var + 1, ngg);
-    const auto k = boundary.direction == 1 ? block.mz - 1 : 0;
+    auto face = boundary.direction;
+    if (face == 1) {
+      range_k[0] = block.mz - 1;
+      range_k[1] = block.mz + ngg - 1;
+    } else {
+      range_k[0] = -ngg;
+      range_k[1] = 0;
+    }
+    ggxl::VectorField3DHost<real> profile_to_match;
+    profile_to_match.resize(block.mx, block.my, 1 + ngg, n_var + 1, ngg);
     // Then we interpolate the profile to the mesh.
-    for (int j = range_j[0]; j <= range_j[1]; ++j) {
-      for (int i = range_i[0]; i <= range_i[1]; ++i) {
-        real d_min = 1e+6;
-        integer i0 = 0, j0 = 0, k0 = 0;
-        for (int kk = 0; kk < extent[2]; ++kk) {
-          for (int jj = 0; jj < extent[1]; ++jj) {
-            for (int ii = 0; ii < extent[0]; ++ii) {
-              real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
-                            (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
-                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
-                            (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
-                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
-                            (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
-              if (d <= d_min) {
-                d_min = d;
-                i0 = ii;
-                j0 = jj;
-                k0 = kk;
+    for (int kc = 0; kc <= ngg; ++kc) {
+      int k = range_k[0] + kc;
+      for (int j = range_j[0]; j <= range_j[1]; ++j) {
+        for (int i = range_i[0]; i <= range_i[1]; ++i) {
+          real d_min = 1e+6;
+          integer i0 = 0, j0 = 0, k0 = 0;
+          for (int kk = 0; kk < extent[2]; ++kk) {
+            for (int jj = 0; jj < extent[1]; ++jj) {
+              for (int ii = 0; ii < extent[0]; ++ii) {
+                real d = sqrt((block.x(i, j, k) - profile_read(ii, jj, kk, 0)) *
+                              (block.x(i, j, k) - profile_read(ii, jj, kk, 0)) +
+                              (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) *
+                              (block.y(i, j, k) - profile_read(ii, jj, kk, 1)) +
+                              (block.z(i, j, k) - profile_read(ii, jj, kk, 2)) *
+                              (block.z(i, j, k) - profile_read(ii, jj, kk, 2)));
+                if (d <= d_min) {
+                  d_min = d;
+                  i0 = ii;
+                  j0 = jj;
+                  k0 = kk;
+                }
               }
             }
           }
-        }
 
-        // Assign the values in 0th order
-        for (int l = 3; l < nv_read; ++l) {
-          if (label_order[l] < n_var + 1) {
-            profile_to_match(i, j, label_order[l]) = profile_read(i0, j0, k0, l);
-          }
-        }
-
-        // If T or p is not given, compute it.
-        if (!has_temperature) {
-          real mw{mw_air};
-          if (species.n_spec > 0) {
-            mw = 0;
-            for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, j, 6 + l) / species.mw[l];
-            mw = 1 / mw;
-          }
-          profile_to_match(i, j, 5) = profile_to_match(i, j, 4) * mw / (R_u * profile_to_match(i, j, 0));
-        }
-        if (!has_pressure) {
-          real mw{mw_air};
-          if (species.n_spec > 0) {
-            mw = 0;
-            for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, j, 6 + l) / species.mw[l];
-            mw = 1 / mw;
-          }
-          profile_to_match(i, j, 4) = profile_to_match(i, j, 5) * R_u * profile_to_match(i, j, 0) / mw;
-        }
-        if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
-          // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
-          real mu;
-          if (species.n_spec > 0) {
-            real mw = 0;
-            std::vector<real> Y;
-            for (int l = 0; l < species.n_spec; ++l) {
-              mw += profile_to_match(i, j, 6 + l) / species.mw[l];
-              Y.push_back(profile_to_match(i, j, 6 + l));
+          // Assign the values in 0th order
+          for (int l = 3; l < nv_read; ++l) {
+            if (label_order[l] < n_var + 1) {
+              profile_to_match(i, j, kc, label_order[l]) = profile_read(i0, j0, k0, l);
             }
-            mw = 1 / mw;
-            mu = compute_viscosity(profile_to_match(i, j, 5), mw, Y.data(), species);
-          } else {
-            mu = Sutherland(profile_to_match(i, j, 5));
           }
-          real mut = mu * turb_viscosity_ratio;
-          const real vel2 = profile_to_match(i, j, 1) * profile_to_match(i, j, 1) +
-                            profile_to_match(i, j, 2) * profile_to_match(i, j, 2) +
-                            profile_to_match(i, j, 3) * profile_to_match(i, j, 3);
-          profile_to_match(i, j, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
-          profile_to_match(i, j, 6 + species.n_spec + 1) =
-              profile_to_match(i, j, 0) * profile_to_match(i, j, 6 + species.n_spec) / mut;
+
+          // If T or p is not given, compute it.
+          if (!has_temperature) {
+            real mw{mw_air};
+            if (species.n_spec > 0) {
+              mw = 0;
+              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, j, kc, 6 + l) / species.mw[l];
+              mw = 1 / mw;
+            }
+            profile_to_match(i, j, kc, 5) = profile_to_match(i, j, kc, 4) * mw / (R_u * profile_to_match(i, j, kc, 0));
+          }
+          if (!has_pressure) {
+            real mw{mw_air};
+            if (species.n_spec > 0) {
+              mw = 0;
+              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, j, kc, 6 + l) / species.mw[l];
+              mw = 1 / mw;
+            }
+            profile_to_match(i, j, kc, 4) = profile_to_match(i, j, kc, 5) * R_u * profile_to_match(i, j, kc, 0) / mw;
+          }
+          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+            // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
+            real mu;
+            if (species.n_spec > 0) {
+              real mw = 0;
+              std::vector<real> Y;
+              for (int l = 0; l < species.n_spec; ++l) {
+                mw += profile_to_match(i, j, kc, 6 + l) / species.mw[l];
+                Y.push_back(profile_to_match(i, j, kc, 6 + l));
+              }
+              mw = 1 / mw;
+              mu = compute_viscosity(profile_to_match(i, j, kc, 5), mw, Y.data(), species);
+            } else {
+              mu = Sutherland(profile_to_match(i, j, kc, 5));
+            }
+            real mut = mu * turb_viscosity_ratio;
+            const real vel2 = profile_to_match(i, j, kc, 1) * profile_to_match(i, j, kc, 1) +
+                              profile_to_match(i, j, kc, 2) * profile_to_match(i, j, kc, 2) +
+                              profile_to_match(i, j, kc, 3) * profile_to_match(i, j, kc, 3);
+            profile_to_match(i, j, kc, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
+            profile_to_match(i, j, kc, 6 + species.n_spec + 1) =
+                profile_to_match(i, j, kc, 0) * profile_to_match(i, j, kc, 6 + species.n_spec) / mut;
+          }
         }
       }
     }
     // Then we copy the data to the profile array.
-    profile.allocate_memory(block.mx, block.my, n_var + 1, ngg);
+    profile.allocate_memory(block.mx, block.my, 1 + ngg, n_var + 1, ngg);
     cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * (n_var + 1),
                cudaMemcpyHostToDevice);
     profile_to_match.deallocate_memory();
@@ -1041,7 +1094,8 @@ initialize_rng(curandState *rng_states, integer size, int64_t time_stamp) {
 void
 DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field) {
   if (const integer n_profile = parameter.get_int("n_profile"); n_profile > 0) {
-    profile_h_ptr.resize(n_profile);
+    profile_hPtr_withGhost.resize(n_profile);
+//    profile_h_ptr.resize(n_profile);
     for (integer i = 0; i < n_profile; ++i) {
       const auto file_name = parameter.get_string_array("profile_file_names")[i];
       const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[i];
@@ -1051,15 +1105,20 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
         auto &bs = mesh[blk].boundary;
         for (auto &b: bs) {
           if (b.type_label == label) {
-            read_profile(b, file_name, mesh[blk], parameter, species, profile_h_ptr[i], profile_related_bc_name);
+            read_profile(b, file_name, mesh[blk], parameter, species, profile_hPtr_withGhost[i],
+                         profile_related_bc_name);
+//            read_profile(b, file_name, mesh[blk], parameter, species, profile_h_ptr[i], profile_related_bc_name);
             break;
           }
         }
       }
     }
-    cudaMalloc(&profile_d_ptr, sizeof(ggxl::VectorField2D<real>) * n_profile);
-    cudaMemcpy(profile_d_ptr, profile_h_ptr.data(), sizeof(ggxl::VectorField2D<real>) * n_profile,
+    cudaMalloc(&profile_dPtr_withGhost, sizeof(ggxl::VectorField3D<real>) * n_profile);
+    cudaMemcpy(profile_dPtr_withGhost, profile_hPtr_withGhost.data(), sizeof(ggxl::VectorField3D<real>) * n_profile,
                cudaMemcpyHostToDevice);
+//    cudaMalloc(&profile_d_ptr, sizeof(ggxl::VectorField2D<real>) * n_profile);
+//    cudaMemcpy(profile_d_ptr, profile_h_ptr.data(), sizeof(ggxl::VectorField2D<real>) * n_profile,
+//               cudaMemcpyHostToDevice);
   }
 
   // Count the max number of rng needed

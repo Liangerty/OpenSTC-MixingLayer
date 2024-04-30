@@ -18,11 +18,11 @@ struct BCInfo {
 };
 
 void read_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
-                  const Species &species, ggxl::VectorField2D<real> &profile,
+                  const Species &species, ggxl::VectorField3D<real> &profile,
                   const std::string &profile_related_bc_name);
 
 void read_dat_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
-                      const Species &species, ggxl::VectorField2D<real> &profile,
+                      const Species &species, ggxl::VectorField3D<real> &profile,
                       const std::string &profile_related_bc_name);
 
 struct DBoundCond {
@@ -64,8 +64,11 @@ struct DBoundCond {
   Periodic *periodic = nullptr;
   // Profiles
   // For now, please make sure that all profiles are in the same plane, that the plane is not split into several parts.
-  std::vector<ggxl::VectorField2D<real>> profile_h_ptr;
-  ggxl::VectorField2D<real> *profile_d_ptr = nullptr;
+//  std::vector<ggxl::VectorField2D<real>> profile_h_ptr;
+//  ggxl::VectorField2D<real> *profile_d_ptr = nullptr;
+  // There may be inflow with values of ghost grids also given.
+  std::vector<ggxl::VectorField3D<real>> profile_hPtr_withGhost;
+  ggxl::VectorField3D<real> *profile_dPtr_withGhost = nullptr;
 
   curandState *rng_d_ptr = nullptr;
 
@@ -188,7 +191,7 @@ __global__ void apply_outflow(DZone *zone, integer i_face, const DParameter *par
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
 __global__ void
-apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggxl::VectorField2D<real> *profile_d_ptr,
+apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggxl::VectorField3D<real> *profile_d_ptr,
              curandState *rng_states_d_ptr) {
   const integer ngg = zone->ngg;
   integer dir[]{0, 0, 0};
@@ -209,6 +212,136 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
   real sv_b[MAX_SPEC_NUMBER + 4];
 
   if (inflow->inflow_type == 1) {
+    // Profile inflow
+    // For this type of inflow, the profile may specify the values for not only the inflow face, but also the ghost layers.
+    // Therefore, all parts including fluctuations and assigning values to ghost layers are done in this function.
+    // After all operations, we return directly.
+
+    auto &prof = profile_d_ptr[inflow->profile_idx];
+    int idx[3] = {i, j, k};
+    idx[b.face] = b.direction == 1 ? 0 : ngg;
+
+    density = prof(idx[0], idx[1], idx[2], 0);
+    u = prof(idx[0], idx[1], idx[2], 1);
+    v = prof(idx[0], idx[1], idx[2], 2);
+    w = prof(idx[0], idx[1], idx[2], 3);
+    p = prof(idx[0], idx[1], idx[2], 4);
+    T = prof(idx[0], idx[1], idx[2], 5);
+    for (int l = 0; l < n_scalar; ++l) {
+      sv_b[l] = prof(idx[0], idx[1], idx[2], 6 + l);
+    }
+    if constexpr (TurbMethod<turb>::hasMut) {
+      mut = density * sv_b[param->n_spec] / sv_b[param->n_spec + 1];
+    }
+    vel = sqrt(u * u + v * v + w * w);
+
+    if (inflow->fluctuation_type == 1) {
+      // White noise fluctuation
+      // We assume it obeying a N(0,rms^2) distribution
+      // The fluctuation is added to the velocity
+      auto index{0};
+      switch (b.face) {
+        case 1:
+          index = (k + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
+          break;
+        case 2:
+          index = (j + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
+          break;
+        case 0:
+        default:
+          index = (k + ngg) * (zone->my + 2 * ngg) + (j + ngg);
+          break;
+      }
+      auto &rng_state = rng_states_d_ptr[index];
+
+      real rms = inflow->fluctuation_intensity;
+
+      u += curand_normal_double(&rng_state) * rms * vel;
+      vel = sqrt(u * u + v * v + w * w);
+    }
+
+    // Specify the boundary value as given.
+    bv(i, j, k, 0) = density;
+    bv(i, j, k, 1) = u;
+    bv(i, j, k, 2) = v;
+    bv(i, j, k, 3) = w;
+    bv(i, j, k, 4) = p;
+    bv(i, j, k, 5) = T;
+    for (int l = 0; l < n_scalar; ++l) {
+      sv(i, j, k, l) = sv_b[l];
+    }
+    if constexpr (TurbMethod<turb>::hasMut) {
+      zone->mut(i, j, k) = mut;
+    }
+    zone->vel(i, j, k) = vel;
+    if constexpr (with_cv) {
+      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
+    }
+
+    // For ghost grids
+    for (integer g = 1; g <= ngg; g++) {
+      const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+      idx[b.face] = b.direction == 1 ? g : ngg - g;
+
+      density = prof(idx[0], idx[1], idx[2], 0);
+      u = prof(idx[0], idx[1], idx[2], 1);
+      v = prof(idx[0], idx[1], idx[2], 2);
+      w = prof(idx[0], idx[1], idx[2], 3);
+      p = prof(idx[0], idx[1], idx[2], 4);
+      T = prof(idx[0], idx[1], idx[2], 5);
+      for (int l = 0; l < n_scalar; ++l) {
+        sv_b[l] = prof(idx[0], idx[1], idx[2], 6 + l);
+      }
+      if constexpr (TurbMethod<turb>::hasMut) {
+        mut = density * sv_b[param->n_spec] / sv_b[param->n_spec + 1];
+      }
+      vel = sqrt(u * u + v * v + w * w);
+
+      if (inflow->fluctuation_type == 1) {
+        // White noise fluctuation
+        // We assume it obeying a N(0,rms^2) distribution
+        // The fluctuation is added to the velocity
+        auto index{0};
+        switch (b.face) {
+          case 1:
+            index = (k + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
+            break;
+          case 2:
+            index = (j + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
+            break;
+          case 0:
+          default:
+            index = (k + ngg) * (zone->my + 2 * ngg) + (j + ngg);
+            break;
+        }
+        auto &rng_state = rng_states_d_ptr[index];
+
+        real rms = inflow->fluctuation_intensity;
+
+        u += curand_normal_double(&rng_state) * rms * vel;
+        vel = sqrt(u * u + v * v + w * w);
+      }
+
+      bv(gi, gj, gk, 0) = density;
+      bv(gi, gj, gk, 1) = u;
+      bv(gi, gj, gk, 2) = v;
+      bv(gi, gj, gk, 3) = w;
+      bv(gi, gj, gk, 4) = p;
+      bv(gi, gj, gk, 5) = T;
+      for (int l = 0; l < n_scalar; ++l) {
+        sv(gi, gj, gk, l) = sv_b[l];
+      }
+      if constexpr (TurbMethod<turb>::hasMut) {
+        zone->mut(gi, gj, gk) = mut;
+      }
+      if constexpr (with_cv) {
+        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+      }
+    }
+    return;
+  }
+
+  if (inflow->inflow_type == 2) {
     // Mixing layer inflow
     const real u_upper = inflow->u, u_lower = inflow->u_lower;
     auto y = zone->y(i, j, k);
@@ -267,45 +400,20 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
     }
   } else {
     // Constant inflow
-    if (inflow->has_profile) {
-      auto &prof = profile_d_ptr[inflow->profile_idx];
-      int idx[2] = {j, k};
-      if (b.face == 1) {
-        idx[0] = i;
-      } else if (b.face == 2) {
-        idx[0] = i;
-        idx[1] = j;
-      }
-
-      density = prof(idx[0], idx[1], 0);
-      u = prof(idx[0], idx[1], 1);
-      v = prof(idx[0], idx[1], 2);
-      w = prof(idx[0], idx[1], 3);
-      p = prof(idx[0], idx[1], 4);
-      T = prof(idx[0], idx[1], 5);
-      for (int l = 0; l < n_scalar; ++l) {
-        sv_b[l] = prof(idx[0], idx[1], 6 + l);
-      }
-      if constexpr (TurbMethod<turb>::hasMut) {
-        mut = density * sv_b[param->n_spec] / sv_b[param->n_spec + 1];
-      }
-      vel = sqrt(u * u + v * v + w * w);
-    } else {
-      density = inflow->density;
-      u = inflow->u;
-      v = inflow->v;
-      w = inflow->w;
-      p = inflow->pressure;
-      T = inflow->temperature;
-      for (int l = 0; l < n_scalar; ++l) {
-        sv_b[l] = inflow->sv[l];
-      }
-
-      if constexpr (TurbMethod<turb>::hasMut) {
-        mut = inflow->mut;
-      }
-      vel = inflow->velocity;
+    density = inflow->density;
+    u = inflow->u;
+    v = inflow->v;
+    w = inflow->w;
+    p = inflow->pressure;
+    T = inflow->temperature;
+    for (int l = 0; l < n_scalar; ++l) {
+      sv_b[l] = inflow->sv[l];
     }
+
+    if constexpr (TurbMethod<turb>::hasMut) {
+      mut = inflow->mut;
+    }
+    vel = inflow->velocity;
 
     if (inflow->fluctuation_type == 1) {
       // White noise fluctuation
@@ -996,8 +1104,8 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_inflow<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param, profile_d_ptr,
-                                                            rng_d_ptr);
+      apply_inflow<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param,
+                                                            profile_dPtr_withGhost, rng_d_ptr);
     }
   }
   // 7 - subsonic inflow

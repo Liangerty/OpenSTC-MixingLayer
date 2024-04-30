@@ -11,8 +11,8 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
   label = std::get<integer>(info.at("label"));
   if (info.find("inflow_type") != info.end()) inflow_type = std::get<integer>(info.at("inflow_type"));
   if (parameter.get_int("problem_type") == 1)
-    inflow_type = 1;
-  if (parameter.get_int("problem_type") == 0 && inflow_type == 1)
+    inflow_type = 2;
+  if (parameter.get_int("problem_type") == 0 && inflow_type == 2)
     inflow_type = 0;
   if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<integer>(info.at("fluctuation_type"));
 
@@ -20,7 +20,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
   const integer n_spec{spec.n_spec};
   real gamma{gamma_air};
   real c{-1};
-  if (inflow_type == 1) {
+  if (inflow_type == 2) {
     // Mixing-layer problem.
     // The info should be treated differently from general cases.
     delta_omega = parameter.get_real("delta_omega");
@@ -185,7 +185,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       auto profile_related_bc_names = parameter.get_string_array("profile_related_bc_names");
       for (int i = 0; i < profile_related_bc_names.size(); ++i) {
         if (profile_related_bc_names[i] == inflow_name) {
-          has_profile = 1;
+          inflow_type = 1;
           profile_idx = i;
           break;
         }
@@ -252,7 +252,6 @@ cfd::Inflow::Inflow(const std::string &inflow_name, const cfd::Species &spec, co
   if (info.find("u") != info.end()) u = std::get<real>(info.at("u"));
   if (info.find("v") != info.end()) v = std::get<real>(info.at("v"));
   if (info.find("w") != info.end()) w = std::get<real>(info.at("w"));
-  if (info.find("has_profile") != info.end()) has_profile = std::get<integer>(info.at("has_profile"));
   if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<integer>(info.at("fluctuation_type"));
 
   const integer n_scalar = parameter.get_int("n_scalar");

@@ -436,7 +436,7 @@ void cfd::Field::initialize_basic_variables(const Parameter &parameter, const st
 
   for (integer i = 0; i < (integer) inflows.size(); ++i) {
     std::tie(rho[i], u[i], v[i], w[i], p[i], T[i]) = inflows[i].var_info();
-    if_profile[i] = inflows[i].has_profile;
+    if_profile[i] = inflows[i].inflow_type == 1 ? 1 : 0;
     if (if_profile[i]) {
       profile_id[i] = inflows[i].profile_idx;
       extents[i] = read_profile_to_init(profiles[i], i, parameter, species);

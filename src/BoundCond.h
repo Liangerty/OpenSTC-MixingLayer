@@ -30,6 +30,10 @@ struct Inflow {
   void copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &parameter);
 
   integer label = 5;
+  // The type of the inflow
+  // 0 - constant inflow
+  // 1 - profile inflow
+  // 2 - mixing layer inflow
   int inflow_type = 0;
 
   // This set is used for inflow_type = 0 (constant inflow).
@@ -58,7 +62,6 @@ struct Inflow {
   // When inflow_type = 1, we need the initial vorticity thickness
   real delta_omega = -1;
 
-  integer has_profile = 0;
   integer profile_idx = 0;
 
   integer fluctuation_type = 0;
