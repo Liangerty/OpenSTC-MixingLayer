@@ -741,12 +741,15 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, integ
 
   const integer n_var = param->n_var;
 
-  compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
-                                  &Fp[i_shared * 5], &Fm[i_shared * 5]);
-  for (size_t i = 0; i < n_add; i++) {
-    compute_flux<MixtureModel::Air>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
-                                    jac[ig_shared[i]], &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
-  }
+  // Li Xinliang
+//  compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
+//                                  &Fp[i_shared * 5], &Fm[i_shared * 5]);
+//  for (size_t i = 0; i < n_add; i++) {
+//    compute_flux<MixtureModel::Air>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
+//                                    jac[ig_shared[i]], &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
+//  }
+
+  // My version
 //  compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
 //                                  &Fk[i_shared * 5]);
 //  for (size_t i = 0; i < n_add; i++) {
@@ -818,15 +821,16 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, integ
 
   // Compute the characteristic flux with L.
   real fChar[5];
-  constexpr real eps{1e-40};
+//  constexpr real eps{1e-40};
   const real jac1{jac[i_shared]}, jac2{jac[i_shared + 1]};
-  const real eps_scaled = eps * param->weno_eps_scale * 0.25 *
-                          ((metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) *
-                           (metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) +
-                           (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) *
-                           (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) +
-                           (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2) *
-                           (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2));
+  const real eps_scaled = 1e-6 * param->weno_eps_scale;
+//  const real eps_scaled = eps * param->weno_eps_scale * 0.25 *
+//                          ((metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) *
+//                           (metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) +
+//                           (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) *
+//                           (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) +
+//                           (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2) *
+//                           (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2));
 //  const real eps_scaled = eps * param->weno_eps_scale *(jac[i_shared] + jac[i_shared + 1]) * 0.5; //
 //  real spec_rad[3];
 //  memset(spec_rad, 0, 3 * sizeof(real));
@@ -869,13 +873,15 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, integ
     real v[5];
     memset(v, 0, 5 * sizeof(real));
     for (int m = 0; m < 5; ++m) {
-      for (int n = 0; n < 5; ++n) {
-        v[m] += LR(l, n) * Fp[(i_shared - 2 + m) * 5 + n];
-      }
+      // Li Xinliang version
 //      for (int n = 0; n < 5; ++n) {
-//        v[m] +=
-//            lambda_p * LR(l, n) * cv[(i_shared - 2 + m) * (n_var + 2) + n] * 0.5 * (jac[i_shared] + jac[i_shared + 1]);
+//        v[m] += LR(l, n) * Fp[(i_shared - 2 + m) * 5 + n];
 //      }
+      // ACANS version
+      for (int n = 0; n < 5; ++n) {
+        v[m] +=
+            lambda_p * LR(l, n) * cv[(i_shared - 2 + m) * (n_var + 2) + n] * 0.5 * (jac[i_shared] + jac[i_shared + 1]);
+      }
 
 //      for (int n = 0; n < 5; ++n) {
 //        v[m] += LR(l, n) * (Fk[(i_shared - 2 + m) * 5 + n] + lambda_l * cv[(i_shared - 2 + m) * 7 + n] *
@@ -905,13 +911,14 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, integ
 
     memset(v, 0, 5 * sizeof(real));
     for (int m = 0; m < 5; ++m) {
-      for (int n = 0; n < 5; ++n) {
-        v[m] += LR(l, n) * Fm[(i_shared - 1 + m) * 5 + n];
-      }
 //      for (int n = 0; n < 5; ++n) {
-//        v[m] +=
-//            lambda_n * LR(l, n) * cv[(i_shared - 1 + m) * (n_var + 2) + n] * 0.5 * (jac[i_shared] + jac[i_shared + 1]);
+//        v[m] += LR(l, n) * Fm[(i_shared - 1 + m) * 5 + n];
 //      }
+
+      for (int n = 0; n < 5; ++n) {
+        v[m] +=
+            lambda_n * LR(l, n) * cv[(i_shared - 1 + m) * (n_var + 2) + n] * 0.5 * (jac[i_shared] + jac[i_shared + 1]);
+      }
 
       //      for (int n = 0; n < 5; ++n) {
 //        v[m] += LR(l, n) * (Fk[(i_shared - 1 + m) * 5 + n] - lambda_l * cv[(i_shared - 1 + m) * 7 + n] *

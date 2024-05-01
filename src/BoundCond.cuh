@@ -288,22 +288,22 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
     }
 
     // Specify the boundary value as given.
-    bv(i, j, k, 0) = density;
-    bv(i, j, k, 1) = u;
-    bv(i, j, k, 2) = v;
-    bv(i, j, k, 3) = w;
-    bv(i, j, k, 4) = p;
-    bv(i, j, k, 5) = T;
-    for (int l = 0; l < n_scalar; ++l) {
-      sv(i, j, k, l) = sv_b[l];
-    }
-    if constexpr (TurbMethod<turb>::hasMut) {
-      zone->mut(i, j, k) = mut;
-    }
-    zone->vel(i, j, k) = vel;
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
-    }
+//    bv(i, j, k, 0) = density;
+//    bv(i, j, k, 1) = u;
+//    bv(i, j, k, 2) = v;
+//    bv(i, j, k, 3) = w;
+//    bv(i, j, k, 4) = p;
+//    bv(i, j, k, 5) = T;
+//    for (int l = 0; l < n_scalar; ++l) {
+//      sv(i, j, k, l) = sv_b[l];
+//    }
+//    if constexpr (TurbMethod<turb>::hasMut) {
+//      zone->mut(i, j, k) = mut;
+//    }
+//    zone->vel(i, j, k) = vel;
+//    if constexpr (with_cv) {
+//      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
+//    }
 
     // For ghost grids
     for (integer g = 1; g <= ngg; g++) {
