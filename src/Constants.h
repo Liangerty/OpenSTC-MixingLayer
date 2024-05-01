@@ -28,4 +28,6 @@ constexpr double mw_air = 28.9647;
 constexpr double boltzmann_constants = 1.380649e-23;
 // Stefan-Boltzmann constant [W/(m^2*K^4)], fetched from [Stefan-Boltzmann constant](https://en.wikipedia.org/wiki/Stefan%E2%80%93Boltzmann_law)
 constexpr double stefan_boltzmann_constants = 5.670374419e-8;
+
+constexpr double pi = 3.1415926535;
 }

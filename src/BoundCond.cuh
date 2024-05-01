@@ -241,6 +241,7 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
     }
     vel = sqrt(u * u + v * v + w * w);
 
+    real bv_fluc_real[6], bv_fluc_imag[6];
     if (inflow->fluctuation_type == 1) {
       // White noise fluctuation
       // We assume it obeying a N(0,rms^2) distribution
@@ -264,13 +265,13 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
 
       u += curand_normal_double(&rng_state) * rms * vel;
       vel = sqrt(u * u + v * v + w * w);
-    } else if (inflow->fluctuation_type==2){
+    } else if (inflow->fluctuation_type == 2) {
       // LST fluctuation
       int idx_fluc[3]{i, j, k};
       idx_fluc[b.face] = 0;
-      auto&fluc_info = fluctuation_dPtr[inflow->fluc_prof_idx];
+      auto &fluc_info = fluctuation_dPtr[inflow->fluc_prof_idx];
 
-      real bv_fluc_real[6], bv_fluc_imag[6];
+      // rho u v w p t
       bv_fluc_real[0] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 0);
       bv_fluc_real[1] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 1);
       bv_fluc_real[2] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 2);
@@ -284,26 +285,39 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
       bv_fluc_imag[4] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 10);
       bv_fluc_imag[5] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 11);
 
-      real x_pos = zone->x(i, j, k), y_pos = zone->y(i, j, k), z_pos = zone->z(i, j, k);
+      real x = zone->x(i, j, k), z = zone->z(i, j, k);
+
+      real A0 = inflow->fluctuation_intensity;
+      real omega = 2.0 * pi * inflow->fluctuation_frequency;
+      real alpha = 2.0 * pi / inflow->streamwise_wavelength;
+      real beta = 2.0 * pi / inflow->spanwise_wavelength;
+      real t = param->physical_time;
+      real phi = alpha * x - omega * t;
+      density += A0 * (bv_fluc_real[0] * cos(phi) - bv_fluc_imag[0] * sin(phi)) * cos(beta * z);
+      u += A0 * (bv_fluc_real[1] * cos(phi) - bv_fluc_imag[1] * sin(phi)) * cos(beta * z);
+      v += A0 * (bv_fluc_real[2] * cos(phi) - bv_fluc_imag[2] * sin(phi)) * cos(beta * z);
+      w += A0 * (bv_fluc_real[3] * cos(phi) - bv_fluc_imag[3] * sin(phi)) * cos(beta * z);
+      T += A0 * (bv_fluc_real[5] * cos(phi) - bv_fluc_imag[5] * sin(phi)) * cos(beta * z);
+      p = density * R_u / mw_air * T;
     }
 
     // Specify the boundary value as given.
-//    bv(i, j, k, 0) = density;
-//    bv(i, j, k, 1) = u;
-//    bv(i, j, k, 2) = v;
-//    bv(i, j, k, 3) = w;
-//    bv(i, j, k, 4) = p;
-//    bv(i, j, k, 5) = T;
-//    for (int l = 0; l < n_scalar; ++l) {
-//      sv(i, j, k, l) = sv_b[l];
-//    }
-//    if constexpr (TurbMethod<turb>::hasMut) {
-//      zone->mut(i, j, k) = mut;
-//    }
-//    zone->vel(i, j, k) = vel;
-//    if constexpr (with_cv) {
-//      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
-//    }
+    bv(i, j, k, 0) = density;
+    bv(i, j, k, 1) = u;
+    bv(i, j, k, 2) = v;
+    bv(i, j, k, 3) = w;
+    bv(i, j, k, 4) = p;
+    bv(i, j, k, 5) = T;
+    for (int l = 0; l < n_scalar; ++l) {
+      sv(i, j, k, l) = sv_b[l];
+    }
+    if constexpr (TurbMethod<turb>::hasMut) {
+      zone->mut(i, j, k) = mut;
+    }
+    zone->vel(i, j, k) = vel;
+    if constexpr (with_cv) {
+      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
+    }
 
     // For ghost grids
     for (integer g = 1; g <= ngg; g++) {
@@ -347,6 +361,26 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
 
         u += curand_normal_double(&rng_state) * rms * vel;
         vel = sqrt(u * u + v * v + w * w);
+      } else if (inflow->fluctuation_type == 2) {
+        // LST fluctuation
+        // int idx_fluc[3]{i, j, k};
+        // idx_fluc[b.face] = 0;
+
+        real x = zone->x(gi, gj, gk), z = zone->z(gi, gj, gk);
+
+        real A0 = inflow->fluctuation_intensity;
+        real omega = 2.0 * pi * inflow->fluctuation_frequency;
+        real alpha = 2.0 * pi / inflow->streamwise_wavelength;
+        real beta = 2.0 * pi / inflow->spanwise_wavelength;
+        real t = param->physical_time;
+        real phi = alpha * x - omega * t;
+        density += A0 * (bv_fluc_real[0] * cos(phi) - bv_fluc_imag[0] * sin(phi)) * cos(beta * z);
+        u += A0 * (bv_fluc_real[1] * cos(phi) - bv_fluc_imag[1] * sin(phi)) * cos(beta * z);
+        v += A0 * (bv_fluc_real[2] * cos(phi) - bv_fluc_imag[2] * sin(phi)) * cos(beta * z);
+        w += A0 * (bv_fluc_real[3] * cos(phi) - bv_fluc_imag[3] * sin(phi)) * cos(beta * z);
+        T += A0 * (bv_fluc_real[5] * cos(phi) - bv_fluc_imag[5] * sin(phi)) * cos(beta * z);
+        p = density * R_u / mw_air * T;
+
       }
 
       bv(gi, gj, gk, 0) = density;
