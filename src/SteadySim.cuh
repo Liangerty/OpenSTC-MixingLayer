@@ -47,6 +47,12 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
 
   for (auto b = 0; b < n_block; ++b) {
     store_last_step<<<bpg[b], tpb>>>(field[b].d_ptr);
+    // Compute the conservative variables from basic variables
+    // In steady simulations, we may also need to use the upwind high-order method;
+    // we need the conservative variables.
+    const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
+    compute_cv_from_bv<mix_model, turb><<<BPG, tpb>>>(field[b].d_ptr, param);
   }
 
   while (!converged) {
@@ -83,7 +89,7 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
       implicit_treatment<mix_model, turb>(mesh[b], param, field[b].d_ptr, parameter, field[b].h_ptr, driver.bound_cond);
 
       // update conservative and basic variables
-      update_bv<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+      update_cv_and_bv<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
       // limit unphysical values computed by the program
       //limit_unphysical_variables<mix_model, turb>(field[b].d_ptr, param, b, step, bpg[b], tpb);
@@ -94,16 +100,16 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
       // the compiler will not treat the called function as a template function,
       // so we need to explicitly specify the "template" keyword here.
       // If we call this function in the "driver" member function, we can omit the "template" keyword, as shown in Driver.cu, line 88.
-      driver.bound_cond.template apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param);
+      driver.bound_cond.template apply_boundary_conditions<mix_model, turb, true>(mesh[b], field[b], param);
     }
     // Third, transfer data between and within processes
-    data_communication<mix_model, turb>(mesh, field, parameter, step, param);
+    data_communication<mix_model, turb, true>(mesh, field, parameter, step, param);
 
     if (mesh.dimension == 2) {
       for (auto b = 0; b < n_block; ++b) {
         const auto mx{mesh[b].mx}, my{mesh[b].my};
         dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, 1};
-        eliminate_k_gradient<<<BPG, tpb>>>(field[b].d_ptr, param);
+        eliminate_k_gradient<true><<<BPG, tpb>>>(field[b].d_ptr, param);
       }
     }
 
