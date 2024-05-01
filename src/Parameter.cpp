@@ -265,6 +265,7 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["mesh_file_type"] = 0;
   real_parameters["gridScale"] = 1.0;
   int_parameters["if_compute_wall_distance"] = 0;
+  int_parameters["wall_distance"] = 0;
 
   bool_parameters["steady"] = true; // Steady simulation is the default choice
   int_parameters["implicit_method"] = 0; // Explicit is used by default
@@ -331,6 +332,8 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["n_inflow_fluctuation"] = 0;
   int_array["need_rng"] = {};
   int_array["need_fluctuation_profile"] = {};
+  string_array["fluctuation_profile_file"] = {};
+  string_array["fluctuation_profile_related_bc_name"] = {};
   bool_parameters["perform_spanwise_average"] = false;
   bool_parameters["positive_preserving"] = false;
 }

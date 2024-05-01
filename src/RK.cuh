@@ -16,6 +16,12 @@ __device__ constexpr real c[3]{1.0, 0.25, 2.0 / 3.0};
 template<MixtureModel mix_model, class turb_method>
 __global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt, integer rk);
 
+__global__ void update_physical_time(DParameter *param, real t);
+
+__global__ void update_physical_time(DParameter *param, real t) {
+  param->physical_time = t;
+}
+
 template<MixtureModel mix_model, class turb>
 void RK3_bv(Driver<mix_model, turb> &driver) {
   if (driver.myid == 0) {
@@ -87,6 +93,8 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
 
   while (!finished) {
     ++step;
+
+    update_physical_time<<<1, 1>>>(param, physical_time);
 
     // Start a single iteration
     // First, store the value of last step if we need to compute residual

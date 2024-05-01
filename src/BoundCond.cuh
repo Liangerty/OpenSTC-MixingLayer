@@ -22,8 +22,8 @@ void read_profile(const Boundary &boundary, const std::string &file, const Block
                   const std::string &profile_related_bc_name);
 
 void read_lst_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
-                  const Species &species, ggxl::VectorField3D<real> &profile,
-                  const std::string &profile_related_bc_name);
+                      const Species &species, ggxl::VectorField3D<real> &profile,
+                      const std::string &profile_related_bc_name);
 
 void read_dat_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
                       const Species &species, ggxl::VectorField3D<real> &profile,
@@ -855,9 +855,12 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, integer i
 
     const real rho_g{p_i * mw / (t_g * cfd::R_u)};
     bv(i_gh[0], i_gh[1], i_gh[2], 0) = rho_g;
-    bv(i_gh[0], i_gh[1], i_gh[2], 1) = 0;
-    bv(i_gh[0], i_gh[1], i_gh[2], 2) = 0;
-    bv(i_gh[0], i_gh[1], i_gh[2], 3) = 0;
+    bv(i_gh[0], i_gh[1], i_gh[2], 1) = -bv(i_in[0], i_in[1], i_in[2], 1);
+    bv(i_gh[0], i_gh[1], i_gh[2], 2) = -bv(i_in[0], i_in[1], i_in[2], 2);
+    bv(i_gh[0], i_gh[1], i_gh[2], 3) = -bv(i_in[0], i_in[1], i_in[2], 3);
+//    bv(i_gh[0], i_gh[1], i_gh[2], 1) = 0;
+//    bv(i_gh[0], i_gh[1], i_gh[2], 2) = 0;
+//    bv(i_gh[0], i_gh[1], i_gh[2], 3) = 0;
     bv(i_gh[0], i_gh[1], i_gh[2], 4) = p_i;
     bv(i_gh[0], i_gh[1], i_gh[2], 5) = t_g;
 
