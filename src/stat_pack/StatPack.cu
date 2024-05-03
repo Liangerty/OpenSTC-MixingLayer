@@ -180,10 +180,9 @@ __device__ void turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone 
   auto &stat = zone->user_defined_statistical_data;
   auto &collect = zone->userCollectForStat;
   auto &firstOrderMoment = zone->firstOrderMoment;
-  auto &rey_tensor = zone->reynolds_stress_tensor;
 
   const real counter_inv{1.0 / counter};
-  real add{0}, add_kolmogorov{0}, add_tau_eta{0};
+  real add{0};
   for (int k = 0; k < mz; ++k) {
     const real density = firstOrderMoment(i, j, k, 0) * counter_inv;
     auto rhoEps = collect(i, j, k, collected_idx + 15) / counter_ud[collected_idx + 15]
@@ -205,28 +204,25 @@ __device__ void turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone 
                     (counter_ud[collected_idx + 7] * counter_ud[collected_idx + 13])
                   - collect(i, j, k, collected_idx + 14) * collect(i, j, k, collected_idx + 8) /
                     (counter_ud[collected_idx + 8] * counter_ud[collected_idx + 14]);
-    const auto Eps{max(rhoEps / density, 1e-30)};
-    add += Eps;
-
-    real nu;
-    auto T{firstOrderMoment(i, j, k, 5) * counter_inv};
-    if (param->n_spec > 0) {
-      real Y[MAX_SPEC_NUMBER], mw{0};
-      for (int l = 0; l < param->n_spec; ++l) {
-        Y[l] = firstOrderMoment(i, j, k, l + 6) * counter_inv;
-        mw += Y[l] / param->mw[l];
-      }
-      mw = 1.0 / mw;
-      nu = compute_viscosity(T, mw, Y, param) / density;
-    } else {
-      nu = Sutherland(T) / density;
-    }
-    add_kolmogorov += pow(nu * nu * nu / Eps, 0.25);
-    add_tau_eta += sqrt(nu / Eps);
+    add += max(rhoEps / density, 1e-30);
   }
   stat(i, j, 0, stat_idx) = add / mz;
-  stat(i, j, 0, stat_idx + 1) = add_kolmogorov / mz;
-  stat(i, j, 0, stat_idx + 2) = add_tau_eta / mz;
+  real nu;
+  auto &mean = zone->mean_value;
+  if (param->n_spec > 0) {
+    real Y[MAX_SPEC_NUMBER], mw{0};
+    for (int l = 0; l < param->n_spec; ++l) {
+      Y[l] = mean(i, j, 0, l + 6);
+      mw += mean(i, j, 0, l + 6) / param->mw[l];
+    }
+    mw = 1.0 / mw;
+    nu = compute_viscosity(mean(i, j, 0, 5), mw, Y, param) / mean(i, j, 0, 0);
+  } else {
+    nu = Sutherland(mean(i, j, 0, 5)) / mean(i, j, 0, 0);
+  }
+  stat(i, j, 0, stat_idx + 1) = pow(nu * nu * nu / stat(i, j, 0, stat_idx), 0.25);
+  stat(i, j, 0, stat_idx + 2) = sqrt(nu / stat(i, j, 0, stat_idx));
+  auto &rey_tensor = zone->reynolds_stress_tensor;
   stat(i, j, 0, stat_idx + 3) =
       0.5 * (rey_tensor(i, j, 0, 0) + rey_tensor(i, j, 0, 1) + rey_tensor(i, j, 0, 2)) / stat(i, j, 0, stat_idx);
 }
