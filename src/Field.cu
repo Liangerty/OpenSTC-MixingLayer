@@ -535,7 +535,6 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
 
   h_ptr->cv.allocate_memory(mx, my, mz, n_var, ngg);
   h_ptr->bv.allocate_memory(mx, my, mz, 6, ngg);
-//  cudaMemcpy(h_ptr->bv.data(), bv.data(), sizeof(real) * h_ptr->bv.size() * 6, cudaMemcpyHostToDevice);
   h_ptr->bv_last.allocate_memory(mx, my, mz, 4, 0);
   h_ptr->vel.allocate_memory(mx, my, mz, ngg);
   h_ptr->acoustic_speed.allocate_memory(mx, my, mz, ngg);
@@ -546,7 +545,6 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   const auto n_spec{parameter.get_int("n_spec")};
   const auto n_scalar = parameter.get_int("n_scalar");
   h_ptr->sv.allocate_memory(mx, my, mz, n_scalar, ngg);
-//  cudaMemcpy(h_ptr->sv.data(), sv.data(), sizeof(real) * h_ptr->sv.size() * n_scalar, cudaMemcpyHostToDevice);
   h_ptr->rho_D.allocate_memory(mx, my, mz, n_spec, ngg);
   if (n_spec > 0) {
     h_ptr->gamma.allocate_memory(mx, my, mz, ngg);

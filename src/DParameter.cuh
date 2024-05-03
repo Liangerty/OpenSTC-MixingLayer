@@ -37,6 +37,7 @@ struct DParameter {
   integer viscous_scheme = 0; // The tag for viscous scheme. 0 - Inviscid, 2 - 2nd order central discretization
 
   real dt = -1; // The global time step. If -1, we use the local time step.
+  real physical_time = 0; // The physical time of the simulation
 
   integer rans_model = 0;  // The tag for RANS model. 0 - Laminar, 1 - SA, 2 - SST
   integer turb_implicit = 1;    // If we implicitly treat the turbulent source term. By default, implicitly treat(1), else, 0(explicit)

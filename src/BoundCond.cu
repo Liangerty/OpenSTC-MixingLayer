@@ -1252,7 +1252,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
     // i direction
     ggxl::VectorField3DHost<real> profile_to_match;
     // The 2*ngg ghost layers in x direction are not used.
-    profile_to_match.resize(1, block.my, block.mz, 2 * (n_var + 1), 0);
+    profile_to_match.resize(1, block.my, block.mz, 2 * (n_var + 1), ngg);
     const int i = boundary.direction == 1 ? block.mx - 1 : 0;
     // Then we interpolate the profile to the mesh.
     for (int k = range_k[0]; k <= range_k[1]; ++k) {
@@ -1287,14 +1287,14 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
       }
     }
     // Then we copy the data to the profile array.
-    profile.allocate_memory(1, block.my, block.mz, 2 * (n_var + 1), 0);
+    profile.allocate_memory(1, block.my, block.mz, 2 * (n_var + 1), ngg);
     cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * 2 * (n_var + 1),
                cudaMemcpyHostToDevice);
     profile_to_match.deallocate_memory();
   } else if (direction == 1) {
     // j direction
     ggxl::VectorField3DHost<real> profile_to_match;
-    profile_to_match.resize(block.mx, 1, block.mz, 2 * (n_var + 1), 0);
+    profile_to_match.resize(block.mx, 1, block.mz, 2 * (n_var + 1), ngg);
     const int j = boundary.direction == 1 ? block.my - 1 : 0;
     // Then we interpolate the profile to the mesh.
     for (int k = range_k[0]; k <= range_k[1]; ++k) {
@@ -1329,14 +1329,14 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
       }
     }
     // Then we copy the data to the profile array.
-    profile.allocate_memory(block.mx, 1, block.mz, 2 * (n_var + 1), 0);
+    profile.allocate_memory(block.mx, 1, block.mz, 2 * (n_var + 1), ngg);
     cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * 2 * (n_var + 1),
                cudaMemcpyHostToDevice);
     profile_to_match.deallocate_memory();
   } else if (direction == 2) {
     // k direction
     ggxl::VectorField3DHost<real> profile_to_match;
-    profile_to_match.resize(block.mx, block.my, 1, 2 * (n_var + 1), 0);
+    profile_to_match.resize(block.mx, block.my, 1, 2 * (n_var + 1), ngg);
     const int k = boundary.direction == 1 ? block.mz - 1 : 0;
     // Then we interpolate the profile to the mesh.
     for (int j = range_j[0]; j <= range_j[1]; ++j) {
@@ -1371,7 +1371,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
       }
     }
     // Then we copy the data to the profile array.
-    profile.allocate_memory(block.mx, block.my, 1, 2 * (n_var + 1), 0);
+    profile.allocate_memory(block.mx, block.my, 1, 2 * (n_var + 1), ngg);
     cudaMemcpy(profile.data(), profile_to_match.data(), sizeof(real) * profile_to_match.size() * 2 * (n_var + 1),
                cudaMemcpyHostToDevice);
     profile_to_match.deallocate_memory();
@@ -1443,7 +1443,7 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
     fluctuation_hPtr.resize(n_fluc_profile);
     for (int i = 0; i < n_fluc_profile; ++i) {
       const auto file_name = parameter.get_string_array("fluctuation_profile_file")[i];
-      auto bc_name = parameter.get_string_array("fluctuation_profile_bc_name")[i];
+      auto bc_name = parameter.get_string_array("fluctuation_profile_related_bc_name")[i];
       const auto &nn = parameter.get_struct(bc_name);
       const auto label = std::get<integer>(nn.at("label"));
       for (integer blk = 0; blk < mesh.n_block; ++blk) {

@@ -70,8 +70,11 @@ struct Inflow {
   integer fluctuation_type = 0;
   // If the fluctuation type is 1, this is the intensity of the fluctuation.
   real fluctuation_intensity = 0;
+  real streamwise_wavelength = 0;
+  real spanwise_wavelength = 0;
   // If the fluctuation type is 2, the following parameters should be given.
   int fluc_prof_idx = 0;
+  real fluctuation_frequency = 0;
 };
 
 struct Wall {
