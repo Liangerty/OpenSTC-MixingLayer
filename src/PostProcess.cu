@@ -68,3 +68,8 @@ __global__ void cfd::wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction,
   heat_flux[i] = conductivity * (pv(i, 1, 0, 5) - pv(i, 0, 0, 5)) * grad_eta;
 
 }
+
+void cfd::wall_friction_heatflux_3d(const cfd::Mesh &mesh, const std::vector<cfd::Field> &field,
+                                    const cfd::Parameter &parameter) {
+
+}

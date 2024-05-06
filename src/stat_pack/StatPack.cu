@@ -280,26 +280,51 @@ H2_variance_and_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *par
   const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
   const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
   const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
-  const real z_x = 0.5 * (xi_x * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
-                          eta_x * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
-                          zeta_x * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
-  const real z_y = 0.5 * (xi_y * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
-                          eta_y * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
-                          zeta_y * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
-  const real z_z = 0.5 * (xi_z * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
-                          eta_z * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
-                          zeta_z * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
-  auto chi = 2.0 / mean(i, j, k, 0) * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
-                                       2.0 * collected_moments(i, j, k, collected_idx + 2) /
-                                       counter_ud[collected_idx + 2] * z_x -
-                                       2.0 * collected_moments(i, j, k, collected_idx + 3) /
-                                       counter_ud[collected_idx + 3] * z_y -
-                                       2.0 * collected_moments(i, j, k, collected_idx + 4) /
-                                       counter_ud[collected_idx + 4] * z_z +
-                                       collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
-                                       (z_x * z_x + z_y * z_y + z_z * z_z));
+  auto mx{zone->mx}, my{zone->my}, mz{zone->mz};
+  real chi{0.0};
+  if (mz == 1) {
+    // 2D case
+    if (i > 0 && i < mx - 1 && j > 0 && j < my - 1) {
+      const real z_x = 0.5 * (xi_x * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                              eta_x * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)));
+      const real z_y = 0.5 * (xi_y * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                              eta_y * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)));
+      const real z_z = 0.5 * (xi_z * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                              eta_z * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)));
+      chi = 2.0 / mean(i, j, k, 0) * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
+                                      2.0 * collected_moments(i, j, k, collected_idx + 2) /
+                                      counter_ud[collected_idx + 2] * z_x -
+                                      2.0 * collected_moments(i, j, k, collected_idx + 3) /
+                                      counter_ud[collected_idx + 3] * z_y -
+                                      2.0 * collected_moments(i, j, k, collected_idx + 4) /
+                                      counter_ud[collected_idx + 4] * z_z +
+                                      collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
+                                      (z_x * z_x + z_y * z_y + z_z * z_z));
+    }
+  } else {
+    if (i > 0 && i < mx - 1 && j > 0 && j < my - 1 && k > 0 && k < mz - 1) {
+      const real z_x = 0.5 * (xi_x * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                              eta_x * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
+                              zeta_x * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
+      const real z_y = 0.5 * (xi_y * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                              eta_y * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
+                              zeta_y * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
+      const real z_z = 0.5 * (xi_z * (mean(i + 1, j, k, 6 + z_idx) - mean(i - 1, j, k, 6 + z_idx)) +
+                              eta_z * (mean(i, j + 1, k, 6 + z_idx) - mean(i, j - 1, k, 6 + z_idx)) +
+                              zeta_z * (mean(i, j, k + 1, 6 + z_idx) - mean(i, j, k - 1, 6 + z_idx)));
+      chi = 2.0 / mean(i, j, k, 0) * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
+                                      2.0 * collected_moments(i, j, k, collected_idx + 2) /
+                                      counter_ud[collected_idx + 2] * z_x -
+                                      2.0 * collected_moments(i, j, k, collected_idx + 3) /
+                                      counter_ud[collected_idx + 3] * z_y -
+                                      2.0 * collected_moments(i, j, k, collected_idx + 4) /
+                                      counter_ud[collected_idx + 4] * z_z +
+                                      collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
+                                      (z_x * z_x + z_y * z_y + z_z * z_z));
+    }
+  }
   stat(i, j, k, stat_idx + 1) = max(chi, 1e-30);
-  stat(i, j, k, stat_idx + 2) = stat(i, j, k, stat_idx) / max(chi, 1e-30);
+  stat(i, j, k, stat_idx + 2) = min(stat(i, j, k, stat_idx) / max(chi, 1e-30), 1.0);
 }
 
 __device__ void H2_variance_and_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
@@ -312,39 +337,82 @@ __device__ void H2_variance_and_dissipation_rate::compute_spanwise_average(cfd::
 
   const real counter_inv{1.0 / counter};
   real add_zVar{0}, add_chi{0};
-  for (int k = 0; k < mz; ++k) {
-    const real density = firstOrderMoment(i, j, k, 0) * counter_inv;
-    const real z_favre = firstOrderMoment(i, j, k, 6 + z_idx) * counter_inv / density;
+  auto mx{zone->mx}, my{zone->my};
+  if (mz == 1) {
+    const real density = firstOrderMoment(i, j, 0, 0) * counter_inv;
+    const real z_favre = firstOrderMoment(i, j, 0, 6 + z_idx) * counter_inv / density;
     // {z''z''}
-    add_zVar += collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] / density -
-                z_favre * z_favre;
+    add_zVar += max(collected_moments(i, j, 0, collected_idx) / counter_ud[collected_idx] / density -
+                    z_favre * z_favre, 1e-30);
+
     // compute the surrounding 8 points' z_favre
-    const real d_zFavre_x = firstOrderMoment(i + 1, j, k, 6 + z_idx) / firstOrderMoment(i + 1, j, k, 0) -
-                            firstOrderMoment(i - 1, j, k, 6 + z_idx) / firstOrderMoment(i - 1, j, k, 0);
-    const real d_zFavre_y = firstOrderMoment(i, j + 1, k, 6 + z_idx) / firstOrderMoment(i, j + 1, k, 0) -
-                            firstOrderMoment(i, j - 1, k, 6 + z_idx) / firstOrderMoment(i, j - 1, k, 0);
-    const real d_zFavre_z = firstOrderMoment(i, j, k + 1, 6 + z_idx) / firstOrderMoment(i, j, k + 1, 0) -
-                            firstOrderMoment(i, j, k - 1, 6 + z_idx) / firstOrderMoment(i, j, k - 1, 0);
-    // compute the gradient of z
-    const auto &m = zone->metric(i, j, k);
-    const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
-    const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
-    const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
-    const real z_x = 0.5 * (xi_x * d_zFavre_x + eta_x * d_zFavre_y + zeta_x * d_zFavre_z);
-    const real z_y = 0.5 * (xi_y * d_zFavre_x + eta_y * d_zFavre_y + zeta_y * d_zFavre_z);
-    const real z_z = 0.5 * (xi_z * d_zFavre_x + eta_z * d_zFavre_y + zeta_z * d_zFavre_z);
-    // chi=2/<rho>*[<rho*D*gradZ*gradZ>-2<rho*D*Zx>*{Z}_x-2<rho*D*Zy>*{Z}_y-2<rho*D*Zz>*{Z}_z+<rho*D>*grad{Z}*grad{Z}]
-    auto chi = 2 / density * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
-                              2 * collected_moments(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] * z_x -
-                              2 * collected_moments(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3] * z_y -
-                              2 * collected_moments(i, j, k, collected_idx + 4) / counter_ud[collected_idx + 4] * z_z +
-                              collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
-                              (z_x * z_x + z_y * z_y + z_z * z_z));
-    add_chi += max(chi, 1e-30);
+    auto chi{0.0};
+    if (i > 0 && i < mx - 1 && j > 0 && j < my - 1) {
+      const real d_zFavre_x = firstOrderMoment(i + 1, j, 0, 6 + z_idx) / firstOrderMoment(i + 1, j, 0, 0) -
+                              firstOrderMoment(i - 1, j, 0, 6 + z_idx) / firstOrderMoment(i - 1, j, 0, 0);
+      const real d_zFavre_y = firstOrderMoment(i, j + 1, 0, 6 + z_idx) / firstOrderMoment(i, j + 1, 0, 0) -
+                              firstOrderMoment(i, j - 1, 0, 6 + z_idx) / firstOrderMoment(i, j - 1, 0, 0);
+      // compute the gradient of z
+      const auto &m = zone->metric(i, j, 0);
+      const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
+      const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
+      const real z_x = 0.5 * (xi_x * d_zFavre_x + eta_x * d_zFavre_y);
+      const real z_y = 0.5 * (xi_y * d_zFavre_x + eta_y * d_zFavre_y);
+      const real z_z = 0.5 * (xi_z * d_zFavre_x + eta_z * d_zFavre_y);
+      // chi=2/<rho>*[<rho*D*gradZ*gradZ>-2<rho*D*Zx>*{Z}_x-2<rho*D*Zy>*{Z}_y-2<rho*D*Zz>*{Z}_z+<rho*D>*grad{Z}*grad{Z}]
+      chi = 2 / density * (collected_moments(i, j, 0, collected_idx + 1) / counter_ud[collected_idx + 1] -
+                           2 * collected_moments(i, j, 0, collected_idx + 2) / counter_ud[collected_idx + 2] *
+                           z_x -
+                           2 * collected_moments(i, j, 0, collected_idx + 3) / counter_ud[collected_idx + 3] *
+                           z_y -
+                           2 * collected_moments(i, j, 0, collected_idx + 4) / counter_ud[collected_idx + 4] *
+                           z_z + collected_moments(i, j, 0, collected_idx + 5) / counter_ud[collected_idx + 5] *
+                                 (z_x * z_x + z_y * z_y + z_z * z_z));
+    }
+    stat(i, j, 0, stat_idx) = add_zVar;
+    stat(i, j, 0, stat_idx + 1) = max(chi, 1e-30);
+    stat(i, j, 0, stat_idx + 2) = min(add_zVar / max(chi, 1e-30), 1.0);
+  } else {
+    for (int k = 0; k < mz; ++k) {
+      const real density = firstOrderMoment(i, j, k, 0) * counter_inv;
+      const real z_favre = firstOrderMoment(i, j, k, 6 + z_idx) * counter_inv / density;
+      // {z''z''}
+      add_zVar += max(collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] / density -
+                      z_favre * z_favre, 1e-30);
+
+      // compute the surrounding 8 points' z_favre
+      if (i > 0 && i < mx - 1 && j > 0 && j < my - 1 && k > 0 && k < mz - 1) {
+        const real d_zFavre_x = firstOrderMoment(i + 1, j, k, 6 + z_idx) / firstOrderMoment(i + 1, j, k, 0) -
+                                firstOrderMoment(i - 1, j, k, 6 + z_idx) / firstOrderMoment(i - 1, j, k, 0);
+        const real d_zFavre_y = firstOrderMoment(i, j + 1, k, 6 + z_idx) / firstOrderMoment(i, j + 1, k, 0) -
+                                firstOrderMoment(i, j - 1, k, 6 + z_idx) / firstOrderMoment(i, j - 1, k, 0);
+        const real d_zFavre_z = firstOrderMoment(i, j, k + 1, 6 + z_idx) / firstOrderMoment(i, j, k + 1, 0) -
+                                firstOrderMoment(i, j, k - 1, 6 + z_idx) / firstOrderMoment(i, j, k - 1, 0);
+        // compute the gradient of z
+        const auto &m = zone->metric(i, j, k);
+        const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
+        const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
+        const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
+        const real z_x = 0.5 * (xi_x * d_zFavre_x + eta_x * d_zFavre_y + zeta_x * d_zFavre_z);
+        const real z_y = 0.5 * (xi_y * d_zFavre_x + eta_y * d_zFavre_y + zeta_y * d_zFavre_z);
+        const real z_z = 0.5 * (xi_z * d_zFavre_x + eta_z * d_zFavre_y + zeta_z * d_zFavre_z);
+        // chi=2/<rho>*[<rho*D*gradZ*gradZ>-2<rho*D*Zx>*{Z}_x-2<rho*D*Zy>*{Z}_y-2<rho*D*Zz>*{Z}_z+<rho*D>*grad{Z}*grad{Z}]
+        auto chi = 2.0 / density * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
+                                    2 * collected_moments(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] *
+                                    z_x -
+                                    2 * collected_moments(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3] *
+                                    z_y -
+                                    2 * collected_moments(i, j, k, collected_idx + 4) / counter_ud[collected_idx + 4] *
+                                    z_z +
+                                    collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
+                                    (z_x * z_x + z_y * z_y + z_z * z_z));
+        add_chi += max(chi, 1e-30);
+      }
+    }
+    stat(i, j, 0, stat_idx) = add_zVar / mz;
+    stat(i, j, 0, stat_idx + 1) = add_chi / (mz - 2);
+    stat(i, j, 0, stat_idx + 2) = stat(i, j, 0, stat_idx) / stat(i, j, 0, stat_idx + 1);
   }
-  stat(i, j, 0, stat_idx) = add_zVar / mz;
-  stat(i, j, 0, stat_idx + 1) = add_chi / mz;
-  stat(i, j, 0, stat_idx + 2) = add_zVar / add_chi;
 }
 
 __device__ void

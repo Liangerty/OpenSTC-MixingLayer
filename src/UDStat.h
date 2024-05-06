@@ -70,14 +70,46 @@ compute_user_defined_statistical_data(cfd::DZone *zone, cfd::DParameter *param, 
     collect_idx += stats::n_collect;
   }(), ...);
 }
+template<typename... stats>
+__global__ void
+compute_user_defined_statistical_data(DZone *zone, DParameter *param, integer counter, const integer *counter_ud) {
+  const integer extent[3]{zone->mx, zone->my, zone->mz};
+  const auto i = (integer) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = (integer) (blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
+
+  auto l = 0, collect_idx = 0;
+  ([&]() {
+    stats::compute(zone, param, counter_ud, i, j, k, counter, l, collect_idx);
+    l += stats::n_stat;
+    collect_idx += stats::n_collect;
+  }(), ...);
+}
 
 template<typename... stats>
 __device__ void
 compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud,
-                                      integer i, integer j, integer mz, integer counter) {
+                                                            integer i, integer j, integer mz, integer counter) {
   auto l = 0, collect_idx = 0;
   ([&]() {
     stats::compute_spanwise_average(zone, param, counter_ud, i, j, mz, counter, l, collect_idx);
+    l += stats::n_stat;
+    collect_idx += stats::n_collect;
+  }(), ...);
+}
+template<typename... stats>
+__global__ void
+compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud,
+                                                            integer counter) {
+  const integer extent[3]{zone->mx, zone->my, zone->mz};
+  const auto i = (integer) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = (integer) (blockDim.y * blockIdx.y + threadIdx.y);
+  if (i >= extent[0] || j >= extent[1]) return;
+
+  auto l = 0, collect_idx = 0;
+  ([&]() {
+    stats::compute_spanwise_average(zone, param, counter_ud, i, j, zone->mz, counter, l, collect_idx);
     l += stats::n_stat;
     collect_idx += stats::n_collect;
   }(), ...);

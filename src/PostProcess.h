@@ -27,6 +27,9 @@ void post_process(Driver<mix_model, turb> &driver) {
       case 0: // Compute the 2D cf/qw
         wall_friction_heatflux_2d(driver.mesh, driver.field, parameter);
         break;
+      case 1: // Compute 3D cf/qw
+        wall_friction_heatflux_3d(driver.mesh, driver.field, parameter);
+        break;
       default:
         break;
     }
@@ -38,4 +41,10 @@ void post_process(Driver<mix_model, turb> &driver) {
 void wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Field> &field, const Parameter &parameter);
 
 __global__ void wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction, real *heat_flux, real dyn_pressure);
+
+// Compute the wall friction and heat flux in 3D. Assume the wall is the j=0 plane
+// Procedure 0
+void wall_friction_heatflux_3d(const Mesh &mesh, const std::vector<cfd::Field> &field, const Parameter &parameter);
+
+__global__ void wall_friction_heatFlux_3d(cfd::DZone *zone, real *friction, real *heat_flux, real dyn_pressure);
 }

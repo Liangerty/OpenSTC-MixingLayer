@@ -251,6 +251,7 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
       const auto mx{mesh[b].mx}, my{mesh[b].my};
       dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, 1};
       compute_statistical_data_spanwise_average<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
+      compute_user_defined_statistical_data_with_spanwise_average<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter_ud_device, counter);
       auto sz = mx * my * sizeof(real);
       cudaDeviceSynchronize();
       cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value.data(), sz * (6 + n_scalar),
@@ -265,6 +266,7 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
       const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
       dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
       compute_statistical_data<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
+      compute_user_defined_statistical_data<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
       auto sz = mx * my * mz * sizeof(real);
       cudaDeviceSynchronize();
       cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value.data(), sz * (6 + n_scalar),
@@ -477,8 +479,6 @@ __global__ void compute_statistical_data(DZone *zone, DParameter *param, integer
   rey_tensor(i, j, k, 3) = vel2ndMoment(i, j, k, 3) * den - mean(i, j, k, 1) * mean(i, j, k, 2);
   rey_tensor(i, j, k, 4) = vel2ndMoment(i, j, k, 4) * den - mean(i, j, k, 1) * mean(i, j, k, 3);
   rey_tensor(i, j, k, 5) = vel2ndMoment(i, j, k, 5) * den - mean(i, j, k, 2) * mean(i, j, k, 3);
-
-  compute_user_defined_statistical_data<USER_DEFINE_STATISTICS>(zone, param, counter_ud, i, j, k, counter);
 }
 
 __global__ void
@@ -536,9 +536,6 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, intege
   for (int l = 0; l < 6; ++l) {
     rey_tensor(i, j, 0, l) = rey_tensor_add[l] / extent[2];
   }
-
-  compute_user_defined_statistical_data_with_spanwise_average<USER_DEFINE_STATISTICS>(zone, param, counter_ud, i, j,
-                                                                                      extent[2], counter);
 }
 
 } // cfd
