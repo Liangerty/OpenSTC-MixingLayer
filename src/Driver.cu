@@ -74,9 +74,7 @@ void Driver<mix_model, turb>::initialize_computation() {
   for (integer b = 0; b < mesh.n_block; ++b) {
     bound_cond.apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param);
   }
-//  if (myid == 0) {
   printf("Boundary conditions are applied successfully for initialization on process %d\n", myid);
-//  }
 
 
   // First, compute the conservative variables from basic variables
@@ -93,9 +91,7 @@ void Driver<mix_model, turb>::initialize_computation() {
   printf("Before data communication on process %d\n", myid);
   data_communication<mix_model, turb>(mesh, field, parameter, 0, param);
 
-//  if (myid == 0) {
   printf("Finish data transfer on process %d.\n", myid);
-//  }
   cudaDeviceSynchronize();
 
   for (auto b = 0; b < mesh.n_block; ++b) {
@@ -155,10 +151,10 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
       real mu, gamma{gamma_air}, mw{mw_air};
       if (ns > 0) {
         real cp_i[MAX_SPEC_NUMBER];
-        compute_cp(var_info[5], cp_i, species);
+        species.compute_cp(var_info[5], cp_i);
         real cp{0};
         mw = 0;
-        for (auto [name, i]: species.spec_list) {
+        for (const auto& [name, i]: species.spec_list) {
           if (var_info[6 + i] > 0)
             fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), var_info[6 + i]);
           mw += var_info[6 + i] / species.mw[i];
@@ -188,10 +184,10 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
       fprintf(ref_state, "temperature = %16.10e\n", var_info[12 + ns]);
       if (ns > 0) {
         real cp_i[MAX_SPEC_NUMBER];
-        compute_cp(var_info[12 + ns], cp_i, species);
+        species.compute_cp(var_info[12 + ns], cp_i);
         real cp{0};
         mw = 0;
-        for (auto [name, i]: species.spec_list) {
+        for (const auto& [name, i]: species.spec_list) {
           if (var_info[13 + ns + i] > 0)
             fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), var_info[13 + ns + i]);
           mw += var_info[13 + ns + i] / species.mw[i];
@@ -215,7 +211,7 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
       fprintf(ref_state, "p_ref = %16.10e\n", parameter.get_real("p_inf"));
       fprintf(ref_state, "T_ref = %16.10e\n", parameter.get_real("T_inf"));
       auto &sv_ref = parameter.get_real_array("sv_inf");
-      for (auto [name, i]: species.spec_list) {
+      for (const auto& [name, i]: species.spec_list) {
         if (sv_ref[i] > 0)
           fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), sv_ref[i]);
       }

@@ -50,9 +50,14 @@ struct DParameter {
   real cfl = 1;
 
   real *mw = nullptr;
+#ifdef HighTempMultiPart
   integer *n_temperature_range = nullptr;
   ggxl::MatrixDyn<real> temperature_cuts;
   ggxl::Array3D<real> therm_poly_coeff;
+#else
+  ggxl::MatrixDyn<real> high_temp_coeff, low_temp_coeff;
+  real *t_low = nullptr, *t_mid = nullptr, *t_high = nullptr;
+#endif
 
   // Transport properties
   real *LJ_potent_inv = nullptr;

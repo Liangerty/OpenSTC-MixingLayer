@@ -19,9 +19,14 @@ struct Species {
   gxl::MatrixDyn<integer> elem_comp;  // the element composition of the species
   std::vector<real> mw; // the array of molecular weights
   // Thermodynamic properties
+#ifdef HighTempMultiPart
   std::vector<integer> n_temperature_range; // the number of temperature ranges
   gxl::MatrixDyn<real> temperature_range; // the temperature range of the thermodynamic sections
   gxl::Array3D<real> therm_poly_coeff; // the polynomial coefficients of the thermodynamic sections
+#else // Combustion2Part
+  std::vector<real> t_low, t_mid, t_high; // the array of thermodynamic sections
+  gxl::MatrixDyn<real> high_temp_coeff, low_temp_coeff; // the cp/h/s polynomial coefficients
+#endif
   // Transport properties
   std::vector<real> LJ_potent_inv;  // the inverse of the Lennard-Jones potential
   std::vector<real> vis_coeff;  // the coefficient to compute viscosity
@@ -50,12 +55,12 @@ private:
 };
 
 struct Reaction {
-  explicit Reaction(Parameter &parameter, const Species& species);
+  explicit Reaction(Parameter &parameter, const Species &species);
 
 private:
   void set_nreac(integer nr, integer ns);
 
-  void read_reaction_line(std::string input, integer idx, const Species& species);
+  void read_reaction_line(std::string input, integer idx, const Species &species);
 
   std::string get_auxi_info(std::ifstream &file, integer idx, const cfd::Species &species, bool &is_dup);
 

@@ -48,8 +48,8 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
     mix_frac_upper = std::get<real>(upper.at("mixture_fraction"));
     mix_frac_lower = std::get<real>(lower.at("mixture_fraction"));
     real cpi_upper[MAX_SPEC_NUMBER], cpi_lower[MAX_SPEC_NUMBER];
-    compute_cp(T_upper, cpi_upper, species);
-    compute_cp(T_lower, cpi_lower, species);
+    species.compute_cp(T_upper, cpi_upper);
+    species.compute_cp(T_lower, cpi_lower);
     real mw_inv_upper{0}, mw_inv_lower{0};
     real cp_upper{0}, cp_lower{0};
     for (int i = 0; i < n_spec; ++i) {

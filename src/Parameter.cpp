@@ -253,7 +253,7 @@ void cfd::Parameter::deduce_known_info() {
 //  update_parameter("inviscid_tag", inviscid_tag);
   update_parameter("inviscid_type", inviscid_type);
 
-  if (int_parameters["temporal_scheme"] == 3) {
+  if (bool_parameters["steady"]==0 && int_parameters["temporal_scheme"] == 3) {
     // RK-3, the chemical source should be treated explicitly.
     update_parameter("chemSrcMethod", 0);
   }

@@ -41,6 +41,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   auto mem_sz = n_spec * sizeof(real);
   cudaMalloc(&mw, mem_sz);
   cudaMemcpy(mw, spec.mw.data(), mem_sz, cudaMemcpyHostToDevice);
+#ifdef HighTempMultiPart
   cudaMalloc(&n_temperature_range, n_spec * sizeof(integer));
   cudaMemcpy(n_temperature_range, spec.n_temperature_range.data(), n_spec * sizeof(integer), cudaMemcpyHostToDevice);
   integer n_ranges = 2;
@@ -53,6 +54,20 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   therm_poly_coeff.allocate_memory(7, n_ranges, n_spec, 0);
   cudaMemcpy(therm_poly_coeff.data(), spec.therm_poly_coeff.data(), sizeof(real) * therm_poly_coeff.size(),
              cudaMemcpyHostToDevice);
+#else
+  high_temp_coeff.init_with_size(n_spec, 7);
+  cudaMemcpy(high_temp_coeff.data(), spec.high_temp_coeff.data(), high_temp_coeff.size() * sizeof(real),
+             cudaMemcpyHostToDevice);
+  low_temp_coeff.init_with_size(n_spec, 7);
+  cudaMemcpy(low_temp_coeff.data(), spec.low_temp_coeff.data(), low_temp_coeff.size() * sizeof(real),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&t_low, mem_sz);
+  cudaMalloc(&t_mid, mem_sz);
+  cudaMalloc(&t_high, mem_sz);
+  cudaMemcpy(t_low, spec.t_low.data(), mem_sz, cudaMemcpyHostToDevice);
+  cudaMemcpy(t_mid, spec.t_mid.data(), mem_sz, cudaMemcpyHostToDevice);
+  cudaMemcpy(t_high, spec.t_high.data(), mem_sz, cudaMemcpyHostToDevice);
+#endif
   cudaMalloc(&LJ_potent_inv, mem_sz);
   cudaMemcpy(LJ_potent_inv, spec.LJ_potent_inv.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMalloc(&vis_coeff, mem_sz);

@@ -12,7 +12,6 @@ __device__ void finite_rate_chemistry(DZone *zone, integer i, integer j, integer
 
   // compute the concentration of species in mol/cm3
   real c[MAX_SPEC_NUMBER];
-  memset(c, 0, MAX_SPEC_NUMBER * sizeof(real));
   const real density{bv(i, j, k, 0)};
   const auto mw = param->mw;
   for (integer l = 0; l < ns; ++l) {
@@ -22,7 +21,6 @@ __device__ void finite_rate_chemistry(DZone *zone, integer i, integer j, integer
   // compute the forward reaction rate
   const real t{bv(i, j, k, 5)};
   real kf[MAX_REAC_NUMBER];
-  memset(kf, 0, MAX_REAC_NUMBER * sizeof(real));
   forward_reaction_rate(t, kf, c, param);
 
   // compute the backward reaction rate
@@ -32,14 +30,12 @@ __device__ void finite_rate_chemistry(DZone *zone, integer i, integer j, integer
 
   // compute the rate of progress
   real q[MAX_REAC_NUMBER * 3];
-  memset(q, 0, MAX_REAC_NUMBER * 3 * sizeof(real));
   real *q1 = &q[MAX_REAC_NUMBER];
   real *q2 = &q[MAX_REAC_NUMBER * 2];
   rate_of_progress(kf, kb, c, q, q1, q2, param);
 
   // compute the chemical source
   real omega[MAX_REAC_NUMBER * 2];
-  memset(omega, 0, MAX_REAC_NUMBER * 2 * sizeof(real));
   real *omega_d = &omega[MAX_REAC_NUMBER];
   chemical_source(q1, q2, omega_d, omega, param);
 
@@ -73,8 +69,7 @@ __device__ void forward_reaction_rate(real t, real *kf, const real *concentratio
     if (type[i] == 3) {
       // Duplicate reaction
       kf[i] += arrhenius(t, A2[i], b2[i], Ea2[i]);
-    }
-    if (type[i] > 3) {
+    } else if (type[i] > 3) {
       real cc{0};
       for (integer l = 0; l < param->n_spec; ++l) {
         cc += concentration[l] * third_body_coeff(i, l);
@@ -137,7 +132,6 @@ backward_reaction_rate(real t, const real *kf, const real *concentration, const 
     return;
 
   real gibbs_rt[MAX_SPEC_NUMBER];
-  memset(gibbs_rt, 0, sizeof(real) * MAX_SPEC_NUMBER);
   compute_gibbs_div_rt(t, param, gibbs_rt);
   constexpr real temp_p = p_atm / R_u * 1e-3;   // Convert the unit to mol*K/cm3
   const real temp_t = temp_p / t; // Unit is mol/cm3

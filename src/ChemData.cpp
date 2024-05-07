@@ -102,6 +102,7 @@ cfd::Species::Species(Parameter &parameter) {
 
 void cfd::Species::compute_cp(real temp, real *cp) const &{
   const real t2{temp * temp}, t3{t2 * temp}, t4{t3 * temp};
+#ifdef HighTempMultiPart
   const auto &c = therm_poly_coeff;
   for (int i = 0; i < n_spec; ++i) {
     real tt{temp};
@@ -124,23 +125,44 @@ void cfd::Species::compute_cp(real temp, real *cp) const &{
     }
     cp[i] *= R_u / mw[i];
   }
+#else // Combustion2Part
+  for (int i = 0; i < n_spec; ++i) {
+    real tt{temp};
+    if (temp < t_low[i]) {
+      tt = t_low[i];
+      const real tt2{tt * tt}, tt3{tt2 * tt}, tt4{tt3 * tt};
+      auto &coeff = low_temp_coeff;
+      cp[i] = coeff(i, 0) + coeff(i, 1) * tt + coeff(i, 2) * tt2 +
+              coeff(i, 3) * tt3 + coeff(i, 4) * tt4;
+    } else {
+      auto &coeff = tt < t_mid[i] ? low_temp_coeff : high_temp_coeff;
+      cp[i] = coeff(i, 0) + coeff(i, 1) * tt + coeff(i, 2) * t2 +
+              coeff(i, 3) * t3 + coeff(i, 4) * t4;
+    }
+    cp[i] *= R_u / mw[i];
+  }
+#endif
 }
 
 void cfd::Species::set_nspec(integer n_sp, integer n_elem) {
   n_spec = n_sp;
   elem_comp.resize(n_sp, n_elem);
   mw.resize(n_sp, 0);
+#ifdef HighTempMultiPart
   n_temperature_range.resize(n_sp, 2);
+#else // Combustion2Part
+  t_low.resize(n_sp, 300);
+  t_mid.resize(n_sp, 1000);
+  t_high.resize(n_sp, 5000);
+  high_temp_coeff.resize(n_sp, 7);
+  low_temp_coeff.resize(n_sp, 7);
+#endif
   LJ_potent_inv.resize(n_sp, 0);
   vis_coeff.resize(n_sp, 0);
   WjDivWi_to_One4th.resize(n_sp, n_sp);
   sqrt_WiDivWjPl1Mul8.resize(n_sp, n_sp);
   binary_diffusivity_coeff.resize(n_sp, n_sp);
   kb_over_eps_jk.resize(n_sp, n_sp);
-//  x.resize(n_sp, 0);
-//  vis_spec.resize(n_sp, 0);
-//  lambda.resize(n_sp, 0);
-//  partition_fun.resize(n_sp, n_sp);
 }
 
 bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech) {
@@ -148,13 +170,23 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
   if (!read_from_comb_mech) {
     gxl::read_until(therm_dat, input, "THERMO", gxl::Case::upper);  // "THERMO"
   }
+#ifdef HighTempMultiPart
   real T_low{300}, T_mid{1000}, T_high{5000};
+#endif // Combustion2Part
   while (std::getline(therm_dat, input)) {
     if (input[0] == '!' || input.empty()) {
       continue;
     }
     std::istringstream line(input);
+#ifdef Combustion2Part
+    real T_low{300}, T_mid{1000}, T_high{5000};
+#endif
     line >> T_low >> T_mid >> T_high;
+#ifdef Combustion2Part
+    t_low.resize(n_spec, T_low);
+    t_mid.resize(n_spec, T_mid);
+    t_high.resize(n_spec, T_high);
+#endif
     break;
   }
 
@@ -163,10 +195,12 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
   std::vector<int> have_read;
   std::istringstream line(input);
   bool has_trans{false};
+#ifdef HighTempMultiPart
   std::vector<std::vector<real>> temporary_range(n_spec, {T_low, T_mid, T_high});
   std::vector<integer> n_temperature_spec(n_spec, 3);
   std::vector<gxl::MatrixDyn<real>> therm_poly_tempo(n_spec);
   integer range_max = 2;
+#endif
   while (gxl::getline_to_stream(therm_dat, input, line, gxl::Case::upper)) {
     if (input[0] == '!' || input.empty()) {
       continue;
@@ -193,6 +227,7 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
     gxl::to_stringstream(key, line);
     line >> key;
     if (!spec_list.contains(key)) {
+#ifdef HighTempMultiPart
       gxl::getline_to_stream(therm_dat, input, line, gxl::Case::upper);
       line >> key;
       if (key != "TEMP") {
@@ -210,6 +245,11 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
           gxl::getline(therm_dat, input);
         }
       }
+#else // Combustion2Part
+      gxl::getline(therm_dat, input);
+      gxl::getline(therm_dat, input);
+      gxl::getline(therm_dat, input);
+#endif
       continue;
     }
     const int curr_sp = spec_list.at(key);
@@ -222,6 +262,7 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
       }
     }
     if (read) {
+#ifdef HighTempMultiPart
       gxl::getline_to_stream(therm_dat, input, line, gxl::Case::upper);
       line >> key;
       if (key != "TEMP") {
@@ -240,9 +281,17 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
           gxl::getline(therm_dat, input);
         }
       }
+#else // Combustion2Part
+      gxl::getline(therm_dat, input);
+      gxl::getline(therm_dat, input);
+      gxl::getline(therm_dat, input);
+      gxl::getline_to_stream(therm_dat, input, line, gxl::Case::upper);
+      line >> key;
+#endif
       continue;
     }
 
+#ifdef HighTempMultiPart
     key.assign(input, 45, 10);  // T_low
     temporary_range[curr_sp][0] = std::stod(key);
     key.assign(input, 55, 10);  // T_high
@@ -253,6 +302,16 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
     if (!key.empty()) {
       temporary_range[curr_sp][1] = std::stod(key);
     }
+#else // Combustion2Part
+    key.assign(input, 45, 10);  // T_low
+    t_low[curr_sp] = std::stod(key);
+    key.assign(input, 55, 10);  // T_high
+    t_high[curr_sp] = std::stod(key);
+    key.assign(input, 65, 10);  // Probably specify a different T_mid
+    gxl::to_stringstream(key, line);
+    line >> key;
+    if (!key.empty()) t_mid[curr_sp] = std::stod(key);
+#endif
 
     // Read element composition
     std::string comp_str{};
@@ -276,6 +335,7 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
 
     // Read the thermodynamic fitting coefficients
     std::getline(therm_dat, input);
+#ifdef HighTempMultiPart
     if (input[0] == 'T') {
       // The keyword is "TEMP", there will be more temperature ranges
       gxl::to_stringstream(input, line);
@@ -351,11 +411,62 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
       therm_poly_tempo[curr_sp](0, 5) = std::stod(cs3);
       therm_poly_tempo[curr_sp](0, 6) = std::stod(cs4);
     }
+#else // Combustion2Part
+    std::string cs1{}, cs2{}, cs3{}, cs4{}, cs5{};
+    double c1, c2, c3, c4, c5;
+    cs1.assign(input, 0, 15);
+    cs2.assign(input, 15, 15);
+    cs3.assign(input, 30, 15);
+    cs4.assign(input, 45, 15);
+    cs5.assign(input, 60, 15);
+    c1 = std::stod(cs1);
+    c2 = std::stod(cs2);
+    c3 = std::stod(cs3);
+    c4 = std::stod(cs4);
+    c5 = std::stod(cs5);
+    high_temp_coeff(curr_sp, 0) = c1;
+    high_temp_coeff(curr_sp, 1) = c2;
+    high_temp_coeff(curr_sp, 2) = c3;
+    high_temp_coeff(curr_sp, 3) = c4;
+    high_temp_coeff(curr_sp, 4) = c5;
+    // second line
+    std::getline(therm_dat, input);
+    cs1.assign(input, 0, 15);
+    cs2.assign(input, 15, 15);
+    cs3.assign(input, 30, 15);
+    cs4.assign(input, 45, 15);
+    cs5.assign(input, 60, 15);
+    c1 = std::stod(cs1);
+    c2 = std::stod(cs2);
+    c3 = std::stod(cs3);
+    c4 = std::stod(cs4);
+    c5 = std::stod(cs5);
+    high_temp_coeff(curr_sp, 5) = c1;
+    high_temp_coeff(curr_sp, 6) = c2;
+    low_temp_coeff(curr_sp, 0) = c3;
+    low_temp_coeff(curr_sp, 1) = c4;
+    low_temp_coeff(curr_sp, 2) = c5;
+    // third line
+    std::getline(therm_dat, input);
+    cs1.assign(input, 0, 15);
+    cs2.assign(input, 15, 15);
+    cs3.assign(input, 30, 15);
+    cs4.assign(input, 45, 15);
+    c1 = std::stod(cs1);
+    c2 = std::stod(cs2);
+    c3 = std::stod(cs3);
+    c4 = std::stod(cs4);
+    low_temp_coeff(curr_sp, 3) = c1;
+    low_temp_coeff(curr_sp, 4) = c2;
+    low_temp_coeff(curr_sp, 5) = c3;
+    low_temp_coeff(curr_sp, 6) = c4;
+#endif
 
     have_read.push_back(curr_sp);
     ++n_read;
   }
 
+#ifdef HighTempMultiPart
   // After reading all info, we need to resize the arrays of thermodynamic info
   temperature_range.resize(n_spec, range_max + 1);
   therm_poly_coeff.resize(7, range_max, n_spec, 0); // This is column major
@@ -369,6 +480,7 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
       }
     }
   }
+#endif
 
   return has_trans;
 }
