@@ -581,21 +581,23 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   }
 
   h_ptr->dq.allocate_memory(mx, my, mz, n_var, 0);
-  h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 0);
-  h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 0);
-  if (parameter.get_int("implicit_method") == 1) { // DPLUR
-    // If DPLUR type, when computing the products of convective jacobian and dq, we need 1 layer of ghost grids whose dq=0.
-    // Except those inner or parallel communication faces, they need to get the dq from neighbor blocks.
-    h_ptr->dq.allocate_memory(mx, my, mz, n_var, 1);
-    h_ptr->dq0.allocate_memory(mx, my, mz, n_var, 1);
-    h_ptr->dqk.allocate_memory(mx, my, mz, n_var, 1);
-    h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 1);
-    h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 1);
+  if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3 && parameter.get_bool("fixed_time_step"))) {
+    h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 0);
+    h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 0);
+    h_ptr->dt_local.allocate_memory(mx, my, mz, 0);
   }
-//  if (parameter.get_bool("steady")) { // steady simulation
-  h_ptr->dt_local.allocate_memory(mx, my, mz, 0);
+  if (parameter.get_int("implicit_method") == 1) { // DPLUR
+    if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3)){
+      // If DPLUR type, when computing the products of convective jacobian and dq, we need 1 layer of ghost grids whose dq=0.
+      // Except those inner or parallel communication faces, they need to get the dq from neighbor blocks.
+      h_ptr->dq.allocate_memory(mx, my, mz, n_var, 1);
+      h_ptr->dq0.allocate_memory(mx, my, mz, n_var, 1);
+      h_ptr->dqk.allocate_memory(mx, my, mz, n_var, 1);
+      h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 1);
+      h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 1);
+    }
+  }
   h_ptr->unphysical.allocate_memory(mx, my, mz, 0);
-//  }
   if (parameter.get_int("inviscid_scheme") == 2) {
     // Roe scheme
     h_ptr->entropy_fix_delta.allocate_memory(mx, my, mz, 1);

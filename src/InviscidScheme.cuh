@@ -51,20 +51,17 @@ compute_hllc_flux(const real *pv_l, const real *pv_r, DParameter *param, integer
 
 template<MixtureModel mix_model>
 __device__ void
-compute_flux(const real *Q, DParameter *param, const real *metric, real jac, real *Fk);
-template<MixtureModel mix_model>
-__device__ void
 compute_flux(const real *Q, DParameter *param, const real *metric, real jac, real *Fp, real *Fm);
 
 template<MixtureModel mix_model>
 __device__ void
 compute_weno_flux_ch(const real *cv, DParameter *param, integer tid, const real *metric, const real *jac, real *fc,
-                     integer i_shared, real *Fk, real *Fm, const int *ig_shared, int n_add, [[maybe_unused]] real *f_1st);
+                     integer i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, [[maybe_unused]] real *f_1st);
 
 template<MixtureModel mix_model>
 __device__ void
 compute_weno_flux_cp(const real *cv, DParameter *param, integer tid, const real *metric, const real *jac, real *fc,
-                     integer i_shared, real *Fk, const int *ig_shared, int n_add, real *f_1st);
+                     integer i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, real *f_1st);
 
 template<MixtureModel mix_model>
 __device__ void

@@ -160,7 +160,8 @@ compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max
 
   // reconstruct the half-point left/right primitive variables with the chosen reconstruction method.
   if (auto sch = param->inviscid_scheme; sch == 51) {
-    compute_weno_flux_cp<mix_model>(cv, param, tid, metric, jac, fc, i_shared, Fp, ig_shared, additional_loaded, f_1st);
+    compute_weno_flux_cp<mix_model>(cv, param, tid, metric, jac, fc, i_shared, Fp, Fm, ig_shared, additional_loaded,
+                                    f_1st);
   } else if (sch == 52) {
     compute_weno_flux_ch<mix_model>(cv, param, tid, metric, jac, fc, i_shared, Fp, Fm, ig_shared, additional_loaded,
                                     f_1st);
@@ -182,24 +183,6 @@ compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max
     for (integer l = 0; l < n_var; ++l) {
       zone->dq(idx[0], idx[1], idx[2], l) -= fc[tid * n_var + l] - fc[(tid - 1) * n_var + l];
     }
-  }
-}
-
-template<MixtureModel mix_model>
-__device__ void
-compute_flux(const real *Q, DParameter *param, const real *metric, real jac, real *Fk) {
-  const integer n_var = param->n_var;
-  real jacUk{jac * (metric[0] * Q[1] + metric[1] * Q[2] + metric[2] * Q[3]) / Q[0]};
-  real pk{Q[n_var]};
-
-  Fk[0] = jacUk * Q[0];
-  Fk[1] = jacUk * Q[1] + jac * pk * metric[0];
-  Fk[2] = jacUk * Q[2] + jac * pk * metric[1];
-  Fk[3] = jacUk * Q[3] + jac * pk * metric[2];
-  Fk[4] = jacUk * (Q[4] + pk);
-
-  for (int l = 5; l < n_var; ++l) {
-    Fk[l] = jacUk * Q[l];
   }
 }
 
@@ -987,14 +970,14 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, integ
 template<MixtureModel mix_model>
 __device__ void
 compute_weno_flux_cp(const real *cv, DParameter *param, integer tid, const real *metric, const real *jac, real *fc,
-                     integer i_shared, real *Fk, const int *ig_shared, int n_add, real *f_1st) {
+                     integer i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, real *f_1st) {
   const integer n_var = param->n_var;
 
   compute_flux<mix_model>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
-                          &Fk[i_shared * n_var]);
+                          &Fp[i_shared * n_var], &Fm[i_shared * n_var]);
   for (size_t i = 0; i < n_add; i++) {
-    compute_flux<mix_model>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3], jac[ig_shared[i]],
-                            &Fk[ig_shared[i] * n_var]);
+    compute_flux<mix_model>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
+                            jac[ig_shared[i]], &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
   }
   __syncthreads();
 
@@ -1012,21 +995,9 @@ compute_weno_flux_cp(const real *cv, DParameter *param, integer tid, const real 
   eps_scaled[1] = eps_ref * param->v_ref * param->v_ref;
   eps_scaled[2] = eps_scaled[1] * param->v_ref * param->v_ref;
 
-  real spec_rad[6];
-  for (int l = -2; l < 4; ++l) {
-    const real *Q = &cv[(i_shared + l) * (n_var + 2)];
-    const real cGradK = Q[n_var + 1] * sqrt(metric[(i_shared + l) * 3] * metric[(i_shared + l) * 3] +
-                                            metric[(i_shared + l) * 3 + 1] * metric[(i_shared + l) * 3 + 1] +
-                                            metric[(i_shared + l) * 3 + 2] * metric[(i_shared + l) * 3 + 2]);
-    const real Uk = (metric[(i_shared + l) * 3] * Q[1] + metric[(i_shared + l) * 3 + 1] * Q[2] +
-                     metric[(i_shared + l) * 3 + 2] * Q[3]) / Q[0];
-    spec_rad[l + 2] = abs(Uk) + cGradK;
-  }
   if (param->positive_preserving) {
     for (int l = 0; l < n_var - 5; ++l) {
-      f_1st[tid * (n_var - 5) + l] =
-          0.5 * (Fk[i_shared * n_var + l + 5] + spec_rad[2] * cv[i_shared * (n_var + 2) + l + 5] * jac1) +
-          0.5 * (Fk[(i_shared + 1) * n_var + l + 5] - spec_rad[3] * cv[(i_shared + 1) * (n_var + 2) + l + 5] * jac2);
+      f_1st[tid * (n_var - 5) + l] = 0.5 * Fp[i_shared * n_var + l + 5] + 0.5 * Fm[(i_shared + 1) * n_var + l + 5];
     }
   }
 
@@ -1041,15 +1012,11 @@ compute_weno_flux_cp(const real *cv, DParameter *param, integer tid, const real 
     }
 
     real v[5];
-    v[0] =
-        0.5 * (Fk[(i_shared - 2) * n_var + l] + spec_rad[0] * cv[(i_shared - 2) * (n_var + 2) + l] * jac[i_shared - 2]);
-    v[1] =
-        0.5 * (Fk[(i_shared - 1) * n_var + l] + spec_rad[1] * cv[(i_shared - 1) * (n_var + 2) + l] * jac[i_shared - 1]);
-    v[2] = 0.5 * (Fk[i_shared * n_var + l] + spec_rad[2] * cv[i_shared * (n_var + 2) + l] * jac[i_shared]);
-    v[3] =
-        0.5 * (Fk[(i_shared + 1) * n_var + l] + spec_rad[3] * cv[(i_shared + 1) * (n_var + 2) + l] * jac[i_shared + 1]);
-    v[4] =
-        0.5 * (Fk[(i_shared + 2) * n_var + l] + spec_rad[4] * cv[(i_shared + 2) * (n_var + 2) + l] * jac[i_shared + 2]);
+    v[0] = Fp[(i_shared - 2) * n_var + l];// * scale;
+    v[1] = Fp[(i_shared - 1) * n_var + l];
+    v[2] = Fp[i_shared * n_var + l];
+    v[3] = Fp[(i_shared + 1) * n_var + l];
+    v[4] = Fp[(i_shared + 2) * n_var + l];
 
     constexpr real one6th{1.0 / 6};
     real v0{one6th * (2 * v[2] + 5 * v[3] - v[4])};
@@ -1069,15 +1036,11 @@ compute_weno_flux_cp(const real *cv, DParameter *param, integer tid, const real 
     real a2{one10th + one10th * tau5sqr / ((eps_here + beta2) * (eps_here + beta2))};
     const real fPlusCp{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
 
-    v[0] =
-        0.5 * (Fk[(i_shared - 1) * n_var + l] - spec_rad[1] * cv[(i_shared - 1) * (n_var + 2) + l] * jac[i_shared - 1]);
-    v[1] = 0.5 * (Fk[i_shared * n_var + l] - spec_rad[2] * cv[i_shared * (n_var + 2) + l] * jac[i_shared]);
-    v[2] =
-        0.5 * (Fk[(i_shared + 1) * n_var + l] - spec_rad[3] * cv[(i_shared + 1) * (n_var + 2) + l] * jac[i_shared + 1]);
-    v[3] =
-        0.5 * (Fk[(i_shared + 2) * n_var + l] - spec_rad[4] * cv[(i_shared + 2) * (n_var + 2) + l] * jac[i_shared + 2]);
-    v[4] =
-        0.5 * (Fk[(i_shared + 3) * n_var + l] - spec_rad[5] * cv[(i_shared + 3) * (n_var + 2) + l] * jac[i_shared + 3]);
+    v[0] = Fm[(i_shared - 1) * n_var + l];
+    v[1] = Fm[i_shared * n_var + l];
+    v[2] = Fm[(i_shared + 1) * n_var + l];
+    v[3] = Fm[(i_shared + 2) * n_var + l];
+    v[4] = Fm[(i_shared + 3) * n_var + l];
 
     v0 = one6th * (11 * v[2] - 7 * v[3] + 2 * v[4]);
     v1 = one6th * (2 * v[1] + 5 * v[2] - v[3]);
