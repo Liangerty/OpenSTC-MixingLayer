@@ -253,7 +253,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
           auto fluctuation_profile_related_bc_name = parameter.get_string_array("fluctuation_profile_related_bc_name");
           fluctuation_profile_related_bc_name.push_back(inflow_name);
           parameter.update_parameter("fluctuation_profile_related_bc_name", fluctuation_profile_related_bc_name);
-          fluc_prof_idx = (int)(need_fluctuation_profile.size()) - 1;
+          fluc_prof_idx = (int) (need_fluctuation_profile.size()) - 1;
         }
       } else {
         parameter.update_parameter("need_fluctuation_profile", std::vector<integer>{label});

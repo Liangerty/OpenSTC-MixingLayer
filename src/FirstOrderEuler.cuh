@@ -126,8 +126,8 @@ void first_order_euler_bv(Driver<mix_model, turb> &driver) {
     // update physical properties such as Mach number, transport coefficients et, al.
     for (auto b = 0; b < n_block; ++b) {
       integer mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
-      dim3 BPG{(mx + 1) / tpb.x + 1, (my + 1) / tpb.y + 1, (mz + 1) / tpb.z + 1};
-      update_physical_properties<mix_model><<<BPG, tpb>>>(field[b].d_ptr, param);
+      dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
+      update_physical_properties<mix_model><<<bpg, tpb>>>(field[b].d_ptr, param);
     }
 
     // Finally, test if the simulation reaches convergence state
@@ -274,8 +274,8 @@ void first_order_euler_cv(Driver<mix_model, turb> &driver) {
     // update physical properties such as Mach number, transport coefficients et, al.
     for (auto b = 0; b < n_block; ++b) {
       integer mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
-      dim3 BPG{(mx + 1) / tpb.x + 1, (my + 1) / tpb.y + 1, (mz + 1) / tpb.z + 1};
-      update_physical_properties<mix_model><<<BPG, tpb>>>(field[b].d_ptr, param);
+      dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
+      update_physical_properties<mix_model><<<bpg, tpb>>>(field[b].d_ptr, param);
     }
 
     // Finally, test if the simulation reaches convergence state
