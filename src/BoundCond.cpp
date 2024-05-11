@@ -226,14 +226,19 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       } else {
         parameter.update_parameter("need_rng", std::vector<integer>{label});
       }
-      if (info.find("fluctuation_intensity") != info.end()) {
+      if (info.find("fluctuation_intensity") != info.end())
         fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
-      }
+      if (info.find("spanwise_wavelength") != info.end())
+        spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
     } else if (fluctuation_type == 2) {
-      if (info.find("fluctuation_frequency") != info.end()) fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
-      if (info.find("fluctuation_intensity") != info.end()) fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
-      if (info.find("streamwise_wavelength") != info.end()) streamwise_wavelength = std::get<real>(info.at("streamwise_wavelength"));
-      if (info.find("spanwise_wavelength") != info.end()) spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
+      if (info.find("fluctuation_frequency") != info.end())
+        fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
+      if (info.find("fluctuation_intensity") != info.end())
+        fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
+      if (info.find("streamwise_wavelength") != info.end())
+        streamwise_wavelength = std::get<real>(info.at("streamwise_wavelength"));
+      if (info.find("spanwise_wavelength") != info.end())
+        spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
 
       // The fluctuation is given by the profile with real and imaginary parts acquired by stability analysis.
       // Only perfect gas is supported for now.

@@ -132,7 +132,7 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
       // We have found the nearest block and i index to the slice in current process.
       // Next, we need to communicate among all processes to find the nearest.
       MPI_Barrier(MPI_COMM_WORLD);
-      MPI_Allgather(&dist, 1, MPI_REAL, distance_smallest, 1, MPI_REAL, MPI_COMM_WORLD);
+      MPI_Allgather(&dist, 1, MPI_DOUBLE, distance_smallest, 1, MPI_DOUBLE, MPI_COMM_WORLD);
       bool this_smallest{true};
       for (int p = 0; p < n_proc; ++p) {
         if (p == myid)
@@ -200,11 +200,11 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
         char file_name[1024];
         sprintf(file_name, "%s/xSlice_%f_coordinates.bin", out_dir.string().c_str(),
                 b.x(iSlice[s], 0, 0) / parameter.get_real("gridScale"));
-        MPI_File_open(MPI_COMM_WORLD, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
+        MPI_File_open(MPI_COMM_SELF, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
         MPI_Status status;
         MPI_Offset offset{0};
         const auto ny{je - js + 1}, nz{ke - ks + 1};
-        int nnv=parameter.get_int("n_var") + 1;
+        int nnv = parameter.get_int("n_var") + 1;
         MPI_File_write_at(fp, offset, &nnv, 1, MPI_INT, &status);
         offset += 4;
         MPI_File_write_at(fp, offset, &ny, 1, MPI_INT, &status);
@@ -377,7 +377,7 @@ void Monitor::output_slices(const Parameter &parameter, std::vector<cfd::Field> 
     char file_name[1024];
     sprintf(file_name, "%s/xSlice_%f_%d_t=%e.bin", out_dir.string().c_str(),
             b.x(iSlice[s], 0, 0) / parameter.get_real("gridScale"), slice_counter, t);
-    MPI_File_open(MPI_COMM_WORLD, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
+    MPI_File_open(MPI_COMM_SELF, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
     MPI_Status status;
     MPI_Offset offset{0};
     MPI_File_write_at(fp, offset, &t, 1, MPI_DOUBLE, &status);
