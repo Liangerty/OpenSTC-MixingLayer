@@ -221,10 +221,11 @@ __device__ void turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone 
     nu = Sutherland(mean(i, j, 0, 5)) / mean(i, j, 0, 0);
   }
   stat(i, j, 0, stat_idx + 1) = pow(nu * nu * nu / stat(i, j, 0, stat_idx), 0.25);
-  stat(i, j, 0, stat_idx + 2) = sqrt(nu / stat(i, j, 0, stat_idx));
+  stat(i, j, 0, stat_idx + 2) = min(sqrt(nu / stat(i, j, 0, stat_idx)), 1.0);
   auto &rey_tensor = zone->reynolds_stress_tensor;
   stat(i, j, 0, stat_idx + 3) =
-      0.5 * (rey_tensor(i, j, 0, 0) + rey_tensor(i, j, 0, 1) + rey_tensor(i, j, 0, 2)) / stat(i, j, 0, stat_idx);
+      min(0.5 * (rey_tensor(i, j, 0, 0) + rey_tensor(i, j, 0, 1) + rey_tensor(i, j, 0, 2)) / stat(i, j, 0, stat_idx),
+          1.0);
 }
 
 __device__ void
@@ -409,9 +410,9 @@ __device__ void H2_variance_and_dissipation_rate::compute_spanwise_average(cfd::
         add_chi += max(chi, 1e-30);
       }
     }
-    stat(i, j, 0, stat_idx) = add_zVar / mz;
-    stat(i, j, 0, stat_idx + 1) = add_chi / (mz - 2);
-    stat(i, j, 0, stat_idx + 2) = stat(i, j, 0, stat_idx) / stat(i, j, 0, stat_idx + 1);
+    stat(i, j, 0, stat_idx) = max(add_zVar / mz, 1e-30);
+    stat(i, j, 0, stat_idx + 1) = max(add_chi / (mz - 2), 1e-30);
+    stat(i, j, 0, stat_idx + 2) = min(stat(i, j, 0, stat_idx) / stat(i, j, 0, stat_idx + 1), 1.0);
   }
 }
 
