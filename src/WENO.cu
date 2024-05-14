@@ -1012,7 +1012,7 @@ compute_weno_flux_cp(const real *cv, DParameter *param, integer tid, const real 
     }
 
     real v[5];
-    v[0] = Fp[(i_shared - 2) * n_var + l];// * scale;
+    v[0] = Fp[(i_shared - 2) * n_var + l];
     v[1] = Fp[(i_shared - 1) * n_var + l];
     v[2] = Fp[i_shared * n_var + l];
     v[3] = Fp[(i_shared + 1) * n_var + l];
@@ -1029,8 +1029,8 @@ compute_weno_flux_cp(const real *cv, DParameter *param, integer tid, const real 
                  0.25 * (v[1] - v[3]) * (v[1] - v[3]);
     real beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
                  0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-    real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
     constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
+    real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
     real a0{three10th + three10th * tau5sqr / ((eps_here + beta0) * (eps_here + beta0))};
     real a1{six10th + six10th * tau5sqr / ((eps_here + beta1) * (eps_here + beta1))};
     real a2{one10th + one10th * tau5sqr / ((eps_here + beta2) * (eps_here + beta2))};
