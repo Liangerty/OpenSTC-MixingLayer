@@ -7,7 +7,7 @@
 #include "Define.h"
 #include "Field.h"
 
-namespace cfd{
+namespace cfd {
 struct ThermRMS {
   static constexpr int n_collect = 4;
   static constexpr std::array<std::string_view, n_collect> namelistCollect{"rho2", "p2", "T2", "T"};
@@ -139,6 +139,7 @@ compute_user_defined_statistical_data(cfd::DZone *zone, cfd::DParameter *param, 
     collect_idx += stats::n_collect;
   }(), ...);
 }
+
 template<typename... stats>
 __global__ void
 compute_user_defined_statistical_data(DZone *zone, DParameter *param, int counter, const int *counter_ud) {
@@ -158,8 +159,8 @@ compute_user_defined_statistical_data(DZone *zone, DParameter *param, int counte
 
 template<typename... stats>
 __device__ void
-compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud,
-                                                            int i, int j, int mz, int counter) {
+compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
+                                                            const int *counter_ud, int i, int j, int mz, int counter) {
   auto l = 0, collect_idx = 0;
   ([&]() {
     stats::compute_spanwise_average(zone, param, counter_ud, i, j, mz, counter, l, collect_idx);
@@ -170,8 +171,8 @@ compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cf
 
 template<typename... stats>
 __global__ void
-compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud,
-                                                            int counter) {
+compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
+                                                            const int *counter_ud, int counter) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);

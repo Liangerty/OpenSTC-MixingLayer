@@ -7,7 +7,6 @@
 #define __host__
 #endif
 
-using integer = int;
 using real = double;
 using uint = unsigned int;
 

@@ -3,7 +3,8 @@
 #include <filesystem>
 #include <fstream>
 
-void cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Field> &field, const Parameter &parameter) {
+void
+cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Field> &field, const Parameter &parameter) {
   const std::filesystem::path out_dir("output/wall");
   if (!exists(out_dir)) {
     create_directories(out_dir);
@@ -47,8 +48,8 @@ void cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Fie
 }
 
 __global__ void cfd::wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction, real *heat_flux, real dyn_pressure) {
-  const integer i = blockDim.x * blockIdx.x + threadIdx.x;
-  if (i>=zone->mx) return;
+  const int i = blockDim.x * blockIdx.x + threadIdx.x;
+  if (i >= zone->mx) return;
 
   auto &pv = zone->bv;
 

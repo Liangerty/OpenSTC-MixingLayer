@@ -29,7 +29,7 @@ struct Inflow {
 
   void copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &parameter);
 
-  integer label = 5;
+  int label = 5;
   // The type of the inflow
   // 0 - constant inflow
   // 1 - profile inflow
@@ -61,13 +61,13 @@ struct Inflow {
   // When inflow_type = 2, we need the initial vorticity thickness
   real delta_omega = -1;
 
-  integer profile_idx = 0;
+  int profile_idx = 0;
 
   // The method of fluctuation.
   // 0 - no fluctuation
   // 1 - random fluctuation
   // 2 - profile with real and imaginary part acquired by stability analysis.
-  integer fluctuation_type = 0;
+  int fluctuation_type = 0;
   // If the fluctuation type is 1, this is the intensity of the fluctuation.
   real fluctuation_intensity = 0;
   real streamwise_wavelength = 0;
@@ -78,15 +78,15 @@ struct Inflow {
 };
 
 struct Wall {
-//  explicit Wall(integer type_label, std::ifstream &bc_file);
+//  explicit Wall(int type_label, std::ifstream &bc_file);
 
-  explicit Wall(const std::map<std::string, std::variant<std::string, integer, real>> &info, cfd::Parameter &parameter);
+  explicit Wall(const std::map<std::string, std::variant<std::string, int, real>> &info, cfd::Parameter &parameter);
 
   enum class ThermalType {
     isothermal, adiabatic, equilibrium_radiation
   };
 
-  integer label = 2;
+  int label = 2;
   ThermalType thermal_type = ThermalType::isothermal;
 
   // If the wall thermal type is radiation equilibrium, this is set as the inflow temperature.
@@ -97,13 +97,13 @@ struct Wall {
 struct Outflow {
   explicit Outflow(const std::string &inflow_name, cfd::Parameter &parameter);
 
-  integer label = 6;
+  int label = 6;
 };
 
 struct Symmetry {
   explicit Symmetry(const std::string &inflow_name, cfd::Parameter &parameter);
 
-  integer label = 3;
+  int label = 3;
 };
 
 struct FarField {
@@ -111,7 +111,7 @@ struct FarField {
 
   void copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter &parameter);
 
-  integer label = 4;
+  int label = 4;
   real mach = -1;
   real pressure = -1;
   real temperature = -1;
@@ -141,7 +141,7 @@ struct SubsonicInflow {
 
   void copy_to_gpu(SubsonicInflow *d_inflow, Species &spec, const Parameter &parameter);
 
-  integer label = 7;
+  int label = 7;
   real total_pressure = 101325;
   real total_temperature = -1;
   real u = 1, v = 0, w = 0;
@@ -158,14 +158,14 @@ struct SubsonicInflow {
 struct BackPressure {
   explicit BackPressure(const std::string &name, cfd::Parameter &parameter);
 
-  integer label = 9;
+  int label = 9;
   real pressure = -1;
 };
 
 struct Periodic {
   explicit Periodic(const std::string &name, cfd::Parameter &parameter);
 
-  integer label = 8;
+  int label = 8;
 };
 
 }

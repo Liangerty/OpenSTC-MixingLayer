@@ -57,8 +57,7 @@ compute_flux(const real *Q, DParameter *param, const real *metric, real jac, rea
 template<MixtureModel mix_model>
 __device__ void
 compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *metric, const real *jac, real *fc,
-                     int i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add,
-                     [[maybe_unused]] real *f_1st);
+                     int i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, [[maybe_unused]] real *f_1st);
 
 template<MixtureModel mix_model>
 __device__ void

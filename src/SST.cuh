@@ -47,15 +47,15 @@ struct SST {
   static constexpr double delta_C_des = C_des1 - C_des2;
 
   __device__ static void
-  compute_mut(cfd::DZone *zone, integer i, integer j, integer k, real mul, const DParameter *param);
+  compute_mut(cfd::DZone *zone, int i, int j, int k, real mul, const DParameter *param);
 
-  __device__ static void compute_source_and_mut(cfd::DZone *zone, integer i, integer j, integer k, DParameter *param);
-
-  __device__ static void
-  implicit_treat_for_dq0(DZone *zone, real diag, integer i, integer j, integer k, const DParameter *param);
+  __device__ static void compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParameter *param);
 
   __device__ static void
-  implicit_treat_for_dqk(DZone *zone, real diag, integer i, integer j, integer k, const real *dq_total,
+  implicit_treat_for_dq0(DZone *zone, real diag, int i, int j, int k, const DParameter *param);
+
+  __device__ static void
+  implicit_treat_for_dqk(DZone *zone, real diag, int i, int j, int k, const real *dq_total,
                          const DParameter *param);
 
 };

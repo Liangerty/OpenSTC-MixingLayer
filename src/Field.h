@@ -14,7 +14,7 @@ struct Inflow;
 struct DZone {
   DZone() = default;
 
-  integer mx = 0, my = 0, mz = 0, ngg = 0; //, n_scal = 0, n_spec = 0, n_var = 5
+  int mx = 0, my = 0, mz = 0, ngg = 0; //, n_scal = 0, n_spec = 0, n_var = 5
   ggxl::Array3D<real> x, y, z;
   Boundary *boundary = nullptr;
   InnerFace *innerface = nullptr;
@@ -26,7 +26,6 @@ struct DZone {
   ggxl::Array3D<real> des_delta;
 
   // Conservative variable: 0-:rho, 1-:rho*u, 2-:rho*v, 3-:rho*w, 4-:rho*(E+V*V/2), 5->(4+Ns)-:rho*Y
-  // The cv array is not used in steady state simulation. It is only used in unsteady simulation.
   ggxl::VectorField3D<real> cv;
   ggxl::VectorField3D<real> bv; // Basic variable: 0-density, 1-u, 2-v, 3-w, 4-pressure, 5-temperature
   ggxl::VectorField3D<real> sv; // Scalar variables: [0,n_spec) - mass fractions; [n_spec,n_spec+n_turb) - turbulent variables
@@ -61,7 +60,7 @@ struct DZone {
   ggxl::Array3D<real[3]> visc_spectr_rad;  // viscous spectral radius.
   ggxl::Array3D<real> dt_local; //local time step. Used for steady flow simulation
   ggxl::Array3D<real> entropy_fix_delta; // The coefficient for entropy fix, which is used in Roe scheme.
-  ggxl::Array3D<integer> unphysical; // When limiting the unphysical variables, this array is used to label if the current position contains unphysical values. 0-physical, 1-unphysical.
+  ggxl::Array3D<int> unphysical; // When limiting the unphysical variables, this array is used to label if the current position contains unphysical values. 0-physical, 1-unphysical.
 
   // RK-3 related variables
   ggxl::VectorField3D<real> qn; // The conservative variables from the last step.
@@ -76,24 +75,10 @@ struct DZone {
 
   // The sum of all basic/scalar variables. The average should be conducted later.
   // Including <rho>, <u>, <v>, <w>, <p>, <T>, <scalars> (mx*my*mz*(6+n_scalar))
-//  ggxl::VectorField3D<real> rhoP_sum;
-//  ggxl::VectorField3D<real> favre_1_sum;
-//  ggxl::VectorField3D<real> ensemble_1_sum;
   ggxl::VectorField3D<real> firstOrderMoment;
   // The second order moment of variables, which is always used to compute reynolds stress and tke.
   // Including <rho*rho>, <pp>, <TT>, <uu>, <uv>, <uw>, <vv>, <vw>, <ww> (mx*my*mz*9)
-//  ggxl::VectorField3D<real> favre_2_sum;
-//  ggxl::VectorField3D<real> ensemble_2_sum;
   ggxl::VectorField3D<real> velocity2ndMoment;
-  // Second order variables of other basic/scalar variables, excluding the cross-statistics.
-  // E.g. <rho*rho>, <T*T>, <p*p>, <H2*H2>, ...
-  // Max dimension would be: (mx,my,mz,3+n_scalar)
-//  ggxl::VectorField3D<real> variable2ndMoment;
-  // Other single-point statistics.
-  // The number of variables to collect should be specified by users.
-  // And we would have a label system.
-  // E.g. <rho*u>, <u*u*u>, <p*u>, <v*v*v*v>...
-//  ggxl::VectorField3D<real> singlePointStatistics;
   // User-defined statistics
   // This will require the user to write their own function to collect related data.
   ggxl::VectorField3D<real> userCollectForStat;
@@ -120,9 +105,8 @@ struct Field {
 
   void copy_data_from_device(const Parameter &parameter);
 
-  integer n_var = 5;
+  int n_var = 5;
   const Block &block;
-//  ggxl::VectorField3DHost<real> cv;  // Is it used in data communication? If not, this can be deleted, because all computations including cv are executed on GPU
   ggxl::VectorField3DHost<real> bv;  // basic variables, including density, u, v, w, p, temperature
   ggxl::VectorField3DHost<real> sv;  // passive scalar variables, including species mass fractions, turbulent variables, mixture fractions, etc.
   ggxl::VectorField3DHost<real> ov;  // other variables used in the computation, e.g., the Mach number, the mut in turbulent computation, scalar dissipation rate in flamelet, etc.

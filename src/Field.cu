@@ -9,19 +9,19 @@
 #include "DParameter.cuh"
 
 cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in) {
-  const integer mx{block.mx}, my{block.my}, mz{block.mz}, ngg{block.ngg};
+  const int mx{block.mx}, my{block.my}, mz{block.mz}, ngg{block.ngg};
   // Let us re-compute the number of variables to be solved here.
   n_var = 5;
   // The variable "n_scalar_transported" is the number of scalar variables to be transported.
-  integer n_scalar_transported{0};
-  integer n_other_var{1}; // Default, mach number
+  int n_scalar_transported{0};
+  int n_other_var{1}; // Default, mach number
   // The variable "n_scalar" is the number of scalar variables in total, including those not transported.
   // This is different from the variable "n_scalar_transported" only when the flamelet model is used.
-  integer n_scalar{0};
+  int n_scalar{0};
   // turbulent variable in sv array is always located after mass fractions, thus its label is always n_spec;
   // however, for conservative array, it may depend on whether the employed method is flamelet or finite rate.
   // This label, "i_turb_cv", is introduced to label the index of the first turbulent variable in the conservative variable array.
-  integer i_turb_cv{5}, i_fl_cv{0};
+  int i_turb_cv{5}, i_fl_cv{0};
 
   if (parameter.get_int("species") == 1) {
     n_scalar += parameter.get_int("n_spec");
@@ -99,15 +99,14 @@ cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in)
   }
 }
 
-std::vector<integer>
+std::vector<int>
 identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::string> &var_name,
-                         const cfd::Species &species,
-                         bool &has_pressure, bool &has_temperature, bool &has_tke) {
-  std::vector<integer> labels;
-  const integer n_spec = species.n_spec;
-  const integer n_turb = parameter.get_int("n_turb");
+                         const cfd::Species &species, bool &has_pressure, bool &has_temperature, bool &has_tke) {
+  std::vector<int> labels;
+  const int n_spec = species.n_spec;
+  const int n_turb = parameter.get_int("n_turb");
   for (auto &name: var_name) {
-    integer l = 999;
+    int l = 999;
     // The first three names are x, y and z, they are assigned value 0 and no match would be found.
     auto n = gxl::to_upper(name);
     if (n == "X") {
@@ -173,13 +172,12 @@ identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::strin
 
 std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, const std::string &file,
                                              const cfd::Parameter &parameter, const cfd::Species &species,
-                                             integer profile_idx) {
+                                             int profile_idx) {
   std::ifstream file_in(file);
   if (!file_in.is_open()) {
     printf("Cannot open file %s\n", file.c_str());
     cfd::MpiParallel::exit();
   }
-//  const integer direction = boundary.face;
 
   std::string input;
   std::vector<std::string> var_name;
@@ -214,7 +212,7 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
     turb_viscosity_ratio = std::get<real>(info.at("turb_viscosity_ratio"));
     turb_intensity = std::get<real>(info.at("turbulence_intensity"));
   }
-  integer mx, my, mz;
+  int mx, my, mz;
   bool i_read{false}, j_read{false}, k_read{false}, packing_read{false};
   std::string key;
   std::string data_packing{"POINT"};
@@ -246,7 +244,7 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
 
   std::array<int, 3> extent{mx, my, mz};
   // Then we read the variables.
-  auto nv_read = (integer) var_name.size();
+  auto nv_read = (int) var_name.size();
   gxl::VectorField3D<real> profile_read;
   profile_read.resize(extent[0], extent[1], extent[2], nv_read, 0);
 
@@ -272,7 +270,7 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
     }
   }
 
-  const integer n_var = parameter.get_int("n_var");
+  const int n_var = parameter.get_int("n_var");
   profile.resize(extent[0], extent[1], extent[2], n_var + 4, 0);
   for (int k = 0; k < extent[2]; ++k) {
     for (int j = 0; j < extent[1]; ++j) {
@@ -333,8 +331,9 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
   return extent;
 }
 
-std::array<int, 3> read_profile_to_init(gxl::VectorField3D<real> &profile, integer profile_idx,
-                                        const cfd::Parameter &parameter, const cfd::Species &species) {
+std::array<int, 3>
+read_profile_to_init(gxl::VectorField3D<real> &profile, int profile_idx, const cfd::Parameter &parameter,
+                     const cfd::Species &species) {
   const std::string &file = parameter.get_string_array("profile_file_names")[profile_idx];
   auto dot = file.find_last_of('.');
   auto suffix = file.substr(dot + 1, file.size());
@@ -347,8 +346,8 @@ std::array<int, 3> read_profile_to_init(gxl::VectorField3D<real> &profile, integ
 }
 
 __global__ void initialize_bv_with_inflow(real *var_info, int n_inflow, cfd::DZone *zone, const real *coordinate_ranges,
-                                          int n_scalar, const int *if_profile,
-                                          ggxl::VectorField3D<real> *profiles, int *extents) {
+                                          int n_scalar, const int *if_profile, ggxl::VectorField3D<real> *profiles,
+                                          int *extents) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
   int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
   int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
@@ -411,7 +410,7 @@ __global__ void initialize_bv_with_inflow(real *var_info, int n_inflow, cfd::DZo
     bv(i, j, k, 3) = w[i_init];
     bv(i, j, k, 4) = p[i_init];
     bv(i, j, k, 5) = T[i_init];
-    for (integer l = 0; l < n_scalar; ++l) {
+    for (int l = 0; l < n_scalar; ++l) {
       sv(i, j, k, l) = scalar_inflow[l * n_inflow + i_init];
     }
   }
@@ -423,18 +422,18 @@ void cfd::Field::initialize_basic_variables(const Parameter &parameter, const st
                                             const std::vector<real> &zs, const std::vector<real> &ze,
                                             const cfd::Species &species) const {
   const auto n = inflows.size();
-  const integer n_scalar = parameter.get_int("n_scalar");
+  const int n_scalar = parameter.get_int("n_scalar");
   std::vector<real> var_info((6 + n_scalar) * n, 0);
   real *rho = var_info.data(), *u = rho + n, *v = u + n, *w = v + n, *p = w + n, *T = p + n;
   real *scalar_inflow = T + n;
 
-  std::vector<integer> if_profile(n, 0);
-  std::vector<integer> profile_id(n, 0);
+  std::vector<int> if_profile(n, 0);
+  std::vector<int> profile_id(n, 0);
   std::vector<gxl::VectorField3D<real>> profiles(n);
   std::vector<int> extent;
   std::vector<std::array<int, 3>> extents(n);
 
-  for (integer i = 0; i < (integer) inflows.size(); ++i) {
+  for (int i = 0; i < (int) inflows.size(); ++i) {
     std::tie(rho[i], u[i], v[i], w[i], p[i], T[i]) = inflows[i].var_info();
     if_profile[i] = inflows[i].inflow_type == 1 ? 1 : 0;
     if (if_profile[i]) {
@@ -551,7 +550,7 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
     h_ptr->cp.allocate_memory(mx, my, mz, ngg);
     if (parameter.get_int("reaction") == 1) {
       // Finite rate chemistry
-      if (const integer chemSrcMethod = parameter.get_int("chemSrcMethod");chemSrcMethod == 1) {
+      if (const int chemSrcMethod = parameter.get_int("chemSrcMethod");chemSrcMethod == 1) {
         // EPI
         h_ptr->chem_src_jac.allocate_memory(mx, my, mz, n_spec * n_spec, 0);
       } else if (chemSrcMethod == 2) {
@@ -581,13 +580,14 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   }
 
   h_ptr->dq.allocate_memory(mx, my, mz, n_var, 0);
-  if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3 && parameter.get_bool("fixed_time_step"))) {
+  if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3 &&
+        parameter.get_bool("fixed_time_step"))) {
     h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 0);
     h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 0);
     h_ptr->dt_local.allocate_memory(mx, my, mz, 0);
   }
   if (parameter.get_int("implicit_method") == 1) { // DPLUR
-    if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3)){
+    if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3)) {
       // If DPLUR type, when computing the products of convective jacobian and dq, we need 1 layer of ghost grids whose dq=0.
       // Except those inner or parallel communication faces, they need to get the dq from neighbor blocks.
       h_ptr->dq.allocate_memory(mx, my, mz, n_var, 1);

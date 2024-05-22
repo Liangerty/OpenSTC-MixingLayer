@@ -12,8 +12,8 @@
 namespace cfd {
 
 struct BCInfo {
-  integer label = 0;
-  integer n_boundary = 0;
+  int label = 0;
+  int n_boundary = 0;
   int2 *boundary = nullptr;
 };
 
@@ -49,7 +49,7 @@ struct DBoundCond {
   //  void
   //  time_dependent_bc_update(const Mesh &mesh, std::vector<Field> &field, DParameter *param, Parameter &parameter) const;
 
-  integer n_wall = 0, n_symmetry = 0, n_inflow = 0, n_outflow = 0, n_farfield = 0, n_subsonic_inflow = 0, n_back_pressure = 0, n_periodic = 0;
+  int n_wall = 0, n_symmetry = 0, n_inflow = 0, n_outflow = 0, n_farfield = 0, n_subsonic_inflow = 0, n_back_pressure = 0, n_periodic = 0;
   BCInfo *wall_info = nullptr;
   BCInfo *symmetry_info = nullptr;
   BCInfo *inflow_info = nullptr;
@@ -82,29 +82,28 @@ private:
   void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field);
 };
 
-void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, integer n_bc, integer **sep, integer blk_idx,
-                               integer n_block, BCInfo *bc_info);
+void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, int n_bc, int **sep, int blk_idx, int n_block,
+                               BCInfo *bc_info);
 
-void link_boundary_and_condition(const std::vector<Boundary> &boundary, BCInfo *bc, integer n_bc, integer **sep,
-                                 integer i_zone);
+void link_boundary_and_condition(const std::vector<Boundary> &boundary, BCInfo *bc, int n_bc, int **sep, int i_zone);
 
 __global__ void
-initialize_rng(curandState *rng_states, integer size, int64_t time_stamp);
+initialize_rng(curandState *rng_states, int size, int64_t time_stamp);
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
-__global__ void apply_symmetry(DZone *zone, integer i_face, DParameter *param) {
+__global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
   const auto &b = zone->boundary[i_face];
   auto range_start = b.range_start, range_end = b.range_end;
-  integer i = range_start[0] + (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  integer j = range_start[1] + (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  integer k = range_start[2] + (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto face = b.face;
-  integer dir[]{0, 0, 0};
+  int dir[]{0, 0, 0};
   dir[face] = b.direction;
 
-  const integer inner_idx[3]{i - dir[0], j - dir[1], k - dir[2]};
+  const int inner_idx[3]{i - dir[0], j - dir[1], k - dir[2]};
 
   auto metric = zone->metric(i, j, k);
   real k_x{metric(face + 1, 1)}, k_y{metric(face + 1, 2)}, k_z{metric(face + 1, 3)};
@@ -129,14 +128,14 @@ __global__ void apply_symmetry(DZone *zone, integer i_face, DParameter *param) {
   bv(i, j, k, 4) = bv(inner_idx[0], inner_idx[1], inner_idx[2], 4);
   bv(i, j, k, 5) = bv(inner_idx[0], inner_idx[1], inner_idx[2], 5);
   auto &sv = zone->sv;
-  for (integer l = 0; l < param->n_scalar; ++l) {
+  for (int l = 0; l < param->n_scalar; ++l) {
     sv(i, j, k, l) = sv(inner_idx[0], inner_idx[1], inner_idx[2], l);
   }
 
   // For ghost grids
-  for (integer g = 1; g <= zone->ngg; ++g) {
-    const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
-    const integer ii{i - g * dir[0]}, ij{j - g * dir[1]}, ik{k - g * dir[2]};
+  for (int g = 1; g <= zone->ngg; ++g) {
+    const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+    const int ii{i - g * dir[0]}, ij{j - g * dir[1]}, ik{k - g * dir[2]};
 
     bv(gi, gj, gk, 0) = bv(ii, ij, ik, 0);
 
@@ -149,7 +148,7 @@ __global__ void apply_symmetry(DZone *zone, integer i_face, DParameter *param) {
                                       bv(gi, gj, gk, 3) * bv(gi, gj, gk, 3));
     bv(gi, gj, gk, 4) = bv(ii, ij, ik, 4);
     bv(gi, gj, gk, 5) = bv(ii, ij, ik, 5);
-    for (integer l = 0; l < param->n_scalar; ++l) {
+    for (int l = 0; l < param->n_scalar; ++l) {
       sv(gi, gj, gk, l) = sv(ii, ij, ik, l);
     }
 
@@ -164,26 +163,26 @@ __global__ void apply_symmetry(DZone *zone, integer i_face, DParameter *param) {
 }
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
-__global__ void apply_outflow(DZone *zone, integer i_face, const DParameter *param) {
-  const integer ngg = zone->ngg;
-  integer dir[]{0, 0, 0};
+__global__ void apply_outflow(DZone *zone, int i_face, const DParameter *param) {
+  const int ngg = zone->ngg;
+  int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  integer i = range_start[0] + (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  integer j = range_start[1] + (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  integer k = range_start[2] + (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
 
-  for (integer g = 1; g <= ngg; ++g) {
-    const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
-    for (integer l = 0; l < 6; ++l) {
+  for (int g = 1; g <= ngg; ++g) {
+    const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+    for (int l = 0; l < 6; ++l) {
       bv(gi, gj, gk, l) = bv(i, j, k, l);
     }
-    for (integer l = 0; l < param->n_scalar; ++l) {
+    for (int l = 0; l < param->n_scalar; ++l) {
       sv(gi, gj, gk, l) = sv(i, j, k, l);
     }
     if constexpr (TurbMethod<turb>::hasMut) {
@@ -197,22 +196,22 @@ __global__ void apply_outflow(DZone *zone, integer i_face, const DParameter *par
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
 __global__ void
-apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggxl::VectorField3D<real> *profile_d_ptr,
+apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::VectorField3D<real> *profile_d_ptr,
              curandState *rng_states_d_ptr, ggxl::VectorField3D<real> *fluctuation_dPtr) {
-  const integer ngg = zone->ngg;
-  integer dir[]{0, 0, 0};
+  const int ngg = zone->ngg;
+  int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  integer i = range_start[0] + (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  integer j = range_start[1] + (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  integer k = range_start[2] + (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
 
-  const integer n_scalar = param->n_scalar;
+  const int n_scalar = param->n_scalar;
 
   real density, u, v, w, p, T, mut, vel;
   real sv_b[MAX_SPEC_NUMBER + 4];
@@ -320,8 +319,8 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
     }
 
     // For ghost grids
-    for (integer g = 1; g <= ngg; g++) {
-      const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+    for (int g = 1; g <= ngg; g++) {
+      const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
       idx[b.face] = b.direction == 1 ? g : ngg - g;
 
       density = prof(idx[0], idx[1], idx[2], 0);
@@ -519,8 +518,8 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
   if constexpr (with_cv) {
     compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
   }
-  for (integer g = 1; g <= ngg; g++) {
-    const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+  for (int g = 1; g <= ngg; g++) {
+    const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
     bv(gi, gj, gk, 0) = density;
     bv(gi, gj, gk, 1) = u;
     bv(gi, gj, gk, 2) = v;
@@ -540,15 +539,15 @@ apply_inflow(DZone *zone, Inflow *inflow, integer i_face, DParameter *param, ggx
 }
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
-__global__ void apply_farfield(DZone *zone, FarField *farfield, integer i_face, DParameter *param) {
-  const integer ngg = zone->ngg;
-  integer dir[]{0, 0, 0};
+__global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DParameter *param) {
+  const int ngg = zone->ngg;
+  int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  integer i = range_start[0] + (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  integer j = range_start[1] + (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  integer k = range_start[2] + (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -564,17 +563,17 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, integer i_face, 
   const real u_face{nx * u_b + ny * v_b + nz * w_b};
 
   // Interpolate the scalar values from internal nodes, which are used to compute gamma, after which, acoustic speed.
-  const integer n_scalar = param->n_scalar, n_spec = param->n_spec;
+  const int n_scalar = param->n_scalar, n_spec = param->n_spec;
   auto &sv = zone->sv;
   real gamma_b{gamma_air}, mw{mw_air};
   real sv_b[MAX_SPEC_NUMBER + 2], cp[MAX_SPEC_NUMBER];
   if constexpr (mix_model != MixtureModel::Air) {
-    for (integer l = 0; l < n_scalar; ++l) {
+    for (int l = 0; l < n_scalar; ++l) {
       sv_b[l] = sv(i, j, k, l);
     }
     gamma_b = zone->gamma(i, j, k);
     real mw_inv{0};
-    for (integer l = 0; l < n_spec; ++l) {
+    for (int l = 0; l < n_spec; ++l) {
       mw_inv += sv_b[l] / param->mw[l];
     }
     mw = 1.0 / mw_inv;
@@ -609,8 +608,8 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, integer i_face, 
       compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
     }
 
-    for (integer g = 1; g <= ngg; g++) {
-      const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+    for (int g = 1; g <= ngg; g++) {
+      const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
       bv(gi, gj, gk, 0) = density;
       bv(gi, gj, gk, 1) = u;
       bv(gi, gj, gk, 2) = v;
@@ -629,12 +628,12 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, integer i_face, 
     }
   } else if (mach_b >= 1) {
     // supersonic outflow
-    for (integer g = 1; g <= ngg; ++g) {
-      const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
-      for (integer l = 0; l < 6; ++l) {
+    for (int g = 1; g <= ngg; ++g) {
+      const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+      for (int l = 0; l < 6; ++l) {
         bv(gi, gj, gk, l) = bv(i, j, k, l);
       }
-      for (integer l = 0; l < n_scalar; ++l) {
+      for (int l = 0; l < n_scalar; ++l) {
         sv(gi, gj, gk, l) = sv(i, j, k, l);
       }
       if constexpr (TurbMethod<turb>::hasMut) {
@@ -687,7 +686,7 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, integer i_face, 
         u = farfield->u + (Un - u_inf) * nx;
         v = farfield->v + (Un - u_inf) * ny;
         w = farfield->w + (Un - u_inf) * nz;
-        for (integer l = 0; l < n_scalar; ++l) {
+        for (int l = 0; l < n_scalar; ++l) {
           sv_b[l] = farfield->sv[l];
         }
         mw = farfield->mw;
@@ -719,7 +718,7 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, integer i_face, 
         temperature = pressure * mw / (density * R_u);
         compute_cp(temperature, cp, param);
         real cp_tot{0};
-        for (integer l = 0; l < n_spec; ++l) {
+        for (int l = 0; l < n_spec; ++l) {
           cp_tot += cp[l] * sv_b[l];
         }
         gamma = cp_tot / (cp_tot - R_u / mw);
@@ -745,8 +744,8 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, integer i_face, 
       compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
     }
 
-    for (integer g = 1; g <= ngg; g++) {
-      const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+    for (int g = 1; g <= ngg; g++) {
+      const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
       bv(gi, gj, gk, 0) = density;
       bv(gi, gj, gk, 1) = u;
       bv(gi, gj, gk, 2) = v;
@@ -768,24 +767,24 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, integer i_face, 
 }
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
-__global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, integer i_face) {
-  const integer ngg = zone->ngg;
-  integer dir[]{0, 0, 0};
+__global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face) {
+  const int ngg = zone->ngg;
+  int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  integer i = range_start[0] + (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  integer j = range_start[1] + (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  integer k = range_start[2] + (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
-  const integer n_spec = param->n_spec;
+  const int n_spec = param->n_spec;
 
   real t_wall{bv(i, j, k, 5)};
 
-  const integer idx[]{i - dir[0], j - dir[1], k - dir[2]};
+  const int idx[]{i - dir[0], j - dir[1], k - dir[2]};
   if (wall->thermal_type == Wall::ThermalType::isothermal) {
     t_wall = wall->temperature;
   } else if (wall->thermal_type == Wall::ThermalType::adiabatic) {
@@ -816,7 +815,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, integer i
     // Mixture
     const auto mwk = param->mw;
     mw = 0;
-    for (integer l = 0; l < n_spec; ++l) {
+    for (int l = 0; l < n_spec; ++l) {
       sv(i, j, k, l) = sv(idx[0], idx[1], idx[2], l);
       mw += sv(i, j, k, l) / mwk[l];
     }
@@ -852,7 +851,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, integer i
 
   if constexpr (mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) {
     // Flamelet model
-    const integer i_fl{param->i_fl};
+    const int i_fl{param->i_fl};
     sv(i, j, k, i_fl) = sv(idx[0], idx[1], idx[2], i_fl);
     sv(i, j, k, i_fl + 1) = sv(idx[0], idx[1], idx[2], i_fl + 1);
   }
@@ -862,8 +861,8 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, integer i
   }
 
   for (int g = 1; g <= ngg; ++g) {
-    const integer i_in[]{i - g * dir[0], j - g * dir[1], k - g * dir[2]};
-    const integer i_gh[]{i + g * dir[0], j + g * dir[1], k + g * dir[2]};
+    const int i_in[]{i - g * dir[0], j - g * dir[1], k - g * dir[2]};
+    const int i_gh[]{i + g * dir[0], j + g * dir[1], k + g * dir[2]};
 
     const real p_i{bv(i_in[0], i_in[1], i_in[2], 4)};
     const real t_i{bv(i_in[0], i_in[1], i_in[2], 5)};
@@ -880,7 +879,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, integer i
     if constexpr (mix_model != MixtureModel::Air) {
       const auto mwk = param->mw;
       mw = 0;
-      for (integer l = 0; l < param->n_spec; ++l) {
+      for (int l = 0; l < param->n_spec; ++l) {
         sv(i_gh[0], i_gh[1], i_gh[2], l) = sv(i_in[0], i_in[1], i_in[2], l);
         mw += sv(i_gh[0], i_gh[1], i_gh[2], l) / mwk[l];
       }
@@ -918,15 +917,15 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, integer i
 }
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
-__global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DParameter *param, integer i_face) {
-  const integer ngg = zone->ngg;
-  integer dir[]{0, 0, 0};
+__global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DParameter *param, int i_face) {
+  const int ngg = zone->ngg;
+  int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  integer i = range_start[0] + (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  integer j = range_start[1] + (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  integer k = range_start[2] + (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -968,8 +967,8 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
   const real density{pressure * mw_air / (temperature * cfd::R_u)};
 
   // assign values for ghost cells
-  for (integer g = 1; g <= ngg; g++) {
-    const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+  for (int g = 1; g <= ngg; g++) {
+    const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
     bv(gi, gj, gk, 0) = density;
     bv(gi, gj, gk, 1) = u_new * inflow->u;
     bv(gi, gj, gk, 2) = u_new * inflow->v;
@@ -978,7 +977,7 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
     bv(gi, gj, gk, 5) = temperature;
 
     const real u_bar{bv(gi, gj, gk, 1) * nx + bv(gi, gj, gk, 2) * ny + bv(gi, gj, gk, 3) * nz};
-    const integer n_scalar = param->n_scalar;
+    const int n_scalar = param->n_scalar;
     if (u_bar > 0) {
       // The normal velocity points out of the domain, which means the value should be acquired from internal nodes.
       for (int l = 0; l < n_scalar; ++l) {
@@ -1002,30 +1001,30 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
 }
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
-__global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DParameter *param, integer i_face) {
-  const integer ngg = zone->ngg;
-  integer dir[]{0, 0, 0};
+__global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DParameter *param, int i_face) {
+  const int ngg = zone->ngg;
+  int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  integer i = range_start[0] + (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  integer j = range_start[1] + (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  integer k = range_start[2] + (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
 
-  for (integer g = 1; g <= ngg; ++g) {
-    const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
-    for (integer l = 0; l < 4; ++l) {
+  for (int g = 1; g <= ngg; ++g) {
+    const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+    for (int l = 0; l < 4; ++l) {
       bv(gi, gj, gk, l) = bv(i, j, k, l);
     }
     bv(gi, gj, gk, 4) = backPressure->pressure;
     // This should be modified later, as p is specified, temperature is extrapolated,
     // the density should be acquired from EOS instead of extrapolation.
     bv(gi, gj, gk, 5) = bv(i, j, k, 5);
-    for (integer l = 0; l < param->n_scalar; ++l) {
+    for (int l = 0; l < param->n_scalar; ++l) {
       sv(gi, gj, gk, l) = sv(i, j, k, l);
     }
     if constexpr (TurbMethod<turb>::hasMut) {
@@ -1038,21 +1037,21 @@ __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DPa
 }
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
-__global__ void apply_periodic(DZone *zone, DParameter *param, integer i_face) {
-  const integer ngg = zone->ngg;
-  integer dir[]{0, 0, 0};
+__global__ void apply_periodic(DZone *zone, DParameter *param, int i_face) {
+  const int ngg = zone->ngg;
+  int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  integer i = range_start[0] + (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  integer j = range_start[1] + (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  integer k = range_start[2] + (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
 
-  integer idx_other[3]{i, j, k};
+  int idx_other[3]{i, j, k};
   switch (b.face) {
     case 0: // i face
       idx_other[0] = b.direction < 0 ? zone->mx - 1 : 0;
@@ -1065,13 +1064,13 @@ __global__ void apply_periodic(DZone *zone, DParameter *param, integer i_face) {
       break;
   }
 
-  for (integer g = 1; g <= ngg; ++g) {
-    const integer gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
-    const integer ii{idx_other[0] + g * dir[0]}, ij{idx_other[1] + g * dir[1]}, ik{idx_other[2] + g * dir[2]};
-    for (integer l = 0; l < 6; ++l) {
+  for (int g = 1; g <= ngg; ++g) {
+    const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+    const int ii{idx_other[0] + g * dir[0]}, ij{idx_other[1] + g * dir[1]}, ik{idx_other[2] + g * dir[2]};
+    for (int l = 0; l < 6; ++l) {
       bv(gi, gj, gk, l) = bv(ii, ij, ik, l);
     }
-    for (integer l = 0; l < param->n_scalar; ++l) {
+    for (int l = 0; l < param->n_scalar; ++l) {
       sv(gi, gj, gk, l) = sv(ii, ij, ik, l);
     }
     if constexpr (TurbMethod<turb>::hasMut) {

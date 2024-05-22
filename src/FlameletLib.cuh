@@ -10,12 +10,12 @@
 namespace cfd {
 
 struct FlameletLib {
-  integer n_spec{0};
-  integer n_z = 0, n_zPrime = 0, n_chi = 0;
+  int n_spec{0};
+  int n_z = 0, n_zPrime = 0, n_chi = 0;
   std::vector<real> z, chi, fz, dz, ffz, zi;
   real fzst = 0;
   gxl::MatrixDyn<real> zPrime, chi_min, chi_max;
-  gxl::MatrixDyn<integer> chi_min_j, chi_max_j;
+  gxl::MatrixDyn<int> chi_min_j, chi_max_j;
   gxl::Array3D<real> chi_ave;
   gxl::VectorField3D<real> yk;
 
@@ -27,18 +27,17 @@ private:
 
 struct DZone;
 
-__device__ void flamelet_source(cfd::DZone *zone, integer i, integer j, integer k, DParameter *param);
+__device__ void flamelet_source(cfd::DZone *zone, int i, int j, int k, DParameter *param);
 
 __device__ void
-compute_massFraction_from_MixtureFraction(cfd::DZone *zone, integer i, integer j, integer k, DParameter *param,
-                                          real *yk_ave);
+compute_massFraction_from_MixtureFraction(cfd::DZone *zone, int i, int j, int k, DParameter *param, real *yk_ave);
 
 __device__ void
-interpolate_scalar_dissipation_rate_with_given_z_zPrime(real chi_ave, integer n_spec, integer i_z, integer i_zPrime,
+interpolate_scalar_dissipation_rate_with_given_z_zPrime(real chi_ave, int n_spec, int i_z, int i_zPrime,
                                                         DParameter *param, real *yk);
 
 __device__ int2
-find_chi_range(const ggxl::Array3D<real> &chi_ave, real chi, integer i_z, integer i_zPrime, integer n_chi);
+find_chi_range(const ggxl::Array3D<real> &chi_ave, real chi, int i_z, int i_zPrime, int n_chi);
 
 __global__ void update_n_fl_step(DParameter *param);
 

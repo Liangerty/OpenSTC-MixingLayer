@@ -1,7 +1,7 @@
 #include "Residual.cuh"
 
 namespace cfd {
-void steady_screen_output(integer step, real err_max, gxl::Time &time, std::array<real, 4> &res) {
+void steady_screen_output(int step, real err_max, gxl::Time &time, std::array<real, 4> &res) {
   time.get_elapsed_time();
   FILE *history = std::fopen("history.dat", "a");
   fprintf(history, "%d\t%11.4e\n", step, err_max);
@@ -15,8 +15,8 @@ void steady_screen_output(integer step, real err_max, gxl::Time &time, std::arra
   printf("Total elapsed CPU time is %16.8fs\n", time.elapsed_time);
 }
 
-void unsteady_screen_output(integer step, real err_max, gxl::Time &time, std::array<real, 4> &res, real dt,
-                            real solution_time) {
+void
+unsteady_screen_output(int step, real err_max, gxl::Time &time, std::array<real, 4> &res, real dt, real solution_time) {
   time.get_elapsed_time();
   FILE *history = std::fopen("history.dat", "a");
   fprintf(history, "%d\t%11.4e\n", step, err_max);

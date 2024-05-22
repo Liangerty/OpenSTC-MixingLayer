@@ -21,12 +21,12 @@ struct BoundaryIO {
   std::vector<MPI_Offset> offset_header;
   std::vector<std::vector<MPI_Offset>> offset_minmax_var;
   std::vector<std::vector<MPI_Offset>> offset_var;
-  std::vector<integer> n_var;
+  std::vector<int> n_var;
 
   std::vector<std::vector<const Boundary *>> boundaries;
-  std::vector<std::vector<integer>> mx, my, mz;
-  std::vector<std::vector<integer>> xs, xe, ys, ye, zs, ze;
-  std::vector<std::vector<integer>> block_ids;
+  std::vector<std::vector<int>> mx, my, mz;
+  std::vector<std::vector<int>> xs, xe, ys, ye, zs, ze;
+  std::vector<std::vector<int>> block_ids;
 
   explicit BoundaryIO(const Parameter &parameter, const Mesh &mesh, const Species &species, std::vector<Field> &_field);
 
@@ -38,8 +38,7 @@ private:
 
 template<MixtureModel mix_model, class turb_method, OutputTimeChoice output_time_choice>
 BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Parameter &parameter_, const Mesh &mesh_,
-                                                                   const Species &species_,
-                                                                   std::vector<Field> &_field)
+                                                                   const Species &species_, std::vector<Field> &_field)
     : parameter(parameter_),
       mesh(mesh_),
       labels_to_output(parameter.get_int_array("output_bc")),
@@ -69,7 +68,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Paramet
   for (auto &name: bc_names) {
     auto &bc = parameter.get_struct(name);
     for (int i = 0; i < n_labels; ++i) {
-      if (std::get<integer>(bc.at("label")) == labels_to_output[i]) {
+      if (std::get<int>(bc.at("label")) == labels_to_output[i]) {
         name_of_boundary[i] = name;
         auto type_name{std::get<std::string>(bc.at("type"))};
         if (type_name == "wall") {
@@ -88,7 +87,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Paramet
     }
   }
 
-  const integer ngg{parameter.get_int("ngg")};
+  const int ngg{parameter.get_int("ngg")};
   for (int blk = 0; blk < mesh.n_block; ++blk) {
     const auto &b = mesh[blk];
     for (const auto &f: b.boundary) {
@@ -97,8 +96,8 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Paramet
         if (label == labels_to_output[l]) {
           boundaries[l].push_back(&f);
           auto face = f.face;
-          integer range_start[3]{f.range_start[0] + ngg, f.range_start[1] + ngg, f.range_start[2] + ngg};
-          integer range_end[3]{f.range_end[0] - ngg, f.range_end[1] - ngg, f.range_end[2] - ngg};
+          int range_start[3]{f.range_start[0] + ngg, f.range_start[1] + ngg, f.range_start[2] + ngg};
+          int range_end[3]{f.range_end[0] - ngg, f.range_end[1] - ngg, f.range_end[2] - ngg};
           range_start[face] -= ngg;
           range_end[face] += ngg;
           if (type[l] == 2) {
@@ -132,7 +131,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Paramet
   write_header(field);
 }
 
-template<MixtureModel mix_model, class turb_method, integer BoundaryType>
+template<MixtureModel mix_model, class turb_method, int BoundaryType>
 int32_t
 acquire_boundary_variable_names(std::vector<std::string> &var_name, const Parameter &parameter,
                                 const Species &species) {
@@ -177,7 +176,7 @@ template<MixtureModel mix_model, class turb_method, OutputTimeChoice output_time
 void
 BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::vector<Field> &_field) {
   const std::filesystem::path out_dir("output");
-  const integer n_proc{parameter.get_int("n_proc")};
+  const int n_proc{parameter.get_int("n_proc")};
   for (int l = 0; l < labels_to_output.size(); ++l) {
     std::string file_name{out_dir.string() + "/" + name_of_boundary[l] + ".plt"};
     MPI_File fp;
@@ -190,7 +189,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
     // Each file should have only one header, thus we let process 0 to write it.
 
     MPI_Offset offset{0};
-    const integer myid{parameter.get_int("myid")};
+    const int myid{parameter.get_int("myid")};
     n_var[l] = 3 + 6;
     std::vector<std::string> var_name{"x", "y", "z", "density", "u", "v", "w", "pressure", "temperature"};
     if (type[l] == 2) {
@@ -227,7 +226,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
     }
 
     // Next part, we need the info about other processes. Thus, we communicate with other processes to get the info first.
-    int n_face_this{static_cast<integer>(boundaries[l].size())};
+    int n_face_this{static_cast<int>(boundaries[l].size())};
     auto *n_face = new int[n_proc];
     MPI_Allgather(&n_face_this, 1, MPI_INT, n_face, 1, MPI_INT, MPI_COMM_WORLD);
     auto *disp = new int[n_proc];
@@ -315,11 +314,11 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
 
     // Compute the offsets for each process
     MPI_Offset new_offset{0};
-    integer i_face{0};
+    int i_face{0};
     for (int p = 0; p < myid; ++p) {
       for (int f = 0; f < n_face[p]; ++f) {
         new_offset += 16 + 20 * n_var[l];
-        const integer N = len_x[i_face] * len_y[i_face] * len_z[i_face];
+        const int N = len_x[i_face] * len_y[i_face] * len_z[i_face];
         // We always write double precision out
         new_offset += n_var[l] * N * 8;
         ++i_face;
@@ -434,7 +433,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
         offset += 8;
       }
       // scalar variables. Y0-Y_{Ns-1}, k, omega, z, z_prime
-      const integer n_scalar{parameter.get_int("n_scalar")};
+      const int n_scalar{parameter.get_int("n_scalar")};
       for (int m = 0; m < n_scalar; ++m) {
         min_val = v.sv(xs[l][f], ys[l][f], zs[l][f], m);
         max_val = v.sv(xs[l][f], ys[l][f], zs[l][f], m);
@@ -471,11 +470,11 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
 
       // 7. Zone Data.
       MPI_Datatype ty;
-      const integer ngg{parameter.get_int("ngg")};
-      integer big_size[3]{b.mx + 2 * ngg, b.my + 2 * ngg, b.mz + 2 * ngg};
-      integer sub_size[3]{mx[l][f], my[l][f], mz[l][f]};
+      const int ngg{parameter.get_int("ngg")};
+      int big_size[3]{b.mx + 2 * ngg, b.my + 2 * ngg, b.mz + 2 * ngg};
+      int sub_size[3]{mx[l][f], my[l][f], mz[l][f]};
       const auto mem_sz = sub_size[0] * sub_size[1] * sub_size[2] * 8;
-      integer start_idx[3]{xs[l][f] + ngg, ys[l][f] + ngg, zs[l][f] + ngg};
+      int start_idx[3]{xs[l][f] + ngg, ys[l][f] + ngg, zs[l][f] + ngg};
       MPI_Type_create_subarray(3, big_size, sub_size, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
       MPI_Type_commit(&ty);
       MPI_File_write_at(fp, offset, b.x.data(), 1, ty, &status);
@@ -530,7 +529,7 @@ void BoundaryIO<mix_model, turb_method, output_time_choice>::print_boundary() {
 
     // II. Data Section
     // First, modify the new min/max values of the variables
-    const integer n_face{static_cast<integer>(boundaries[l].size())};
+    const int n_face{static_cast<int>(boundaries[l].size())};
     for (int f = 0; f < n_face; ++f) {
       MPI_Offset offset{offset_minmax_var[l][f]};
       const auto blk = block_ids[l][f];
@@ -570,7 +569,7 @@ void BoundaryIO<mix_model, turb_method, output_time_choice>::print_boundary() {
         offset += 8;
       }
       // scalar variables. Y0-Y_{Ns-1}, k, omega, z, z_prime
-      const integer n_scalar{parameter.get_int("n_scalar")};
+      const int n_scalar{parameter.get_int("n_scalar")};
       for (int m = 0; m < n_scalar; ++m) {
         min_val = v.sv(xs[l][f], ys[l][f], zs[l][f], m);
         max_val = v.sv(xs[l][f], ys[l][f], zs[l][f], m);
@@ -607,12 +606,12 @@ void BoundaryIO<mix_model, turb_method, output_time_choice>::print_boundary() {
 
       // 7. Zone Data.
       MPI_Datatype ty;
-      const integer ngg{parameter.get_int("ngg")};
+      const int ngg{parameter.get_int("ngg")};
       const auto &b = mesh[blk];
-      integer big_size[3]{b.mx + 2 * ngg, b.my + 2 * ngg, b.mz + 2 * ngg};
-      integer sub_size[3]{mx[l][f], my[l][f], mz[l][f]};
+      int big_size[3]{b.mx + 2 * ngg, b.my + 2 * ngg, b.mz + 2 * ngg};
+      int sub_size[3]{mx[l][f], my[l][f], mz[l][f]};
       const auto mem_sz = sub_size[0] * sub_size[1] * sub_size[2] * 8;
-      integer start_idx[3]{xs[l][f] + ngg, ys[l][f] + ngg, zs[l][f] + ngg};
+      int start_idx[3]{xs[l][f] + ngg, ys[l][f] + ngg, zs[l][f] + ngg};
       MPI_Type_create_subarray(3, big_size, sub_size, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
       MPI_Type_commit(&ty);
 
@@ -642,5 +641,4 @@ void BoundaryIO<mix_model, turb_method, output_time_choice>::print_boundary() {
     MPI_File_close(&fp);
   }
 }
-
 }

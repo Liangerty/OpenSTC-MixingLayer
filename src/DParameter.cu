@@ -42,10 +42,10 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   cudaMalloc(&mw, mem_sz);
   cudaMemcpy(mw, spec.mw.data(), mem_sz, cudaMemcpyHostToDevice);
 #ifdef HighTempMultiPart
-  cudaMalloc(&n_temperature_range, n_spec * sizeof(integer));
-  cudaMemcpy(n_temperature_range, spec.n_temperature_range.data(), n_spec * sizeof(integer), cudaMemcpyHostToDevice);
-  integer n_ranges = 2;
-  for (integer l = 0; l < n_spec; ++l) {
+  cudaMalloc(&n_temperature_range, n_spec * sizeof(int));
+  cudaMemcpy(n_temperature_range, spec.n_temperature_range.data(), n_spec * sizeof(int), cudaMemcpyHostToDevice);
+  int n_ranges = 2;
+  for (int l = 0; l < n_spec; ++l) {
     n_ranges = std::max(spec.n_temperature_range[l], n_ranges);
   }
   temperature_cuts.init_with_size(n_spec, n_ranges + 1);
@@ -88,17 +88,17 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
 
   // reactions info
   if (n_reac > 0) {
-    cudaMalloc(&reac_type, n_reac * sizeof(integer));
-    cudaMemcpy(reac_type, reaction->label.data(), n_reac * sizeof(integer), cudaMemcpyHostToDevice);
-    cudaMalloc(&rev_type, n_reac * sizeof(integer));
-    cudaMemcpy(rev_type, reaction->rev_type.data(), n_reac * sizeof(integer), cudaMemcpyHostToDevice);
+    cudaMalloc(&reac_type, n_reac * sizeof(int));
+    cudaMemcpy(reac_type, reaction->label.data(), n_reac * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMalloc(&rev_type, n_reac * sizeof(int));
+    cudaMemcpy(rev_type, reaction->rev_type.data(), n_reac * sizeof(int), cudaMemcpyHostToDevice);
     stoi_f.init_with_size(n_reac, n_spec);
-    cudaMemcpy(stoi_f.data(), reaction->stoi_f.data(), stoi_f.size() * sizeof(integer), cudaMemcpyHostToDevice);
+    cudaMemcpy(stoi_f.data(), reaction->stoi_f.data(), stoi_f.size() * sizeof(int), cudaMemcpyHostToDevice);
     stoi_b.init_with_size(n_reac, n_spec);
-    cudaMemcpy(stoi_b.data(), reaction->stoi_b.data(), stoi_b.size() * sizeof(integer), cudaMemcpyHostToDevice);
+    cudaMemcpy(stoi_b.data(), reaction->stoi_b.data(), stoi_b.size() * sizeof(int), cudaMemcpyHostToDevice);
     mem_sz = n_reac * sizeof(real);
-    cudaMalloc(&reac_order, n_reac * sizeof(integer));
-    cudaMemcpy(reac_order, reaction->order.data(), n_reac * sizeof(integer), cudaMemcpyHostToDevice);
+    cudaMalloc(&reac_order, n_reac * sizeof(int));
+    cudaMemcpy(reac_order, reaction->order.data(), n_reac * sizeof(int), cudaMemcpyHostToDevice);
     cudaMalloc(&A, mem_sz);
     cudaMemcpy(A, reaction->A.data(), mem_sz, cudaMemcpyHostToDevice);
     cudaMalloc(&b, mem_sz);
@@ -139,10 +139,10 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     chi_max.init_with_size(n_zPrime + 1, n_z + 1);
     cudaMemcpy(chi_max.data(), flamelet_lib->chi_max.data(), chi_max.size() * sizeof(real), cudaMemcpyHostToDevice);
     chi_min_j.init_with_size(n_zPrime + 1, n_z + 1);
-    cudaMemcpy(chi_min_j.data(), flamelet_lib->chi_min_j.data(), chi_min_j.size() * sizeof(integer),
+    cudaMemcpy(chi_min_j.data(), flamelet_lib->chi_min_j.data(), chi_min_j.size() * sizeof(int),
                cudaMemcpyHostToDevice);
     chi_max_j.init_with_size(n_zPrime + 1, n_z + 1);
-    cudaMemcpy(chi_max_j.data(), flamelet_lib->chi_max_j.data(), chi_max_j.size() * sizeof(integer),
+    cudaMemcpy(chi_max_j.data(), flamelet_lib->chi_max_j.data(), chi_max_j.size() * sizeof(int),
                cudaMemcpyHostToDevice);
 
     chi_ave.allocate_memory(n_chi, n_zPrime + 1, n_z + 1, 0);
@@ -176,7 +176,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   // density limits
   limit_flow.ll[0] = 1e-6 * parameter.get_real("rho_inf");
   limit_flow.ul[0] = 1e+3 * parameter.get_real("rho_inf");
-  for (integer l = 1; l < 4; ++l) {
+  for (int l = 1; l < 4; ++l) {
     real vRef{parameter.get_real("v_inf")};
     if (abs(vRef) < 1) {
       vRef = parameter.get_real("speed_of_sound");
@@ -193,7 +193,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     limit_flow.ul[6] = std::numeric_limits<real>::max();
   }
   auto &sv_inf{parameter.get_real_array("sv_inf")};
-  for (integer l = 0; l < n_scalar; ++l) {
+  for (int l = 0; l < n_scalar; ++l) {
     limit_flow.sv_inf[l] = sv_inf[l];
   }
 }

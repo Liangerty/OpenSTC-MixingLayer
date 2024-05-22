@@ -4,10 +4,10 @@
 #include "gxl_lib/MyAtomic.cuh"
 
 __global__ void cfd::store_last_step(cfd::DZone *zone) {
-  const integer mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  integer i = blockDim.x * blockIdx.x + threadIdx.x;
-  integer j = blockDim.y * blockIdx.y + threadIdx.y;
-  integer k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
+  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  int j = blockDim.y * blockIdx.y + threadIdx.y;
+  int k = blockDim.z * blockIdx.z + threadIdx.z;
   if (i >= mx || j >= my || k >= mz) return;
 
   zone->bv_last(i, j, k, 0) = zone->bv(i, j, k, 0);
@@ -17,10 +17,10 @@ __global__ void cfd::store_last_step(cfd::DZone *zone) {
 }
 
 __global__ void cfd::compute_square_of_dbv(cfd::DZone *zone) {
-  const integer mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  integer i = blockDim.x * blockIdx.x + threadIdx.x;
-  integer j = blockDim.y * blockIdx.y + threadIdx.y;
-  integer k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
+  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  int j = blockDim.y * blockIdx.y + threadIdx.y;
+  int k = blockDim.z * blockIdx.z + threadIdx.z;
   if (i >= mx || j >= my || k >= mz) return;
 
   auto &bv = zone->bv;
@@ -33,27 +33,27 @@ __global__ void cfd::compute_square_of_dbv(cfd::DZone *zone) {
 }
 
 __global__ void
-cfd::repair_turbulent_variables(cfd::DZone *zone, cfd::DParameter *param, integer blk_id, integer count_start) {
+cfd::repair_turbulent_variables(cfd::DZone *zone, cfd::DParameter *param, int blk_id, int count_start) {
   const auto mx{zone->mx}, my{zone->my}, mz{zone->mz};
   auto &unphysical = zone->unphysical;
   auto &sv = zone->sv;
-  const integer n_spec{param->n_spec};
+  const int n_spec{param->n_spec};
   for (int k = 0; k < mz; ++k) {
     for (int j = 0; j < my; ++j) {
       for (int i = 0; i < mx; ++i) {
         if (unphysical(i, j, k)) {
           real updated_var[2];
           memset(updated_var, 0, 2 * sizeof(real));
-          integer kn{0};
+          int kn{0};
           // Compute the sum of all "good" points surrounding the "bad" point
-          for (integer ka = -1; ka < 2; ++ka) {
-            const integer k1{k + ka};
+          for (int ka = -1; ka < 2; ++ka) {
+            const int k1{k + ka};
             if (k1 < 0 || k1 >= mz) continue;
-            for (integer ja = -1; ja < 2; ++ja) {
-              const integer j1{j + ja};
+            for (int ja = -1; ja < 2; ++ja) {
+              const int j1{j + ja};
               if (j1 < 0 || j1 >= my) continue;
-              for (integer ia = -1; ia < 2; ++ia) {
-                const integer i1{i + ia};
+              for (int ia = -1; ia < 2; ++ia) {
+                const int i1{i + ia};
                 if (i1 < 0 || i1 >= mx)continue;
 
                 if (isnan(sv(i1, j1, k1, n_spec)) || isnan(sv(i1, j1, k1, 1 + n_spec)) || sv(i1, j1, k1, n_spec) < 0 ||
@@ -93,27 +93,27 @@ cfd::repair_turbulent_variables(cfd::DZone *zone, cfd::DParameter *param, intege
 }
 
 __global__ void
-cfd::repair_mixtureFraction_variables(cfd::DZone *zone, cfd::DParameter *param, integer blk_id, integer count_start) {
+cfd::repair_mixtureFraction_variables(cfd::DZone *zone, cfd::DParameter *param, int blk_id, int count_start) {
   const auto mx{zone->mx}, my{zone->my}, mz{zone->mz};
   auto &unphysical = zone->unphysical;
   auto &sv = zone->sv;
-  const integer i_fl{param->i_fl};
+  const int i_fl{param->i_fl};
   for (int k = 0; k < mz; ++k) {
     for (int j = 0; j < my; ++j) {
       for (int i = 0; i < mx; ++i) {
         if (unphysical(i, j, k)) {
           real updated_var[2];
           memset(updated_var, 0, 2 * sizeof(real));
-          integer kn{0};
+          int kn{0};
           // Compute the sum of all "good" points surrounding the "bad" point
-          for (integer ka = -1; ka < 2; ++ka) {
-            const integer k1{k + ka};
+          for (int ka = -1; ka < 2; ++ka) {
+            const int k1{k + ka};
             if (k1 < 0 || k1 >= mz) continue;
-            for (integer ja = -1; ja < 2; ++ja) {
-              const integer j1{j + ja};
+            for (int ja = -1; ja < 2; ++ja) {
+              const int j1{j + ja};
               if (j1 < 0 || j1 >= my) continue;
-              for (integer ia = -1; ia < 2; ++ia) {
-                const integer i1{i + ia};
+              for (int ia = -1; ia < 2; ++ia) {
+                const int i1{i + ia};
                 if (i1 < 0 || i1 >= mx)continue;
 
                 if (isnan(sv(i1, j1, k1, i_fl)) || sv(i1, j1, k1, i_fl) < 0 || sv(i1, j1, k1, i_fl) > 1
@@ -155,14 +155,14 @@ cfd::repair_mixtureFraction_variables(cfd::DZone *zone, cfd::DParameter *param, 
 real cfd::global_time_step(const Mesh &mesh, const Parameter &parameter, std::vector<cfd::Field> &field) {
   real dt{1e+6};
 
-  constexpr integer TPB{128};
+  constexpr int TPB{128};
   real dt_block;
   int num_sms, num_blocks_per_sm;
   cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, 0);
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(&num_blocks_per_sm, min_of_arr, TPB, 0);
-  for (integer b = 0; b < mesh.n_block; ++b) {
+  for (int b = 0; b < mesh.n_block; ++b) {
     const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
-    const integer size = mx * my * mz;
+    const int size = mx * my * mz;
     int n_blocks = std::min(num_blocks_per_sm * num_sms, (size + TPB - 1) / TPB);
     min_of_arr<<<n_blocks, TPB>>>(field[b].h_ptr->dt_local.data(), size);//, TPB * sizeof(real)
     min_of_arr<<<1, TPB>>>(field[b].h_ptr->dt_local.data(), n_blocks);//, TPB * sizeof(real)
@@ -179,15 +179,15 @@ real cfd::global_time_step(const Mesh &mesh, const Parameter &parameter, std::ve
   return dt;
 }
 
-__global__ void cfd::min_of_arr(real *arr, integer size) {
-  integer i = blockDim.x * blockIdx.x + threadIdx.x;
-  const integer t = threadIdx.x;
+__global__ void cfd::min_of_arr(real *arr, int size) {
+  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  const int t = threadIdx.x;
 
   if (i >= size) {
     return;
   }
   real inp{1e+6};
-  for (integer idx = i; idx < size; idx += blockDim.x * gridDim.x) {
+  for (int idx = i; idx < size; idx += blockDim.x * gridDim.x) {
     inp = min(inp, arr[idx]);
   }
   __syncthreads();

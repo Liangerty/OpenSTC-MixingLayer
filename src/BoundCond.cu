@@ -10,7 +10,7 @@
 namespace cfd {
 
 template<typename BCType>
-void register_bc(BCType *&bc, int n_bc, std::vector<integer> &indices, BCInfo *&bc_info, Species &species,
+void register_bc(BCType *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_info, Species &species,
                  Parameter &parameter) {
   if (n_bc <= 0) {
     return;
@@ -18,11 +18,11 @@ void register_bc(BCType *&bc, int n_bc, std::vector<integer> &indices, BCInfo *&
 
   cudaMalloc(&bc, n_bc * sizeof(BCType));
   bc_info = new BCInfo[n_bc];
-  for (integer i = 0; i < n_bc; ++i) {
-    const integer index = indices[i];
+  for (int i = 0; i < n_bc; ++i) {
+    const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      integer bc_label = std::get<integer>(this_bc.at("label"));
+      int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -35,7 +35,7 @@ void register_bc(BCType *&bc, int n_bc, std::vector<integer> &indices, BCInfo *&
 }
 
 template<>
-void register_bc<Wall>(Wall *&bc, integer n_bc, std::vector<integer> &indices, BCInfo *&bc_info, Species &species,
+void register_bc<Wall>(Wall *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_info, Species &species,
                        Parameter &parameter) {
   if (n_bc <= 0) {
     return;
@@ -43,11 +43,11 @@ void register_bc<Wall>(Wall *&bc, integer n_bc, std::vector<integer> &indices, B
 
   cudaMalloc(&bc, n_bc * sizeof(Wall));
   bc_info = new BCInfo[n_bc];
-  for (integer i = 0; i < n_bc; ++i) {
-    const integer index = indices[i];
+  for (int i = 0; i < n_bc; ++i) {
+    const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      integer bc_label = std::get<integer>(this_bc.at("label"));
+      int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -59,7 +59,7 @@ void register_bc<Wall>(Wall *&bc, integer n_bc, std::vector<integer> &indices, B
 }
 
 template<>
-void register_bc<Inflow>(Inflow *&bc, integer n_bc, std::vector<integer> &indices, BCInfo *&bc_info, Species &species,
+void register_bc<Inflow>(Inflow *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_info, Species &species,
                          Parameter &parameter) {
   if (n_bc <= 0) {
     return;
@@ -67,11 +67,11 @@ void register_bc<Inflow>(Inflow *&bc, integer n_bc, std::vector<integer> &indice
 
   cudaMalloc(&bc, n_bc * sizeof(Inflow));
   bc_info = new BCInfo[n_bc];
-  for (integer i = 0; i < n_bc; ++i) {
-    const integer index = indices[i];
+  for (int i = 0; i < n_bc; ++i) {
+    const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      integer bc_label = std::get<integer>(this_bc.at("label"));
+      int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -85,7 +85,7 @@ void register_bc<Inflow>(Inflow *&bc, integer n_bc, std::vector<integer> &indice
 
 template<>
 void
-register_bc<FarField>(FarField *&bc, integer n_bc, std::vector<integer> &indices, BCInfo *&bc_info, Species &species,
+register_bc<FarField>(FarField *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_info, Species &species,
                       Parameter &parameter) {
   if (n_bc <= 0) {
     return;
@@ -93,11 +93,11 @@ register_bc<FarField>(FarField *&bc, integer n_bc, std::vector<integer> &indices
 
   cudaMalloc(&bc, n_bc * sizeof(FarField));
   bc_info = new BCInfo[n_bc];
-  for (integer i = 0; i < n_bc; ++i) {
-    const integer index = indices[i];
+  for (int i = 0; i < n_bc; ++i) {
+    const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      integer bc_label = std::get<integer>(this_bc.at("label"));
+      int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -110,19 +110,19 @@ register_bc<FarField>(FarField *&bc, integer n_bc, std::vector<integer> &indices
 }
 
 template<>
-void register_bc<SubsonicInflow>(SubsonicInflow *&bc, integer n_bc, std::vector<integer> &indices,
-                                 BCInfo *&bc_info, Species &species, Parameter &parameter) {
+void register_bc<SubsonicInflow>(SubsonicInflow *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_info,
+                                 Species &species, Parameter &parameter) {
   if (n_bc <= 0) {
     return;
   }
 
   cudaMalloc(&bc, n_bc * sizeof(SubsonicInflow));
   bc_info = new BCInfo[n_bc];
-  for (integer i = 0; i < n_bc; ++i) {
-    const integer index = indices[i];
+  for (int i = 0; i < n_bc; ++i) {
+    const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      integer bc_label = std::get<integer>(this_bc.at("label"));
+      int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -135,19 +135,20 @@ void register_bc<SubsonicInflow>(SubsonicInflow *&bc, integer n_bc, std::vector<
 }
 
 template<>
-void register_bc<BackPressure>(BackPressure *&bc, integer n_bc, std::vector<integer> &indices,
-                               BCInfo *&bc_info, Species &species, Parameter &parameter) {
+void
+register_bc<BackPressure>(BackPressure *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_info, Species &species,
+                          Parameter &parameter) {
   if (n_bc <= 0) {
     return;
   }
 
   cudaMalloc(&bc, n_bc * sizeof(BackPressure));
   bc_info = new BCInfo[n_bc];
-  for (integer i = 0; i < n_bc; ++i) {
-    const integer index = indices[i];
+  for (int i = 0; i < n_bc; ++i) {
+    const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      integer bc_label = std::get<integer>(this_bc.at("label"));
+      int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -160,7 +161,7 @@ void register_bc<BackPressure>(BackPressure *&bc, integer n_bc, std::vector<inte
 }
 
 void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter) {
-  std::vector<integer> bc_labels;
+  std::vector<int> bc_labels;
   // Count the number of distinct boundary conditions
   for (auto i = 0; i < mesh.n_block; i++) {
     for (auto &b: mesh[i].boundary) {
@@ -178,11 +179,11 @@ void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Spe
     }
   }
   // Initialize the inflow and wall conditions which are different among cases.
-  std::vector<integer> wall_idx, symmetry_idx, inflow_idx, outflow_idx, farfield_idx, subsonic_inflow_idx, back_pressure_idx, periodic_idx;
+  std::vector<int> wall_idx, symmetry_idx, inflow_idx, outflow_idx, farfield_idx, subsonic_inflow_idx, back_pressure_idx, periodic_idx;
   auto &bcs = parameter.get_string_array("boundary_conditions");
   for (auto &bc_name: bcs) {
     auto &bc = parameter.get_struct(bc_name);
-    auto label = std::get<integer>(bc.at("label"));
+    auto label = std::get<int>(bc.at("label"));
 
     auto this_iter = bc_labels.end();
     for (auto iter = bc_labels.begin(); iter != bc_labels.end(); ++iter) {
@@ -277,66 +278,66 @@ void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Spe
 }
 
 void DBoundCond::link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) const {
-  const integer n_block{mesh.n_block};
-  auto **i_wall = new integer *[n_wall];
+  const int n_block{mesh.n_block};
+  auto **i_wall = new int *[n_wall];
   for (size_t i = 0; i < n_wall; i++) {
-    i_wall[i] = new integer[n_block];
-    for (integer j = 0; j < n_block; j++) {
+    i_wall[i] = new int[n_block];
+    for (int j = 0; j < n_block; j++) {
       i_wall[i][j] = 0;
     }
   }
-  auto **i_symm = new integer *[n_symmetry];
+  auto **i_symm = new int *[n_symmetry];
   for (size_t i = 0; i < n_symmetry; i++) {
-    i_symm[i] = new integer[n_block];
-    for (integer j = 0; j < n_block; j++) {
+    i_symm[i] = new int[n_block];
+    for (int j = 0; j < n_block; j++) {
       i_symm[i][j] = 0;
     }
   }
-  auto **i_farfield = new integer *[n_farfield];
+  auto **i_farfield = new int *[n_farfield];
   for (size_t i = 0; i < n_farfield; ++i) {
-    i_farfield[i] = new integer[n_block];
-    for (integer j = 0; j < n_block; ++j) {
+    i_farfield[i] = new int[n_block];
+    for (int j = 0; j < n_block; ++j) {
       i_farfield[i][j] = 0;
     }
   }
-  auto **i_inflow = new integer *[n_inflow];
+  auto **i_inflow = new int *[n_inflow];
   for (size_t i = 0; i < n_inflow; i++) {
-    i_inflow[i] = new integer[n_block];
-    for (integer j = 0; j < n_block; j++) {
+    i_inflow[i] = new int[n_block];
+    for (int j = 0; j < n_block; j++) {
       i_inflow[i][j] = 0;
     }
   }
-  auto **i_outflow = new integer *[n_outflow];
+  auto **i_outflow = new int *[n_outflow];
   for (size_t i = 0; i < n_outflow; i++) {
-    i_outflow[i] = new integer[n_block];
-    for (integer j = 0; j < n_block; j++) {
+    i_outflow[i] = new int[n_block];
+    for (int j = 0; j < n_block; j++) {
       i_outflow[i][j] = 0;
     }
   }
-  auto **i_subsonic_inflow = new integer *[n_subsonic_inflow];
+  auto **i_subsonic_inflow = new int *[n_subsonic_inflow];
   for (size_t i = 0; i < n_subsonic_inflow; i++) {
-    i_subsonic_inflow[i] = new integer[n_block];
-    for (integer j = 0; j < n_block; j++) {
+    i_subsonic_inflow[i] = new int[n_block];
+    for (int j = 0; j < n_block; j++) {
       i_subsonic_inflow[i][j] = 0;
     }
   }
-  auto **i_back_pressure = new integer *[n_back_pressure];
+  auto **i_back_pressure = new int *[n_back_pressure];
   for (size_t i = 0; i < n_back_pressure; i++) {
-    i_back_pressure[i] = new integer[n_block];
-    for (integer j = 0; j < n_block; j++) {
+    i_back_pressure[i] = new int[n_block];
+    for (int j = 0; j < n_block; j++) {
       i_back_pressure[i][j] = 0;
     }
   }
-  auto **i_periodic = new integer *[n_periodic];
+  auto **i_periodic = new int *[n_periodic];
   for (size_t i = 0; i < n_periodic; i++) {
-    i_periodic[i] = new integer[n_block];
-    for (integer j = 0; j < n_block; j++) {
+    i_periodic[i] = new int[n_block];
+    for (int j = 0; j < n_block; j++) {
       i_periodic[i][j] = 0;
     }
   }
 
   // We first count how many faces corresponds to a given boundary condition
-  for (integer i = 0; i < n_block; i++) {
+  for (int i = 0; i < n_block; i++) {
     count_boundary_of_type_bc(mesh[i].boundary, n_wall, i_wall, i, n_block, wall_info);
     count_boundary_of_type_bc(mesh[i].boundary, n_symmetry, i_symm, i, n_block, symmetry_info);
     count_boundary_of_type_bc(mesh[i].boundary, n_farfield, i_farfield, i, n_block, farfield_info);
@@ -402,28 +403,28 @@ void DBoundCond::link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) co
     cudaMemcpy(field[i].h_ptr->boundary, mesh[i].boundary.data(), mesh[i].boundary.size() * sizeof(Boundary),
                cudaMemcpyHostToDevice);
   }
-  for (integer i = 0; i < n_wall; i++) {
+  for (int i = 0; i < n_wall; i++) {
     delete[]i_wall[i];
   }
-  for (integer i = 0; i < n_symmetry; i++) {
+  for (int i = 0; i < n_symmetry; i++) {
     delete[]i_symm[i];
   }
-  for (integer i = 0; i < n_farfield; ++i) {
+  for (int i = 0; i < n_farfield; ++i) {
     delete[]i_farfield[i];
   }
-  for (integer i = 0; i < n_inflow; i++) {
+  for (int i = 0; i < n_inflow; i++) {
     delete[]i_inflow[i];
   }
-  for (integer i = 0; i < n_outflow; i++) {
+  for (int i = 0; i < n_outflow; i++) {
     delete[]i_outflow[i];
   }
-  for (integer i = 0; i < n_subsonic_inflow; ++i) {
+  for (int i = 0; i < n_subsonic_inflow; ++i) {
     delete[]i_subsonic_inflow[i];
   }
-  for (integer i = 0; i < n_back_pressure; ++i) {
+  for (int i = 0; i < n_back_pressure; ++i) {
     delete[]i_back_pressure[i];
   }
-  for (integer i = 0; i < n_periodic; ++i) {
+  for (int i = 0; i < n_periodic; ++i) {
     delete[]i_periodic[i];
   }
   delete[]i_wall;
@@ -436,18 +437,18 @@ void DBoundCond::link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) co
   delete[]i_periodic;
 }
 
-void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, integer n_bc, integer **sep, integer blk_idx,
-                               integer n_block, BCInfo *bc_info) {
+void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, int n_bc, int **sep, int blk_idx, int n_block,
+                               BCInfo *bc_info) {
   if (n_bc <= 0) {
     return;
   }
 
   // Count how many faces correspond to the given bc
   const auto n_boundary{boundary.size()};
-  auto *n = new integer[n_bc];
-  memset(n, 0, sizeof(integer) * n_bc);
+  auto *n = new int[n_bc];
+  memset(n, 0, sizeof(int) * n_bc);
   for (size_t l = 0; l < n_bc; l++) {
-    integer label = bc_info[l].label; // This means every bc should have a member "label"
+    int label = bc_info[l].label; // This means every bc should have a member "label"
     for (size_t i = 0; i < n_boundary; i++) {
       auto &b = boundary[i];
       if (b.type_label == label) {
@@ -464,11 +465,10 @@ void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, integer n_
   delete[]n;
 }
 
-void link_boundary_and_condition(const std::vector<Boundary> &boundary, BCInfo *bc, integer n_bc, integer **sep,
-                                 integer i_zone) {
+void link_boundary_and_condition(const std::vector<Boundary> &boundary, BCInfo *bc, int n_bc, int **sep, int i_zone) {
   const auto n_boundary{boundary.size()};
   for (size_t l = 0; l < n_bc; l++) {
-    integer label = bc[l].label;
+    int label = bc[l].label;
     int has_read{sep[l][i_zone]};
     for (auto i = 0; i < n_boundary; i++) {
       auto &b = boundary[i];
@@ -481,9 +481,9 @@ void link_boundary_and_condition(const std::vector<Boundary> &boundary, BCInfo *
 }
 
 void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &parameter) {
-  const integer n_scalar{parameter.get_int("n_scalar")};
+  const int n_scalar{parameter.get_int("n_scalar")};
   real *h_sv = new real[n_scalar];
-  for (integer l = 0; l < n_scalar; ++l) {
+  for (int l = 0; l < n_scalar; ++l) {
     h_sv[l] = sv[l];
   }
   delete[]sv;
@@ -492,7 +492,7 @@ void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &param
   if (inflow_type == 2) {
     // For mixing layer flow, there are another group of sv.
     real *h_sv_lower = new real[n_scalar];
-    for (integer l = 0; l < n_scalar; ++l) {
+    for (int l = 0; l < n_scalar; ++l) {
       h_sv_lower[l] = sv_lower[l];
     }
     delete[]sv_lower;
@@ -504,9 +504,9 @@ void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &param
 }
 
 void FarField::copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter &parameter) {
-  const integer n_scalar{parameter.get_int("n_scalar")};
+  const int n_scalar{parameter.get_int("n_scalar")};
   real *h_sv = new real[n_scalar];
-  for (integer l = 0; l < n_scalar; ++l) {
+  for (int l = 0; l < n_scalar; ++l) {
     h_sv[l] = sv[l];
   }
   delete[]sv;
@@ -517,9 +517,9 @@ void FarField::copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter 
 }
 
 void SubsonicInflow::copy_to_gpu(cfd::SubsonicInflow *d_inflow, cfd::Species &spec, const cfd::Parameter &parameter) {
-  const integer n_scalar{parameter.get_int("n_scalar")};
+  const int n_scalar{parameter.get_int("n_scalar")};
   real *h_sv = new real[n_scalar];
-  for (integer l = 0; l < n_scalar; ++l) {
+  for (int l = 0; l < n_scalar; ++l) {
     h_sv[l] = sv[l];
   }
   delete[]sv;
@@ -532,12 +532,12 @@ void SubsonicInflow::copy_to_gpu(cfd::SubsonicInflow *d_inflow, cfd::Species &sp
 void initialize_profile_with_inflow(const Boundary &boundary, const Block &block, const Parameter &parameter,
                                     const Species &species, ggxl::VectorField3D<real> &profile,
                                     const std::string &profile_related_bc_name) {
-  const integer direction = boundary.face;
-  const integer extent[3]{block.mx, block.my, block.mz};
-  const integer ngg = block.ngg;
-  integer range_0[2]{-ngg, block.mx + ngg - 1}, range_1[2]{-ngg, block.my + ngg - 1}, range_2[2]{-ngg,
-                                                                                                 block.mz + ngg - 1};
-  integer n0 = extent[0], n1 = extent[1], n2 = extent[2];
+  const int direction = boundary.face;
+  const int extent[3]{block.mx, block.my, block.mz};
+  const int ngg = block.ngg;
+  int range_0[2]{-ngg, block.mx + ngg - 1}, range_1[2]{-ngg, block.my + ngg - 1}, range_2[2]{-ngg,
+                                                                                             block.mz + ngg - 1};
+  int n0 = extent[0], n1 = extent[1], n2 = extent[2];
 //  if (direction == 1) {
 //    n1 = extent[0];
 //    range_1[1] = block.mx + ngg - 1;
@@ -562,19 +562,19 @@ void initialize_profile_with_inflow(const Boundary &boundary, const Block &block
   }
 
   ggxl::VectorField3DHost<real> profile_host;
-  const integer n_var = parameter.get_int("n_var");
+  const int n_var = parameter.get_int("n_var");
   profile_host.resize(n0, n1, n2, n_var + 1, ngg);
   Inflow inflow1(profile_related_bc_name, species, parameter);
   for (int i0 = range_0[0]; i0 <= range_0[1]; ++i0) {
-    for (integer i1 = range_1[0]; i1 <= range_1[1]; ++i1) {
-      for (integer i2 = range_2[0]; i2 <= range_2[1]; ++i2) {
+    for (int i1 = range_1[0]; i1 <= range_1[1]; ++i1) {
+      for (int i2 = range_2[0]; i2 <= range_2[1]; ++i2) {
         profile_host(i0, i1, i2, 0) = inflow1.density;
         profile_host(i0, i1, i2, 1) = inflow1.u;
         profile_host(i0, i1, i2, 2) = inflow1.v;
         profile_host(i0, i1, i2, 3) = inflow1.w;
         profile_host(i0, i1, i2, 4) = inflow1.pressure;
         profile_host(i0, i1, i2, 5) = inflow1.temperature;
-        for (integer i = 0; i < species.n_spec; ++i) {
+        for (int i = 0; i < species.n_spec; ++i) {
           profile_host(i0, i1, i2, 6 + i) = inflow1.sv[i];
         }
       }
@@ -602,14 +602,14 @@ void read_profile(const Boundary &boundary, const std::string &file, const Block
   }
 }
 
-std::vector<integer>
+std::vector<int>
 identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::string> &var_name, const Species &species,
                          bool &has_pressure, bool &has_temperature, bool &has_tke) {
-  std::vector<integer> labels;
-  const integer n_spec = species.n_spec;
-  const integer n_turb = parameter.get_int("n_turb");
+  std::vector<int> labels;
+  const int n_spec = species.n_spec;
+  const int n_turb = parameter.get_int("n_turb");
   for (auto &name: var_name) {
-    integer l = 999;
+    int l = 999;
     // The first three names are x, y and z, they are assigned value 0 and no match would be found.
     auto n = gxl::to_upper(name);
     if (n == "DENSITY" || n == "ROE" || n == "RHO") {
@@ -676,7 +676,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
     printf("Cannot open file %s\n", file.c_str());
     MpiParallel::exit();
   }
-  const integer direction = boundary.face;
+  const int direction = boundary.face;
 
   std::string input;
   std::vector<std::string> var_name;
@@ -712,7 +712,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
     turb_intensity = std::get<real>(info.at("turbulence_intensity"));
   }
 
-  integer mx, my, mz;
+  int mx, my, mz;
   bool i_read{false}, j_read{false}, k_read{false}, packing_read{false};
   std::string key;
   std::string data_packing{"POINT"};
@@ -743,10 +743,10 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
   // This line is the DT=(double ...) line, which must exist if we output the data from Tecplot.
   std::getline(file_in, input);
 
-  integer extent[3]{mx, my, mz};
+  int extent[3]{mx, my, mz};
 
   // Then we read the variables.
-  auto nv_read = (integer) var_name.size();
+  auto nv_read = (int) var_name.size();
   gxl::VectorField3D<real> profile_read;
   profile_read.resize(extent[0], extent[1], extent[2], nv_read, 0);
 
@@ -772,9 +772,9 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
     }
   }
 
-  const integer n_var = parameter.get_int("n_var");
+  const int n_var = parameter.get_int("n_var");
   const auto ngg = block.ngg;
-  integer range_i[2]{-ngg, block.mx + ngg - 1},
+  int range_i[2]{-ngg, block.mx + ngg - 1},
       range_j[2]{-ngg, block.my + ngg - 1},
       range_k[2]{-ngg, block.mz + ngg - 1};
   if (direction == 0) {
@@ -797,7 +797,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
         for (int ic = 0; ic <= ngg; ++ic) {
           int i = range_i[0] + ic;
           real d_min = 1e+6;
-          integer i0 = 0, j0 = 0, k0 = 0;
+          int i0 = 0, j0 = 0, k0 = 0;
           for (int kk = 0; kk < extent[2]; ++kk) {
             for (int jj = 0; jj < extent[1]; ++jj) {
               for (int ii = 0; ii < extent[0]; ++ii) {
@@ -907,7 +907,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
         for (int i = range_i[0]; i <= range_i[1]; ++i) {
           int j = range_j[0] + jc;
           real d_min = 1e+6;
-          integer i0 = 0, j0 = 0, k0 = 0;
+          int i0 = 0, j0 = 0, k0 = 0;
           for (int kk = 0; kk < extent[2]; ++kk) {
             for (int jj = 0; jj < extent[1]; ++jj) {
               for (int ii = 0; ii < extent[0]; ++ii) {
@@ -1002,7 +1002,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
       for (int j = range_j[0]; j <= range_j[1]; ++j) {
         for (int i = range_i[0]; i <= range_i[1]; ++i) {
           real d_min = 1e+6;
-          integer i0 = 0, j0 = 0, k0 = 0;
+          int i0 = 0, j0 = 0, k0 = 0;
           for (int kk = 0; kk < extent[2]; ++kk) {
             for (int jj = 0; jj < extent[1]; ++jj) {
               for (int ii = 0; ii < extent[0]; ++ii) {
@@ -1083,8 +1083,8 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
 }
 
 __global__ void
-initialize_rng(curandState *rng_states, integer size, int64_t time_stamp) {
-  auto i = (integer) (blockDim.x * blockIdx.x + threadIdx.x);
+initialize_rng(curandState *rng_states, int size, int64_t time_stamp) {
+  auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   if (i >= size)
     return;
 
@@ -1099,7 +1099,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
     printf("Cannot open file %s\n", file.c_str());
     MpiParallel::exit();
   }
-  const integer direction = boundary.face;
+  const int direction = boundary.face;
 
   std::string input;
   std::vector<std::string> var_name;
@@ -1119,10 +1119,10 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
   }
   bool has_pressure{false}, has_temperature{false}, has_rho{false};
   // Identify the labels of the variables
-  std::vector<integer> label_order;
-  const integer n_spec = species.n_spec;
+  std::vector<int> label_order;
+  const int n_spec = species.n_spec;
   for (auto &name: var_name) {
-    integer l = 999;
+    int l = 999;
     // The first three names are x, y and z, they are assigned value 0 and no match would be found.
     auto n = gxl::to_upper(name);
     if (n == "RHOR") {
@@ -1183,7 +1183,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
     }
   }
 
-  integer mx, my, mz;
+  int mx, my, mz;
   bool i_read{false}, j_read{false}, k_read{false}, packing_read{false};
   std::string key;
   std::string data_packing{"POINT"};
@@ -1214,10 +1214,10 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
   // This line is the DT=(double ...) line, which must exist if we output the data from Tecplot.
   std::getline(file_in, input);
 
-  integer extent[3]{mx, my, mz};
+  int extent[3]{mx, my, mz};
 
   // Then we read the variables.
-  auto nv_read = (integer) var_name.size();
+  auto nv_read = (int) var_name.size();
   gxl::VectorField3D<real> profile_read;
   profile_read.resize(extent[0], extent[1], extent[2], nv_read, 0);
 
@@ -1243,9 +1243,9 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
     }
   }
 
-  const integer n_var = parameter.get_int("n_var");
+  const int n_var = parameter.get_int("n_var");
   const auto ngg = block.ngg;
-  integer range_i[2]{-ngg, block.mx + ngg - 1},
+  int range_i[2]{-ngg, block.mx + ngg - 1},
       range_j[2]{-ngg, block.my + ngg - 1},
       range_k[2]{-ngg, block.mz + ngg - 1};
   if (direction == 0) {
@@ -1258,7 +1258,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
     for (int k = range_k[0]; k <= range_k[1]; ++k) {
       for (int j = range_j[0]; j <= range_j[1]; ++j) {
         real d_min = 1e+6;
-        integer i0 = 0, j0 = 0, k0 = 0;
+        int i0 = 0, j0 = 0, k0 = 0;
         for (int kk = 0; kk < extent[2]; ++kk) {
           for (int jj = 0; jj < extent[1]; ++jj) {
             for (int ii = 0; ii < extent[0]; ++ii) {
@@ -1300,7 +1300,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
     for (int k = range_k[0]; k <= range_k[1]; ++k) {
       for (int i = range_i[0]; i <= range_i[1]; ++i) {
         real d_min = 1e+6;
-        integer i0 = 0, j0 = 0, k0 = 0;
+        int i0 = 0, j0 = 0, k0 = 0;
         for (int kk = 0; kk < extent[2]; ++kk) {
           for (int jj = 0; jj < extent[1]; ++jj) {
             for (int ii = 0; ii < extent[0]; ++ii) {
@@ -1342,7 +1342,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
     for (int j = range_j[0]; j <= range_j[1]; ++j) {
       for (int i = range_i[0]; i <= range_i[1]; ++i) {
         real d_min = 1e+6;
-        integer i0 = 0, j0 = 0, k0 = 0;
+        int i0 = 0, j0 = 0, k0 = 0;
         for (int kk = 0; kk < extent[2]; ++kk) {
           for (int jj = 0; jj < extent[1]; ++jj) {
             for (int ii = 0; ii < extent[0]; ++ii) {
@@ -1380,14 +1380,14 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
 
 void
 DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field) {
-  if (const integer n_profile = parameter.get_int("n_profile"); n_profile > 0) {
+  if (const int n_profile = parameter.get_int("n_profile"); n_profile > 0) {
     profile_hPtr_withGhost.resize(n_profile);
-    for (integer i = 0; i < n_profile; ++i) {
+    for (int i = 0; i < n_profile; ++i) {
       const auto file_name = parameter.get_string_array("profile_file_names")[i];
       const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[i];
       const auto &nn = parameter.get_struct(profile_related_bc_name);
-      const auto label = std::get<integer>(nn.at("label"));
-      for (integer blk = 0; blk < mesh.n_block; ++blk) {
+      const auto label = std::get<int>(nn.at("label"));
+      for (int blk = 0; blk < mesh.n_block; ++blk) {
         auto &bs = mesh[blk].boundary;
         for (auto &b: bs) {
           if (b.type_label == label) {
@@ -1407,7 +1407,7 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
   auto size{0};
   const auto need_rng = parameter.get_int_array("need_rng");
   if (!need_rng.empty()) {
-    for (integer blk = 0; blk < mesh.n_block; ++blk) {
+    for (int blk = 0; blk < mesh.n_block; ++blk) {
       auto &bs = mesh[blk].boundary;
       for (auto &b: bs) {
         if (gxl::exists(need_rng, b.type_label)) {
@@ -1445,8 +1445,8 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
       const auto file_name = parameter.get_string_array("fluctuation_profile_file")[i];
       auto bc_name = parameter.get_string_array("fluctuation_profile_related_bc_name")[i];
       const auto &nn = parameter.get_struct(bc_name);
-      const auto label = std::get<integer>(nn.at("label"));
-      for (integer blk = 0; blk < mesh.n_block; ++blk) {
+      const auto label = std::get<int>(nn.at("label"));
+      for (int blk = 0; blk < mesh.n_block; ++blk) {
         auto &bs = mesh[blk].boundary;
         for (auto &b: bs) {
           if (b.type_label == label) {

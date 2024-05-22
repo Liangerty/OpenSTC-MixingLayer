@@ -420,9 +420,9 @@ void Roe_compute_inviscid_flux(const Block &block, cfd::DZone *zone, DParameter 
 template<MixtureModel mix_model>
 __global__ void compute_entropy_fix_delta(cfd::DZone *zone, DParameter *param) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int)(blockDim.x * blockIdx.x + threadIdx.x) - 1;
-  int j = (int)(blockDim.y * blockIdx.y + threadIdx.y) - 1;
-  int k = (int)(blockDim.z * blockIdx.z + threadIdx.z) - 1;
+  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - 1;
+  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - 1;
+  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - 1;
   if (i >= mx + 1 || j >= my + 1 || k >= mz + 1) return;
 
   const auto &bv{zone->bv};
@@ -451,15 +451,15 @@ __global__ void
 Roe_compute_inviscid_flux_1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const auto tid = (int)(threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const auto block_dim = (int)(blockDim.x * blockDim.y * blockDim.z);
+  const auto tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const auto block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
   const int n_point = block_dim + 2 * ngg - 1;
 
   int idx[3];
-  idx[0] = (int)((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (int)((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (int)((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
+  idx[0] = (int) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = (int) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = (int) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= 1;
   if (idx[direction] >= max_extent) return;
 
@@ -585,26 +585,26 @@ compute_convective_term_aweno<MixtureModel::FL>(const Block &block, cfd::DZone *
 
 template
 void Roe_compute_inviscid_flux<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                  const integer n_var, const Parameter &parameter);
+                                                  const int n_var, const Parameter &parameter);
 
 template
 void Roe_compute_inviscid_flux<MixtureModel::Mixture>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                      const integer n_var, const Parameter &parameter);
+                                                      const int n_var, const Parameter &parameter);
 
 template
 void Roe_compute_inviscid_flux<MixtureModel::FR>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                 const integer n_var, const Parameter &parameter);
+                                                 const int n_var, const Parameter &parameter);
 
 template<>
 void Roe_compute_inviscid_flux<MixtureModel::FL>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                 const integer n_var, const Parameter &parameter) {
+                                                 const int n_var, const Parameter &parameter) {
   printf("Roe_compute_inviscid_flux<MixtureModel::FL> is not implemented yet.\n");
   MpiParallel::exit();
 }
 
 template<>
 void Roe_compute_inviscid_flux<MixtureModel::MixtureFraction>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                              const integer n_var, const Parameter &parameter) {
+                                                              const int n_var, const Parameter &parameter) {
   printf("Roe_compute_inviscid_flux<MixtureModel::MixtureFraction> is not implemented yet.\n");
   MpiParallel::exit();
 }

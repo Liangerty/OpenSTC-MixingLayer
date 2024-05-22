@@ -2,9 +2,9 @@
 #include "DParameter.cuh"
 #include "Transport.cuh"
 
-namespace cfd{
+namespace cfd {
 __device__ void
-ThermRMS::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k, integer collect_idx) {
+ThermRMS::collect(cfd::DZone *zone, cfd::DParameter *param, int i, int j, int k, int collect_idx) {
   auto &collect = zone->userCollectForStat;
   const auto &bv = zone->bv;
 
@@ -15,8 +15,8 @@ ThermRMS::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j
 }
 
 __device__ void
-ThermRMS::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i,
-                                   integer j, integer mz, integer counter, integer stat_idx, integer collected_idx) {
+ThermRMS::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
+                                   int mz, int counter, int stat_idx, int collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
   auto &collect = zone->userCollectForStat;
   auto &firstOrderMoment = zone->firstOrderMoment;
@@ -39,8 +39,8 @@ ThermRMS::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, con
 }
 
 __device__ void
-ThermRMS::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i, integer j, integer k,
-                  integer counter, integer stat_idx, integer collected_idx) {
+ThermRMS::compute(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int k, int counter,
+                  int stat_idx, int collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
   auto &collect = zone->userCollectForStat;
   auto &mean = zone->mean_value;
@@ -56,8 +56,7 @@ ThermRMS::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *count
 }
 
 __device__ void
-turbulent_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k,
-                                    integer collect_idx) {
+turbulent_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, int i, int j, int k, int collect_idx) {
   auto &collect = zone->userCollectForStat;
   const auto &bv = zone->bv;
 
@@ -123,8 +122,8 @@ turbulent_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, in
 }
 
 __device__ void
-turbulent_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud, integer i,
-                                    integer j, integer k, integer counter, integer stat_idx, integer collected_idx) {
+turbulent_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
+                                    int k, int counter, int stat_idx, int collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
   auto &collect = zone->userCollectForStat;
   auto &mean = zone->mean_value;
@@ -172,10 +171,10 @@ turbulent_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, co
   stat(i, j, k, stat_idx + 3) = tke / stat(i, j, k, stat_idx);
 }
 
-__device__ void turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
-                                                                     const integer *counter_ud, integer i, integer j,
-                                                                     integer mz, integer counter, integer stat_idx,
-                                                                     integer collected_idx) {
+__device__ void
+turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud,
+                                                     int i, int j, int mz, int counter, int stat_idx,
+                                                     int collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
   auto &collect = zone->userCollectForStat;
   auto &firstOrderMoment = zone->firstOrderMoment;
@@ -228,8 +227,8 @@ __device__ void turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone 
 }
 
 __device__ void
-H2_variance_and_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, integer i, integer j, integer k,
-                                          integer collect_idx) {
+H2_variance_and_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, int i, int j, int k,
+                                          int collect_idx) {
   auto &stat = zone->userCollectForStat; // There may be mistakes!
   const auto &sv = zone->sv;
 
@@ -262,10 +261,8 @@ H2_variance_and_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *par
 }
 
 __device__ void
-H2_variance_and_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, const integer *counter_ud,
-                                          integer i,
-                                          integer j, integer k, integer counter, integer stat_idx,
-                                          integer collected_idx) {
+H2_variance_and_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
+                                          int k, int counter, int stat_idx, int collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
   auto &collected_moments = zone->userCollectForStat;
   auto &mean = zone->mean_value;
@@ -328,9 +325,9 @@ H2_variance_and_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *par
 }
 
 __device__ void H2_variance_and_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
-                                                                           const integer *counter_ud, integer i,
-                                                                           integer j, integer mz, integer counter,
-                                                                           integer stat_idx, integer collected_idx) {
+                                                                           const int *counter_ud, int i, int j, int mz,
+                                                                           int counter, int stat_idx,
+                                                                           int collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
   auto &collected_moments = zone->userCollectForStat;
   auto &firstOrderMoment = zone->firstOrderMoment;

@@ -10,14 +10,14 @@ struct DParameter;
 
 template<MixtureModel mix_model>
 __device__ void
-AWENO_interpolation(const real *cv, real *pv_l, real *pv_r, integer idx_shared, integer n_var, const real *metric,
+AWENO_interpolation(const real *cv, real *pv_l, real *pv_r, int idx_shared, int n_var, const real *metric,
                     DParameter *param);
 
-__device__ double2 WENO5(const real *L, const real *cv, integer n_var, integer i_shared, integer l_row);
+__device__ double2 WENO5(const real *L, const real *cv, int n_var, int i_shared, int l_row);
 
-__device__ double2 WENO7(const real *L, const real *cv, integer n_var, integer i_shared, integer l_row);
+__device__ double2 WENO7(const real *L, const real *cv, int n_var, int i_shared, int l_row);
 
 template<MixtureModel mix_model>
-__global__ void CDSPart1D(cfd::DZone *zone, integer direction, integer max_extent, DParameter *param);
+__global__ void CDSPart1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
 // Implementations
 }

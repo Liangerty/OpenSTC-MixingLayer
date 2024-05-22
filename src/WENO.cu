@@ -8,13 +8,13 @@
 namespace cfd {
 
 template<MixtureModel mix_model>
-void compute_convective_term_weno(const Block &block, cfd::DZone *zone, DParameter *param, integer n_var,
+void compute_convective_term_weno(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
                                   const Parameter &parameter) {
   // The implementation of classic WENO.
-  const integer extent[3]{block.mx, block.my, block.mz};
+  const int extent[3]{block.mx, block.my, block.mz};
 
-  constexpr integer block_dim = 64;
-  const integer n_computation_per_block = block_dim + 2 * block.ngg - 1;
+  constexpr int block_dim = 64;
+  const int n_computation_per_block = block_dim + 2 * block.ngg - 1;
   auto shared_mem = (block_dim * n_var // fc
                      + n_computation_per_block * n_var * 2 // F+/F-
                      + n_computation_per_block * (n_var + 3)) * sizeof(real) // cv[n_var]+p+T+jacobian
@@ -24,9 +24,9 @@ void compute_convective_term_weno(const Block &block, cfd::DZone *zone, DParamet
   }
 
   for (auto dir = 0; dir < 2; ++dir) {
-    integer tpb[3]{1, 1, 1};
+    int tpb[3]{1, 1, 1};
     tpb[dir] = block_dim;
-    integer bpg[3]{extent[0], extent[1], extent[2]};
+    int bpg[3]{extent[0], extent[1], extent[2]};
     bpg[dir] = (extent[dir] - 1) / (tpb[dir] - 1) + 1;
 
     dim3 TPB(tpb[0], tpb[1], tpb[2]);
@@ -37,8 +37,8 @@ void compute_convective_term_weno(const Block &block, cfd::DZone *zone, DParamet
   if (extent[2] > 1) {
     // 3D computation
     // Number of threads in the 3rd direction cannot exceed 64
-    constexpr integer tpb[3]{1, 1, 64};
-    integer bpg[3]{extent[0], extent[1], (extent[2] - 1) / (tpb[2] - 1) + 1};
+    constexpr int tpb[3]{1, 1, 64};
+    int bpg[3]{extent[0], extent[1], (extent[2] - 1) / (tpb[2] - 1) + 1};
 
     dim3 TPB(tpb[0], tpb[1], tpb[2]);
     dim3 BPG(bpg[0], bpg[1], bpg[2]);
@@ -48,18 +48,18 @@ void compute_convective_term_weno(const Block &block, cfd::DZone *zone, DParamet
 
 template<MixtureModel mix_model>
 __global__ void
-compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max_extent, DParameter *param) {
-  integer labels[3]{0, 0, 0};
+compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param) {
+  int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const auto tid = (integer) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const auto block_dim = (integer) (blockDim.x * blockDim.y * blockDim.z);
+  const auto tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const auto block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
-  const integer n_point = block_dim + 2 * ngg - 1;
+  const int n_point = block_dim + 2 * ngg - 1;
 
-  integer idx[3];
-  idx[0] = (integer) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (integer) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (integer) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
+  int idx[3];
+  idx[0] = (int) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = (int) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = (int) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= 1;
   if (idx[direction] >= max_extent) return;
 
@@ -77,7 +77,7 @@ compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max
   if (param->positive_preserving)
     f_1st = &fc[block_dim * n_var];
 
-  const integer i_shared = tid - 1 + ngg;
+  const int i_shared = tid - 1 + ngg;
   for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
     cv[i_shared * n_reconstruct + l] = zone->cv(idx[0], idx[1], idx[2], l);
   }
@@ -94,7 +94,7 @@ compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max
   int additional_loaded{0};
   if (tid < ngg - 1) {
     ig_shared[additional_loaded] = tid;
-    const integer g_idx[3]{idx[0] - (ngg - 1) * labels[0], idx[1] - (ngg - 1) * labels[1],
+    const int g_idx[3]{idx[0] - (ngg - 1) * labels[0], idx[1] - (ngg - 1) * labels[1],
                            idx[2] - (ngg - 1) * labels[2]};
 
     for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
@@ -110,7 +110,7 @@ compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max
   }
   if (tid > block_dim - ngg - 1 || idx[direction] > max_extent - ngg - 1) {
     ig_shared[additional_loaded] = tid + 2 * ngg - 1;
-    const integer g_idx[3]{idx[0] + ngg * labels[0], idx[1] + ngg * labels[1], idx[2] + ngg * labels[2]};
+    const int g_idx[3]{idx[0] + ngg * labels[0], idx[1] + ngg * labels[1], idx[2] + ngg * labels[2]};
     for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
       cv[ig_shared[additional_loaded] * n_reconstruct + l] = zone->cv(g_idx[0], g_idx[1], g_idx[2], l);
     }
@@ -126,7 +126,7 @@ compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max
     int n_more_left = ngg - 1 - tid - 1;
     for (int m = 0; m < n_more_left; ++m) {
       ig_shared[additional_loaded] = tid + m + 1;
-      const integer g_idx[3]{idx[0] - (ngg - 1 - m - 1) * labels[0], idx[1] - (ngg - 1 - m - 1) * labels[1],
+      const int g_idx[3]{idx[0] - (ngg - 1 - m - 1) * labels[0], idx[1] - (ngg - 1 - m - 1) * labels[1],
                              idx[2] - (ngg - 1 - m - 1) * labels[2]};
 
       for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
@@ -143,7 +143,7 @@ compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max
     int n_more_right = ngg - 1 - tid;
     for (int m = 0; m < n_more_right; ++m) {
       ig_shared[additional_loaded] = i_shared + m + 1;
-      const integer g_idx[3]{idx[0] + (m + 1) * labels[0], idx[1] + (m + 1) * labels[1], idx[2] + (m + 1) * labels[2]};
+      const int g_idx[3]{idx[0] + (m + 1) * labels[0], idx[1] + (m + 1) * labels[1], idx[2] + (m + 1) * labels[2]};
       for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
         cv[ig_shared[additional_loaded] * n_reconstruct + l] = zone->cv(g_idx[0], g_idx[1], g_idx[2], l);
       }
@@ -180,15 +180,33 @@ compute_convective_term_weno_1D(cfd::DZone *zone, integer direction, integer max
   __syncthreads();
 
   if (tid > 0) {
-    for (integer l = 0; l < n_var; ++l) {
+    for (int l = 0; l < n_var; ++l) {
       zone->dq(idx[0], idx[1], idx[2], l) -= fc[tid * n_var + l] - fc[(tid - 1) * n_var + l];
     }
   }
 }
 
 template<MixtureModel mix_model>
+__device__ void
+compute_flux(const real *Q, DParameter *param, const real *metric, real jac, real *Fk) {
+  const int n_var = param->n_var;
+  real jacUk{jac * (metric[0] * Q[1] + metric[1] * Q[2] + metric[2] * Q[3]) / Q[0]};
+  real pk{Q[n_var]};
+
+  Fk[0] = jacUk * Q[0];
+  Fk[1] = jacUk * Q[1] + jac * pk * metric[0];
+  Fk[2] = jacUk * Q[2] + jac * pk * metric[1];
+  Fk[3] = jacUk * Q[3] + jac * pk * metric[2];
+  Fk[4] = jacUk * (Q[4] + pk);
+
+  for (int l = 5; l < n_var; ++l) {
+    Fk[l] = jacUk * Q[l];
+  }
+}
+
+template<MixtureModel mix_model>
 __device__ void compute_flux(const real *Q, DParameter *param, const real *metric, real jac, real *Fp, real *Fm) {
-  const integer n_var = param->n_var;
+  const int n_var = param->n_var;
   const real Uk{(Q[1] * metric[0] + Q[2] * metric[1] + Q[3] * metric[2]) / Q[0]};
   real pk{Q[n_var]};
   const real cGradK = Q[n_var + 1] * sqrt(metric[0] * metric[0] + metric[1] * metric[1] + metric[2] * metric[2]);
@@ -214,9 +232,9 @@ __device__ void compute_flux(const real *Q, DParameter *param, const real *metri
 
 template<MixtureModel mix_model>
 __device__ void
-compute_weno_flux_ch(const real *cv, DParameter *param, integer tid, const real *metric, const real *jac, real *fc,
-                     integer i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, real *f_1st) {
-  const integer n_var = param->n_var;
+compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *metric, const real *jac, real *fc,
+                     int i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, real *f_1st) {
+  const int n_var = param->n_var;
 
   // 0: acans; 1: li xinliang(own flux splitting); 2: my(same spectral radius)
   constexpr int method = 1;
@@ -718,11 +736,11 @@ compute_weno_flux_ch(const real *cv, DParameter *param, integer tid, const real 
 // Thus, we keep the current version.
 template<>
 __device__ void
-compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, integer tid, const real *metric,
-                                        const real *jac, real *fc, integer i_shared, real *Fp, real *Fm,
+compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int tid, const real *metric,
+                                        const real *jac, real *fc, int i_shared, real *Fp, real *Fm,
                                         const int *ig_shared, int n_add, [[maybe_unused]] real *f_1st) {
 
-  const integer n_var = param->n_var;
+  const int n_var = param->n_var;
 
   // Li Xinliang
   compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
@@ -969,9 +987,9 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, integ
 
 template<MixtureModel mix_model>
 __device__ void
-compute_weno_flux_cp(const real *cv, DParameter *param, integer tid, const real *metric, const real *jac, real *fc,
-                     integer i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, real *f_1st) {
-  const integer n_var = param->n_var;
+compute_weno_flux_cp(const real *cv, DParameter *param, int tid, const real *metric, const real *jac, real *fc,
+                     int i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, real *f_1st) {
+  const int n_var = param->n_var;
 
   compute_flux<mix_model>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
                           &Fp[i_shared * n_var], &Fm[i_shared * n_var]);
@@ -1105,22 +1123,22 @@ positive_preserving_limiter(const real *f_1st, int n_var, int tid, real *fc, con
 }
 
 template void
-compute_convective_term_weno<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param, integer n_var,
+compute_convective_term_weno<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
                                                 const Parameter &parameter);
 
 template void
 compute_convective_term_weno<MixtureModel::Mixture>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                    integer n_var, const Parameter &parameter);
+                                                    int n_var, const Parameter &parameter);
 
 template void
 compute_convective_term_weno<MixtureModel::MixtureFraction>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                            integer n_var, const Parameter &parameter);
+                                                            int n_var, const Parameter &parameter);
 
 template void
-compute_convective_term_weno<MixtureModel::FR>(const Block &block, cfd::DZone *zone, DParameter *param, integer n_var,
+compute_convective_term_weno<MixtureModel::FR>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
                                                const Parameter &parameter);
 
 template void
-compute_convective_term_weno<MixtureModel::FL>(const Block &block, cfd::DZone *zone, DParameter *param, integer n_var,
+compute_convective_term_weno<MixtureModel::FL>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
                                                const Parameter &parameter);
 }

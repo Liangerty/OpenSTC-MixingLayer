@@ -12,14 +12,14 @@ namespace cfd {
 
 struct UserDefineIO {
   /**********************************************************************************************/
-  constexpr static integer n_auxiliary = 1;
-  constexpr static integer n_static_auxiliary = 0;
-  constexpr static integer n_dynamic_auxiliary = n_auxiliary - n_static_auxiliary;
+  constexpr static int n_auxiliary = 1;
+  constexpr static int n_static_auxiliary = 0;
+  constexpr static int n_dynamic_auxiliary = n_auxiliary - n_static_auxiliary;
   /**********************************************************************************************/
 };
 
 struct Field;
 
-void copy_auxiliary_data_from_device(cfd::Field &field, integer size);
+void copy_auxiliary_data_from_device(cfd::Field &field, int size);
 
 }

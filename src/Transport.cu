@@ -8,7 +8,7 @@ real cfd::Sutherland(real temperature) {
   return 1.716e-5 * pow(temperature / 273, 1.5) * (273 + 111) / (temperature + 111);
 }
 
-real cfd::compute_viscosity(real temperature, real mw_total, real const *Y,const Species &spec) {
+real cfd::compute_viscosity(real temperature, real mw_total, real const *Y, const Species &spec) {
   // This method can only be used on CPU, while for GPU the allocation may be performed in every step
   std::vector<real> x(spec.n_spec);
   std::vector<real> vis_spec(spec.n_spec);
@@ -41,8 +41,8 @@ real cfd::compute_viscosity(real temperature, real mw_total, real const *Y,const
 }
 
 __device__ void
-cfd::compute_transport_property(integer i, integer j, integer k, real temperature, real mw_total, const real *cp,
-                                cfd::DParameter *param, DZone *zone) {
+cfd::compute_transport_property(int i, int j, int k, real temperature, real mw_total, const real *cp, DParameter *param,
+                                DZone *zone) {
   const auto n_spec{param->n_spec};
   const real *mw = param->mw;
 
@@ -113,8 +113,7 @@ cfd::compute_transport_property(integer i, integer j, integer k, real temperatur
 }
 
 __device__ real
-cfd::compute_viscosity(integer i, integer j, integer k, real temperature, real mw_total, cfd::DParameter *param,
-                       DZone *zone) {
+cfd::compute_viscosity(int i, int j, int k, real temperature, real mw_total, DParameter *param, DZone *zone) {
   const auto n_spec{param->n_spec};
   const real *mw = param->mw;
   const auto &yk = zone->sv;
@@ -147,7 +146,7 @@ __device__ real cfd::compute_Omega_D(real t_red) {
   return 1.0 / std::pow(t_red, 0.145) + 1.0 / ((t_red + 0.5) * (t_red + 0.5));
 }
 
-__device__ real cfd::compute_viscosity(real temperature, real mw_total, const real *Y, cfd::DParameter *param) {
+__device__ real cfd::compute_viscosity(real temperature, real mw_total, const real *Y, DParameter *param) {
   const auto n_spec{param->n_spec};
   const real *mw = param->mw;
 

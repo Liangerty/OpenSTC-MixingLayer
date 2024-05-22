@@ -13,12 +13,12 @@ namespace cfd {
 
 int add_other_variable_name(std::vector<std::string> &var_name);
 
-MPI_Offset write_static_max_min(MPI_Offset offset, const Field &field, integer ngg, MPI_File &fp);
+MPI_Offset write_static_max_min(MPI_Offset offset, const Field &field, int ngg, MPI_File &fp);
 
-MPI_Offset write_dynamic_max_min_first_step(MPI_Offset offset, const cfd::Field &field, integer ngg, MPI_File &fp);
+MPI_Offset write_dynamic_max_min_first_step(MPI_Offset offset, const cfd::Field &field, int ngg, MPI_File &fp);
 
 MPI_Offset
-write_dynamic_max_min(MPI_Offset offset, const cfd::Field &field, integer ngg, MPI_File &fp);
+write_dynamic_max_min(MPI_Offset offset, const cfd::Field &field, int ngg, MPI_File &fp);
 
 MPI_Offset
 write_static_array(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, long long int mem_sz);
@@ -41,11 +41,10 @@ class FieldIO {
   MPI_Offset *offset_sol_time = nullptr;
 
 public:
-  explicit FieldIO(integer _myid, const Mesh &_mesh, std::vector<Field> &_field, const Parameter &_parameter,
-                   const Species &spec,
-                   int ngg_out);
+  explicit FieldIO(int _myid, const Mesh &_mesh, std::vector<Field> &_field, const Parameter &_parameter,
+                   const Species &spec, int ngg_out);
 
-  void print_field(integer step, real time = 0) const;
+  void print_field(int step, real time = 0) const;
 
 private:
   void write_header();
@@ -58,9 +57,8 @@ private:
 };
 
 template<MixtureModel mix_model, class turb, OutputTimeChoice output_time_choice>
-FieldIO<mix_model, turb, output_time_choice>::FieldIO(integer _myid, const Mesh &_mesh,
-                                                      std::vector<Field> &_field, const Parameter &_parameter,
-                                                      const Species &spec, int ngg_out):
+FieldIO<mix_model, turb, output_time_choice>::FieldIO(int _myid, const Mesh &_mesh, std::vector<Field> &_field,
+                                                      const Parameter &_parameter, const Species &spec, int ngg_out):
     myid{_myid}, mesh{_mesh}, field(_field), parameter{_parameter}, species{spec}, ngg_output{ngg_out} {
   const std::filesystem::path out_dir("output");
   if (!exists(out_dir)) {
@@ -189,7 +187,7 @@ void FieldIO<mix_model, turb, output_time_choice>::write_header() {
     offset_header = offset;
   }
   offset_sol_time = new MPI_Offset[mesh.n_block];
-  auto *disp = new integer[mesh.n_proc];
+  auto *disp = new int[mesh.n_proc];
   disp[0] = 0;
   for (int i = 1; i < mesh.n_proc; ++i) {
     disp[i] = disp[i - 1] + mesh.nblk[i - 1];
@@ -204,9 +202,9 @@ void FieldIO<mix_model, turb, output_time_choice>::write_header() {
 template<MixtureModel mix_model, class turb, OutputTimeChoice output_time_choice>
 void FieldIO<mix_model, turb, output_time_choice>::compute_offset_header() {
   MPI_Offset new_offset{0};
-  integer i_blk{0};
+  int i_blk{0};
   for (int p = 0; p < myid; ++p) {
-    const integer n_blk = mesh.nblk[p];
+    const int n_blk = mesh.nblk[p];
     for (int b = 0; b < n_blk; ++b) {
       new_offset += 16 + 20 * n_var;
       const int64_t mx{mesh.mx_blk[i_blk] + 2 * ngg_output}, my{mesh.my_blk[i_blk] + 2 * ngg_output}, mz{
@@ -341,7 +339,7 @@ void FieldIO<mix_model, turb, output_time_choice>::write_common_data_section() {
     MPI_File_write_at(fp, offset, &max_val, 1, MPI_DOUBLE, &status);
     offset += 8;
     // scalar variables. Y0-Y_{Ns-1}, k, omega, z, z_prime
-    const integer n_scalar{parameter.get_int("n_scalar")};
+    const int n_scalar{parameter.get_int("n_scalar")};
     for (int l = 0; l < n_scalar; ++l) {
       min_val = v.sv(-ngg, -ngg, -ngg, l);
       max_val = v.sv(-ngg, -ngg, -ngg, l);
@@ -397,10 +395,10 @@ void FieldIO<mix_model, turb, output_time_choice>::write_common_data_section() {
 
     // 7. Zone Data.
     MPI_Datatype ty;
-    integer lsize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
+    int lsize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
     const long long memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    integer memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, mz + 2 * b.ngg};
-    integer start_idx[3]{b.ngg - ngg, b.ngg - ngg, b.ngg - ngg};
+    int memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, mz + 2 * b.ngg};
+    int start_idx[3]{b.ngg - ngg, b.ngg - ngg, b.ngg - ngg};
     MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
     MPI_File_write_at(fp, offset, b.x.data(), 1, ty, &status);
@@ -484,7 +482,7 @@ FieldIO<mix_model, turb, output_time_choice>::acquire_variable_names(std::vector
 }
 
 template<MixtureModel mix_model, class turb, OutputTimeChoice output_time_choice>
-void FieldIO<mix_model, turb, output_time_choice>::print_field(integer step, real time) const {
+void FieldIO<mix_model, turb, output_time_choice>::print_field(int step, real time) const {
   if (myid == 0) {
     std::ofstream file("output/message/step.txt");
     file << step;
@@ -546,7 +544,7 @@ void FieldIO<mix_model, turb, output_time_choice>::print_field(integer step, rea
     MPI_File_write_at(fp, offset, &max_val, 1, MPI_DOUBLE, &status);
     offset += 8;
     // scalar variables. Y0-Y_{Ns-1}, k, omega, z, z_prime
-    const integer n_scalar{parameter.get_int("n_scalar")};
+    const int n_scalar{parameter.get_int("n_scalar")};
     for (int l = 0; l < n_scalar; ++l) {
       min_val = v.sv(-ngg, -ngg, -ngg, l);
       max_val = v.sv(-ngg, -ngg, -ngg, l);
@@ -602,10 +600,10 @@ void FieldIO<mix_model, turb, output_time_choice>::print_field(integer step, rea
 
     // 7. Zone Data.
     MPI_Datatype ty;
-    integer lsize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
+    int lsize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
     const long long memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    integer memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, mz + 2 * b.ngg};
-    integer start_idx[3]{b.ngg - ngg, b.ngg - ngg, b.ngg - ngg};
+    int memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, mz + 2 * b.ngg};
+    int start_idx[3]{b.ngg - ngg, b.ngg - ngg, b.ngg - ngg};
     MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
 
@@ -660,11 +658,11 @@ class FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries> {
   MPI_Offset *offset_var = nullptr;
 
 public:
-  explicit FieldIO(integer _myid, const Mesh &_mesh, std::vector<Field> &_field, const Parameter &_parameter,
+  explicit FieldIO(int _myid, const Mesh &_mesh, std::vector<Field> &_field, const Parameter &_parameter,
                    const Species &spec,
                    int ngg_out);
 
-  void print_field(integer step, real time) const;
+  void print_field(int step, real time) const;
 
 private:
   void write_header();
@@ -707,7 +705,7 @@ int32_t FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::acquire_variable
 }
 
 template<MixtureModel mix_model, class turb>
-FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::FieldIO(integer _myid, const Mesh &_mesh,
+FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::FieldIO(int _myid, const Mesh &_mesh,
                                                                 std::vector<Field> &_field, const Parameter &_parameter,
                                                                 const Species &spec, int ngg_out):
     myid{_myid}, mesh{_mesh}, field(_field), parameter{_parameter}, species{spec}, ngg_output{ngg_out} {
@@ -738,7 +736,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_header() {
 
   MPI_Offset offset{0};
   auto *offset_process = new MPI_Offset[mesh.n_proc];
-  auto *zone_number_process = new integer[mesh.n_proc];
+  auto *zone_number_process = new int[mesh.n_proc];
   zone_number_process[0] = 0;
   n_var = acquire_variable_names();
   if (myid == 0) {
@@ -772,12 +770,12 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_header() {
 
     // iv. Zones
     auto n_blk = mesh.nblk;
-    auto *disp = new integer[mesh.n_proc];
+    auto *disp = new int[mesh.n_proc];
     disp[0] = n_blk[0];
     for (int i = 1; i < mesh.n_proc; ++i) {
       disp[i] = disp[i - 1] + n_blk[i];
     }
-    integer pid{0};
+    int pid{0};
     for (int i = 0; i < mesh.n_block_total; ++i) {
       // 1. Zone marker. Value = 299.0, indicates a V112 header.
       constexpr float zone_marker{299.0f};
@@ -864,9 +862,9 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_header() {
 template<MixtureModel mix_model, class turb>
 void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::compute_offset_header() {
   MPI_Offset new_offset{0};
-  integer i_blk{0};
+  int i_blk{0};
   for (int p = 0; p < myid; ++p) {
-    const integer n_blk = mesh.nblk[p];
+    const int n_blk = mesh.nblk[p];
     for (int b = 0; b < n_blk; ++b) {
       new_offset += 16 + 20 * n_var;
       const int64_t mx{mesh.mx_blk[i_blk] + 2 * ngg_output}, my{mesh.my_blk[i_blk] + 2 * ngg_output}, mz{
@@ -1006,7 +1004,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_common_data_s
     MPI_File_write_at(fp, offset, &max_val, 1, MPI_DOUBLE, &status);
     offset += 8;
     // scalar variables. Y0-Y_{Ns-1}, k, omega, z, z_prime
-    const integer n_scalar{parameter.get_int("n_scalar")};
+    const int n_scalar{parameter.get_int("n_scalar")};
     for (int l = 0; l < n_scalar; ++l) {
       min_val = v.sv(-ngg, -ngg, -ngg, l);
       max_val = v.sv(-ngg, -ngg, -ngg, l);
@@ -1043,10 +1041,10 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_common_data_s
 
     // 7. Zone Data.
     MPI_Datatype ty;
-    integer lsize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
+    int lsize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
     const long long memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    integer memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, mz + 2 * b.ngg};
-    integer start_idx[3]{b.ngg - ngg, b.ngg - ngg, b.ngg - ngg};
+    int memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, mz + 2 * b.ngg};
+    int start_idx[3]{b.ngg - ngg, b.ngg - ngg, b.ngg - ngg};
     MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
     MPI_File_write_at(fp, offset, b.x.data(), 1, ty, &status);
@@ -1083,7 +1081,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_common_data_s
 }
 
 template<MixtureModel mix_model, class turb>
-void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::print_field(integer step, real time) const {
+void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::print_field(int step, real time) const {
   // We assume the data have been copied by the IOManager.
   const std::filesystem::path out_dir("output/time_series");
   MPI_File fp;
@@ -1277,7 +1275,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::print_field(integer
     MPI_File_write_at(fp, offset, &max_val, 1, MPI_DOUBLE, &status);
     offset += 8;
     // scalar variables. Y0-Y_{Ns-1}, k, omega, z, z_prime
-    const integer n_scalar{parameter.get_int("n_scalar")};
+    const int n_scalar{parameter.get_int("n_scalar")};
     for (int l = 0; l < n_scalar; ++l) {
       min_val = v.sv(-ngg, -ngg, -ngg, l);
       max_val = v.sv(-ngg, -ngg, -ngg, l);
@@ -1314,10 +1312,10 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::print_field(integer
 
     // 7. Zone Data.
     MPI_Datatype ty;
-    integer lsize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
+    int lsize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
     const long long memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    integer memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, mz + 2 * b.ngg};
-    integer start_idx[3]{b.ngg - ngg, b.ngg - ngg, b.ngg - ngg};
+    int memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, mz + 2 * b.ngg};
+    int start_idx[3]{b.ngg - ngg, b.ngg - ngg, b.ngg - ngg};
     MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
 

@@ -20,7 +20,7 @@ struct DZone;
 template<MixtureModel mix_model, class turb>
 void post_process(Driver<mix_model, turb> &driver) {
   auto &parameter{driver.parameter};
-  static const std::vector<integer> processes{parameter.get_int_array("post_process")};
+  static const std::vector<int> processes{parameter.get_int_array("post_process")};
 
   for (auto process: processes) {
     switch (process) {
@@ -38,9 +38,9 @@ void post_process(Driver<mix_model, turb> &driver) {
 
 // Compute the wall friction and heat flux in 2D. Assume the wall is the j=0 plane
 // Procedure 0
-void wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Field> &field, const Parameter &parameter);
+void wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<Field> &field, const Parameter &parameter);
 
-__global__ void wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction, real *heat_flux, real dyn_pressure);
+__global__ void wall_friction_heatFlux_2d(DZone *zone, real *friction, real *heat_flux, real dyn_pressure);
 
 // Compute the wall friction and heat flux in 3D. Assume the wall is the j=0 plane
 // Procedure 0

@@ -14,20 +14,20 @@
 #include "PostProcess.h"
 
 namespace cfd {
-__global__ void compute_qn_star(cfd::DZone *zone, integer n_var, real dt_global);
+__global__ void compute_qn_star(DZone *zone, int n_var, real dt_global);
 
 template<MixtureModel mixture_model, class turb_method>
 void dual_time_stepping_implicit_treat(const Block &block, DParameter *param, DZone *d_ptr, DZone *h_ptr,
                                        Parameter &parameter, DBoundCond &bound_cond, real diag_factor);
 
-__global__ void compute_modified_rhs(cfd::DZone *zone, integer n_var, real dt_global);
+__global__ void compute_modified_rhs(DZone *zone, int n_var, real dt_global);
 
-bool inner_converged(const Mesh &mesh, const std::vector<Field> &field, const Parameter &parameter, integer iter,
-                     std::array<real, 4> &res_scale, integer myid, integer step, integer &inner_iter);
+bool inner_converged(const Mesh &mesh, const std::vector<Field> &field, const Parameter &parameter, int iter,
+                     std::array<real, 4> &res_scale, int myid, int step, int &inner_iter);
 
-__global__ void compute_square_of_dbv_wrt_last_inner_iter(cfd::DZone *zone);
+__global__ void compute_square_of_dbv_wrt_last_inner_iter(DZone *zone);
 
-__global__ void store_last_iter(cfd::DZone *zone);
+__global__ void store_last_iter(DZone *zone);
 
 template<MixtureModel mix_model, class turb>
 void dual_time_stepping(Driver<mix_model, turb> &driver) {
@@ -41,19 +41,19 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
 
   dim3 tpb{8, 8, 4};
   auto &mesh{driver.mesh};
-  const integer n_block{mesh.n_block};
+  const int n_block{mesh.n_block};
   if (mesh.dimension == 2) {
     tpb = {16, 16, 1};
   }
   dim3 *bpg = new dim3[n_block];
-  for (integer b = 0; b < n_block; ++b) {
+  for (int b = 0; b < n_block; ++b) {
     const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
     bpg[b] = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
   }
 
   std::vector<cfd::Field> &field{driver.field};
-  const integer n_var{parameter.get_int("n_var")};
-  const integer ng_1 = 2 * mesh[0].ngg - 1;
+  const int n_var{parameter.get_int("n_var")};
+  const int ng_1 = 2 * mesh[0].ngg - 1;
   DParameter *param{driver.param};
   for (auto b = 0; b < n_block; ++b) {
     // Store the initial value of the flow field
@@ -80,14 +80,14 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
 
   Monitor monitor(parameter, driver.spec, mesh);
-  const integer if_monitor{parameter.get_int("if_monitor")};
+  const int if_monitor{parameter.get_int("if_monitor")};
 
-  integer step{parameter.get_int("step")};
-  integer total_step{parameter.get_int("total_step") + step};
-  const integer output_screen = parameter.get_int("output_screen");
+  int step{parameter.get_int("step")};
+  int total_step{parameter.get_int("total_step") + step};
+  const int output_screen = parameter.get_int("output_screen");
   real total_simulation_time{parameter.get_real("total_simulation_time")};
-  const integer output_file = parameter.get_int("output_file");
-  integer inner_iteration = parameter.get_int("inner_iteration");
+  const int output_file = parameter.get_int("output_file");
+  int inner_iteration = parameter.get_int("inner_iteration");
 
   bool finished{false};
   // This should be got from a Parameter later, which may be got from a previous simulation.
@@ -99,7 +99,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
 
   bool monitor_inner_iteration;
   std::array<real, 4> res_scale_inner{1, 1, 1, 1};
-  const integer iteration_adjust_step{parameter.get_int("iteration_adjust_step")};
+  const int iteration_adjust_step{parameter.get_int("iteration_adjust_step")};
 
   while (!finished) {
     ++step;
@@ -127,7 +127,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
     }
 
     // dual-time stepping inner iteration
-    for (integer iter = 1; iter <= inner_iteration; ++iter) {
+    for (int iter = 1; iter <= inner_iteration; ++iter) {
       for (auto b = 0; b < n_block; ++b) {
         if (monitor_inner_iteration) {
           store_last_iter<<<bpg[b], tpb>>>(field[b].d_ptr);
@@ -174,7 +174,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
 
       // update physical properties such as Mach number, transport coefficients et, al.
       for (auto b = 0; b < n_block; ++b) {
-        integer mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+        int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
         dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
         update_physical_properties<mix_model><<<bpg, tpb>>>(field[b].d_ptr, param);
       }
@@ -221,11 +221,10 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
 }
 
 template<MixtureModel mixture_model, class turb_method>
-void dual_time_stepping_implicit_treat(const Block &block, DParameter *param, DZone *d_ptr,
-                                       DZone *h_ptr, Parameter &parameter,
-                                       DBoundCond &bound_cond, real diag_factor) {
-  const integer extent[3]{block.mx, block.my, block.mz};
-  const integer dim{extent[2] == 1 ? 2 : 3};
+void dual_time_stepping_implicit_treat(const Block &block, DParameter *param, DZone *d_ptr, DZone *h_ptr,
+                                       Parameter &parameter, DBoundCond &bound_cond, real diag_factor) {
+  const int extent[3]{block.mx, block.my, block.mz};
+  const int dim{extent[2] == 1 ? 2 : 3};
   dim3 tpb{8, 8, 4};
   if (dim == 2) {
     tpb = {16, 16, 1};

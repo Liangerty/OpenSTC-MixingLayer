@@ -40,14 +40,14 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
   std::string line;
   gxl::getline(monitor_file, line); // The comment line
   std::istringstream line_stream;
-  integer counter{0};
+  int counter{0};
   while (gxl::getline_to_stream(monitor_file, line, line_stream)) {
-    integer pid;
+    int pid;
     line_stream >> pid;
     if (myid != pid) {
       continue;
     }
-    integer i, j, k, b;
+    int i, j, k, b;
     line_stream >> b >> i >> j >> k;
     is_h.push_back(i);
     js_h.push_back(j);
@@ -58,24 +58,24 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
     ++counter;
   }
   // copy the indices to GPU
-  cudaMalloc(&h_ptr->bs_d, sizeof(integer) * counter);
-  cudaMalloc(&h_ptr->is_d, sizeof(integer) * counter);
-  cudaMalloc(&h_ptr->js_d, sizeof(integer) * counter);
-  cudaMalloc(&h_ptr->ks_d, sizeof(integer) * counter);
-  cudaMemcpy(h_ptr->bs_d, bs_h.data(), sizeof(integer) * counter, cudaMemcpyHostToDevice);
-  cudaMemcpy(h_ptr->is_d, is_h.data(), sizeof(integer) * counter, cudaMemcpyHostToDevice);
-  cudaMemcpy(h_ptr->js_d, js_h.data(), sizeof(integer) * counter, cudaMemcpyHostToDevice);
-  cudaMemcpy(h_ptr->ks_d, ks_h.data(), sizeof(integer) * counter, cudaMemcpyHostToDevice);
+  cudaMalloc(&h_ptr->bs_d, sizeof(int) * counter);
+  cudaMalloc(&h_ptr->is_d, sizeof(int) * counter);
+  cudaMalloc(&h_ptr->js_d, sizeof(int) * counter);
+  cudaMalloc(&h_ptr->ks_d, sizeof(int) * counter);
+  cudaMemcpy(h_ptr->bs_d, bs_h.data(), sizeof(int) * counter, cudaMemcpyHostToDevice);
+  cudaMemcpy(h_ptr->is_d, is_h.data(), sizeof(int) * counter, cudaMemcpyHostToDevice);
+  cudaMemcpy(h_ptr->js_d, js_h.data(), sizeof(int) * counter, cudaMemcpyHostToDevice);
+  cudaMemcpy(h_ptr->ks_d, ks_h.data(), sizeof(int) * counter, cudaMemcpyHostToDevice);
   n_point_total = counter;
   printf("Process %d has %d monitor points.\n", myid, n_point_total);
   disp.resize(parameter.get_int("n_block"), 0);
-  for (integer b = 1; b < n_block; ++b) {
+  for (int b = 1; b < n_block; ++b) {
     disp[b] = disp[b - 1] + n_point[b - 1];
   }
-  cudaMalloc(&h_ptr->disp, sizeof(integer) * n_block);
-  cudaMemcpy(h_ptr->disp, disp.data(), sizeof(integer) * n_block, cudaMemcpyHostToDevice);
-  cudaMalloc(&h_ptr->n_point, sizeof(integer) * n_block);
-  cudaMemcpy(h_ptr->n_point, n_point.data(), sizeof(integer) * n_block, cudaMemcpyHostToDevice);
+  cudaMalloc(&h_ptr->disp, sizeof(int) * n_block);
+  cudaMemcpy(h_ptr->disp, disp.data(), sizeof(int) * n_block, cudaMemcpyHostToDevice);
+  cudaMalloc(&h_ptr->n_point, sizeof(int) * n_block);
+  cudaMemcpy(h_ptr->n_point, n_point.data(), sizeof(int) * n_block, cudaMemcpyHostToDevice);
 
   // Create arrays to contain the monitored data.
   mon_var_h.allocate_memory(n_var, output_file, n_point_total, 0);
@@ -90,7 +90,7 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
     create_directories(out_dir);
   }
   files.resize(n_point_total, nullptr);
-  for (integer l = 0; l < n_point_total; ++l) {
+  for (int l = 0; l < n_point_total; ++l) {
     std::string file_name{
         "/monitor_" + std::to_string(myid) + '_' + std::to_string(bs_h[l]) + '_' + std::to_string(is_h[l]) + '_' +
         std::to_string(js_h[l]) + '_' +
@@ -220,7 +220,7 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
         int l_size[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
         int small_size[3]{1, ny, nz};
         const auto mem_sz = ny * nz * 8;
-        integer start_idx[3]{b.ngg + iSlice[s], b.ngg + iSlice_js[s], b.ngg + iSlice_ks[s]};
+        int start_idx[3]{b.ngg + iSlice[s], b.ngg + iSlice_js[s], b.ngg + iSlice_ks[s]};
         MPI_Type_create_subarray(3, l_size, small_size, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
         MPI_Type_commit(&ty);
         MPI_File_write_at(fp, offset, b.y.data(), 1, ty, &status);
@@ -239,7 +239,7 @@ std::vector<std::string> Monitor::setup_labels_to_monitor(const Parameter &param
 
   auto var_name{parameter.get_string_array("monitor_var")};
 
-  std::vector<integer> bv_idx, sv_idx;
+  std::vector<int> bv_idx, sv_idx;
   auto n_found{0};
   std::vector<std::string> var_name_found;
   for (auto name: var_name) {
@@ -299,17 +299,17 @@ std::vector<std::string> Monitor::setup_labels_to_monitor(const Parameter &param
   }
 
   // copy the index to the class member
-  n_bv = (integer) (bv_idx.size());
-  n_sv = (integer) (sv_idx.size());
+  n_bv = (int) (bv_idx.size());
+  n_sv = (int) (sv_idx.size());
   // The +1 is for physical time
   n_var = n_bv + n_sv + 1;
   h_ptr->n_bv = n_bv;
   h_ptr->n_sv = n_sv;
   h_ptr->n_var = n_var;
-  cudaMalloc(&h_ptr->bv_label, sizeof(integer) * n_bv);
-  cudaMalloc(&h_ptr->sv_label, sizeof(integer) * n_sv);
-  cudaMemcpy(h_ptr->bv_label, bv_idx.data(), sizeof(integer) * n_bv, cudaMemcpyHostToDevice);
-  cudaMemcpy(h_ptr->sv_label, sv_idx.data(), sizeof(integer) * n_sv, cudaMemcpyHostToDevice);
+  cudaMalloc(&h_ptr->bv_label, sizeof(int) * n_bv);
+  cudaMalloc(&h_ptr->sv_label, sizeof(int) * n_sv);
+  cudaMemcpy(h_ptr->bv_label, bv_idx.data(), sizeof(int) * n_bv, cudaMemcpyHostToDevice);
+  cudaMemcpy(h_ptr->sv_label, sv_idx.data(), sizeof(int) * n_sv, cudaMemcpyHostToDevice);
 
   return var_name_found;
 }
@@ -320,11 +320,11 @@ Monitor::~Monitor() {
   }
 }
 
-void Monitor::monitor_point(integer step, real physical_time, std::vector<cfd::Field> &field) {
+void Monitor::monitor_point(int step, real physical_time, std::vector<cfd::Field> &field) {
   if (counter_step == 0)
     step_start = step;
 
-  for (integer b = 0; b < n_block; ++b) {
+  for (int b = 0; b < n_block; ++b) {
     if (n_point[b] > 0) {
       const auto tpb{128};
       const auto bpg{(n_point[b] - 1) / tpb + 1};
@@ -338,10 +338,10 @@ void Monitor::output_data() {
   cudaMemcpy(mon_var_h.data(), h_ptr->data.data(), sizeof(real) * n_var * output_file * n_point_total,
              cudaMemcpyDeviceToHost);
 
-  for (integer p = 0; p < n_point_total; ++p) {
-    for (integer l = 0; l < counter_step; ++l) {
+  for (int p = 0; p < n_point_total; ++p) {
+    for (int l = 0; l < counter_step; ++l) {
       fprintf(files[p], "%d\t", step_start + l);
-      for (integer k = 0; k < n_var; ++k) {
+      for (int k = 0; k < n_var; ++k) {
         fprintf(files[p], "%e\t", mon_var_h(k, l, p));
       }
       fprintf(files[p], "\n");
@@ -373,7 +373,7 @@ void Monitor::output_slices(const Parameter &parameter, std::vector<cfd::Field> 
     auto ny{iSlice_je[s] - iSlice_js[s] + 1}, nz{iSlice_ke[s] - iSlice_ks[s] + 1};
     int small_size[3]{1, ny, nz};
     const auto mem_sz = ny * nz * 8;
-    integer start_idx[3]{b.ngg + iSlice[s], b.ngg + iSlice_js[s], b.ngg + iSlice_ks[s]};
+    int start_idx[3]{b.ngg + iSlice[s], b.ngg + iSlice_js[s], b.ngg + iSlice_ks[s]};
     MPI_Type_create_subarray(3, l_size, small_size, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
 
@@ -414,9 +414,8 @@ void Monitor::output_slices(const Parameter &parameter, std::vector<cfd::Field> 
 }
 
 __global__ void
-record_monitor_data(DZone *zone, DeviceMonitorData *monitor_info, integer blk_id, integer counter_pos,
-                    real physical_time) {
-  auto idx = (integer) (blockDim.x * blockIdx.x + threadIdx.x);
+record_monitor_data(DZone *zone, DeviceMonitorData *monitor_info, int blk_id, int counter_pos, real physical_time) {
+  auto idx = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   if (idx >= monitor_info->n_point[blk_id])
     return;
   auto idx_tot = monitor_info->disp[blk_id] + idx;
@@ -428,12 +427,12 @@ record_monitor_data(DZone *zone, DeviceMonitorData *monitor_info, integer blk_id
   const auto bv_label = monitor_info->bv_label;
   const auto sv_label = monitor_info->sv_label;
   const auto n_bv{monitor_info->n_bv};
-  integer var_counter{0};
-  for (integer l = 0; l < n_bv; ++l) {
+  int var_counter{0};
+  for (int l = 0; l < n_bv; ++l) {
     data(var_counter, counter_pos, idx_tot) = zone->bv(i, j, k, bv_label[l]);
     ++var_counter;
   }
-  for (integer l = 0; l < monitor_info->n_sv; ++l) {
+  for (int l = 0; l < monitor_info->n_sv; ++l) {
     data(var_counter, counter_pos, idx_tot) = zone->sv(i, j, k, sv_label[l]);
     ++var_counter;
   }
