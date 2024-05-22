@@ -2,7 +2,6 @@
 #include "Initialize.cuh"
 #include "DataCommunication.cuh"
 #include "TimeAdvanceFunc.cuh"
-#include "MPIIO.hpp"
 #include "WallDistance.cuh"
 #include "MixingLayer.cuh"
 

@@ -62,7 +62,7 @@ FieldIO<mix_model, turb, output_time_choice>::FieldIO(integer _myid, const Mesh 
                                                       std::vector<Field> &_field, const Parameter &_parameter,
                                                       const Species &spec, int ngg_out):
     myid{_myid}, mesh{_mesh}, field(_field), parameter{_parameter}, species{spec}, ngg_output{ngg_out} {
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   if (!exists(out_dir)) {
     create_directories(out_dir);
   }
@@ -73,7 +73,7 @@ FieldIO<mix_model, turb, output_time_choice>::FieldIO(integer _myid, const Mesh 
 
 template<MixtureModel mix_model, class turb, OutputTimeChoice output_time_choice>
 void FieldIO<mix_model, turb, output_time_choice>::write_header() {
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   MPI_File fp;
   // Question: Should I use MPI_MODE_CREATE only here?
   // If a previous simulation has a larger file size than the current one, the way we write to the file is offset,
@@ -222,7 +222,7 @@ void FieldIO<mix_model, turb, output_time_choice>::compute_offset_header() {
 
 template<MixtureModel mix_model, class turb, OutputTimeChoice output_time_choice>
 void FieldIO<mix_model, turb, output_time_choice>::write_common_data_section() {
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/flowfield.plt").c_str(), MPI_MODE_WRONLY,
                 MPI_INFO_NULL, &fp);
@@ -496,7 +496,7 @@ void FieldIO<mix_model, turb, output_time_choice>::print_field(integer step, rea
     f.copy_data_from_device(parameter);
   }
 
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/flowfield.plt").c_str(), MPI_MODE_WRONLY,
                 MPI_INFO_NULL, &fp);
@@ -711,7 +711,7 @@ FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::FieldIO(integer _myid, c
                                                                 std::vector<Field> &_field, const Parameter &_parameter,
                                                                 const Species &spec, int ngg_out):
     myid{_myid}, mesh{_mesh}, field(_field), parameter{_parameter}, species{spec}, ngg_output{ngg_out} {
-  const std::filesystem::path out_dir("output/field/time_series");
+  const std::filesystem::path out_dir("output/time_series");
   if (!exists(out_dir)) {
     create_directories(out_dir);
   }
@@ -722,7 +722,7 @@ FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::FieldIO(integer _myid, c
 
 template<MixtureModel mix_model, class turb>
 void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_header() {
-  const std::filesystem::path out_dir("output/field/time_series");
+  const std::filesystem::path out_dir("output/time_series");
   MPI_File fp;
   // Question: Should I use MPI_MODE_CREATE only here?
   // If a previous simulation has a larger file size than the current one, the way we write to the file is offset,
@@ -882,7 +882,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::compute_offset_head
 
 template<MixtureModel mix_model, class turb>
 void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_common_data_section() {
-  const std::filesystem::path out_dir("output/field/time_series");
+  const std::filesystem::path out_dir("output/time_series");
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/flowfield_0.plt").c_str(), MPI_MODE_WRONLY,
                 MPI_INFO_NULL, &fp);
@@ -1085,7 +1085,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_common_data_s
 template<MixtureModel mix_model, class turb>
 void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::print_field(integer step, real time) const {
   // We assume the data have been copied by the IOManager.
-  const std::filesystem::path out_dir("output/field/time_series");
+  const std::filesystem::path out_dir("output/time_series");
   MPI_File fp;
   char time_char[11];
   sprintf(time_char, "%9.4e", time);

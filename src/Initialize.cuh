@@ -75,7 +75,7 @@ void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vec
 
 template<MixtureModel mix_model, class turb>
 void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vector<Field> &field, Species &species) {
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   if (!exists(out_dir)) {
     printf("The directory to flowfield files does not exist!\n");
   }

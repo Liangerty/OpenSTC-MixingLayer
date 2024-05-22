@@ -208,7 +208,7 @@ public:
     return val[j * disp1 + i + dispt + l * sz];
   }
 
-  __device__ const T &operator()(const int i, const int j, const int k, const int l) const {
+  __device__ const T &operator()(const int i, const int j, const int l) const {
     return val[j * disp1 + i + dispt + l * sz];
   }
 

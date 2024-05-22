@@ -124,7 +124,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Paramet
     }
   }
 
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   if (!exists(out_dir)) {
     create_directories(out_dir);
   }
@@ -176,7 +176,7 @@ acquire_boundary_variable_names(std::vector<std::string> &var_name, const Parame
 template<MixtureModel mix_model, class turb_method, OutputTimeChoice output_time_choice>
 void
 BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::vector<Field> &_field) {
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   const integer n_proc{parameter.get_int("n_proc")};
   for (int l = 0; l < labels_to_output.size(); ++l) {
     std::string file_name{out_dir.string() + "/" + name_of_boundary[l] + ".plt"};
@@ -520,7 +520,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
 
 template<MixtureModel mix_model, class turb_method, OutputTimeChoice output_time_choice>
 void BoundaryIO<mix_model, turb_method, output_time_choice>::print_boundary() {
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   for (int l = 0; l < labels_to_output.size(); ++l) {
     std::string file_name{out_dir.string() + "/" + name_of_boundary[l] + ".plt"};
     MPI_File fp;

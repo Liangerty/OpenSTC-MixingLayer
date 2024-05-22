@@ -88,7 +88,7 @@ void StatisticsCollector::initialize_statistics_collector(const Species &species
 
 template<MixtureModel mix_model, class turb>
 void StatisticsCollector::prepare_for_statistical_data_plot(const Species &species) {
-  const std::filesystem::path out_dir("output/stat");
+  const std::filesystem::path out_dir("output");
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/stat_data.plt").c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY,
                 MPI_INFO_NULL, &fp);

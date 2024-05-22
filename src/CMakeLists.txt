@@ -17,7 +17,7 @@ list(APPEND src_file
     ImplicitTreatmentHPP.cuh Initialize.cuh Initialize.cu InviscidScheme.cuh InviscidScheme.cu IOManager.h IOBase.h
     kernels.cuh kernels.cu
     Limiter.cuh LaxFriedrichs.cu
-    main.cu Mesh.h Mesh.cpp MPIIO.hpp MPIIO.cu MixtureFraction.cpp MixtureFraction.h Monitor.cuh Monitor.cu MixingLayer.cuh MixingLayer.cu
+    main.cu Mesh.h Mesh.cpp MixtureFraction.cpp MixtureFraction.h Monitor.cuh Monitor.cu MixingLayer.cuh MixingLayer.cu
     Parallel.h Parallel.cpp Parameter.h Parameter.cpp PostProcess.h PostProcess.cu
     Reconstruction.cu Reconstruction.cuh Residual.cu Residual.cuh Roe.cuh Roe.cu RK.cuh
     SchemeSelector.cuh SourceTerm.cuh SST.cuh SST.cu SteadySim.cuh Simulate.cuh StatisticsCollector.cu StatisticsCollector.cuh

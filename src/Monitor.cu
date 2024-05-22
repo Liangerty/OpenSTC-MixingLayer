@@ -113,6 +113,10 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
   auto xSlice = parameter.get_real_array("xSlice");
   // Here, we assume the points with the same i index have the same x coordinate.
   if (!xSlice.empty()) {
+    const std::filesystem::path out_dir_slice("output/slice");
+    if (!exists(out_dir_slice)) {
+      create_directories(out_dir_slice);
+    }
     const real gridScale{parameter.get_real("gridScale")};
     auto distance_smallest = new real[n_proc];
     for (auto xThis: xSlice) {
@@ -198,7 +202,7 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
         // Here, we should first output the slices' coordinates.
         MPI_File fp;
         char file_name[1024];
-        sprintf(file_name, "%s/xSlice_%f_coordinates.bin", out_dir.string().c_str(),
+        sprintf(file_name, "%s/xSlice_%f_coordinates.bin", out_dir_slice.string().c_str(),
                 b.x(iSlice[s], 0, 0) / parameter.get_real("gridScale"));
         MPI_File_open(MPI_COMM_SELF, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
         MPI_Status status;
@@ -351,7 +355,7 @@ void Monitor::output_slices(const Parameter &parameter, std::vector<cfd::Field> 
     return;
   }
   std::vector<int> blk_read{};
-  const std::filesystem::path out_dir("output/monitor");
+  const std::filesystem::path out_dir("output/slice");
   for (int s = 0; s < n_iSlice; ++s) {
     auto blk = iSliceInBlock[s];
     const auto &b = mesh[iSliceInBlock[s]];
