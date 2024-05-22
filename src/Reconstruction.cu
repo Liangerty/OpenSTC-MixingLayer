@@ -2,17 +2,17 @@
 #include "Limiter.cuh"
 
 namespace cfd {
-__device__ void first_order_reconstruct(const real *pv, real *pv_l, real *pv_r, integer idx_shared, integer n_var) {
+__device__ void first_order_reconstruct(const real *pv, real *pv_l, real *pv_r, int idx_shared, int n_var) {
   // The variables that can be reconstructed directly are density, u, v, w, p, Y_k, the number of which is
   // equal to the number of conservative variables(n_var).
-  for (integer l = 0; l < n_var; ++l) {
+  for (int l = 0; l < n_var; ++l) {
     pv_l[l] = pv[idx_shared * n_var + l];
     pv_r[l] = pv[(idx_shared + 1) * n_var + l];
   }
 }
 
 __device__ void
-MUSCL_reconstruct(const real *pv, real *pv_l, real *pv_r, integer idx_shared, integer n_var, integer limiter) {
+MUSCL_reconstruct(const real *pv, real *pv_l, real *pv_r, int idx_shared, int n_var, int limiter) {
   static constexpr real kappa{1.0 / 3.0};
   // The variables that can be reconstructed directly are density, u, v, w, p, Y_k, the number of which is
   // equal to the number of conservative variables(n_var).
@@ -33,7 +33,7 @@ MUSCL_reconstruct(const real *pv, real *pv_l, real *pv_r, integer idx_shared, in
 }
 
 __device__ void
-NND2_reconstruct(const real *pv, real *pv_l, real *pv_r, integer idx_shared, integer n_var, integer limiter) {
+NND2_reconstruct(const real *pv, real *pv_l, real *pv_r, int idx_shared, int n_var, int limiter) {
   for (int l = 0; l < n_var; ++l) {
     // \Delta_i = u_i - u_{i-1}; \Delta_{i+1} = u_{i+1} - u_i
     const real delta_i{pv[idx_shared * n_var + l] - pv[(idx_shared - 1) * n_var + l]};

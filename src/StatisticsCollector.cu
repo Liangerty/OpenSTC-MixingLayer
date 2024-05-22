@@ -1,5 +1,4 @@
 #include "StatisticsCollector.cuh"
-#include "UDStat.h"
 
 namespace cfd {
 StatisticsCollector::StatisticsCollector(Parameter &_parameter, const Mesh &_mesh, std::vector<Field> &_field)

@@ -2,7 +2,6 @@
 
 #include "InviscidScheme.cuh"
 #include "ViscousScheme.cuh"
-#include "Roe.cuh"
 
 namespace cfd {
 template<MixtureModel mix_model, TurbulenceMethod turb_method>

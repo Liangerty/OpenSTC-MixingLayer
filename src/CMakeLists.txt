@@ -6,20 +6,19 @@
 #     However, the correctness, if the resource is available for the corresponding kernel may need to be tested.
 
 list(APPEND src_file
-    AusmP.cu AWENO.cuh AWENO.cu
+    AWENO.cuh AWENO.cu
     BoundCond.h BoundCond.cpp BoundCond.cu BoundCond.cuh BoundaryIO.h
     ChemData.h ChemData.cpp Constants.h
     DataCommunication.cuh DataCommunication.cu Define.h DParameter.cu DParameter.cuh DPLUR.cuh DPLUR.cu Driver.cu Driver.cuh DualTimeStepping.cuh DualTimeStepping.cu
     Element.h Element.cpp
     Field.h Field.cu FieldOperation.cuh FieldOperation.cu FiniteRateChem.cu FiniteRateChem.cuh FieldIO.h FirstOrderEuler.cuh
     FlameletDriver.cuh FlameletDriver.cu FlameletLib.cu FlameletLib.cuh
-    HLLC.cu
     ImplicitTreatmentHPP.cuh Initialize.cuh Initialize.cu InviscidScheme.cuh InviscidScheme.cu IOManager.h IOBase.h
     kernels.cuh kernels.cu
-    Limiter.cuh LaxFriedrichs.cu
+    Limiter.cuh
     main.cu Mesh.h Mesh.cpp MixtureFraction.cpp MixtureFraction.h Monitor.cuh Monitor.cu MixingLayer.cuh MixingLayer.cu
     Parallel.h Parallel.cpp Parameter.h Parameter.cpp PostProcess.h PostProcess.cu
-    Reconstruction.cu Reconstruction.cuh Residual.cu Residual.cuh Roe.cuh Roe.cu RK.cuh
+    Reconstruction.cu Reconstruction.cuh Residual.cu Residual.cuh RK.cuh RiemannSolver.cuh
     SchemeSelector.cuh SourceTerm.cuh SST.cuh SST.cu SteadySim.cuh Simulate.cuh StatisticsCollector.cu StatisticsCollector.cuh
     Transport.cuh Transport.cu TimeAdvanceFunc.cu TimeAdvanceFunc.cuh Thermo.cuh Thermo.cu TurbMethod.hpp
     UDIO.h UDIO.cu UDStat.h UDStat.cu
@@ -30,8 +29,6 @@ list(APPEND src_file
     gxl_lib/MyString.cpp gxl_lib/MyAlgorithm.cpp gxl_lib/MyAlgorithm.h
     gxl_lib/Time.cpp gxl_lib/Time.h
     gxl_lib/MyAtomic.cuh
-
-    stat_pack/StatPack.cuh stat_pack/StatPack.cu
 )
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
