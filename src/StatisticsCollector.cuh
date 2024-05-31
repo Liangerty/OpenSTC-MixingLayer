@@ -399,5 +399,5 @@ void StatisticsCollector::collect_data(DParameter *param) {
 
 MPI_Offset write_ud_stat_max_min(MPI_Offset offset, const Field &field, MPI_File &fp, int mz);
 
-MPI_Offset write_ud_stat_data(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, int mem_sz);
+MPI_Offset write_ud_stat_data(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, int64_t mem_sz);
 } // cfd

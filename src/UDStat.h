@@ -29,11 +29,16 @@ struct ThermRMS {
 };
 
 struct turbulent_dissipation_rate {
-  static constexpr int n_collect = 16;
-  static constexpr std::array<std::string_view, n_collect> namelistCollect{"u_x", "u_y", "u_z", "v_x", "v_y", "v_z",
-                                                                           "w_x", "w_y", "w_z",
-                                                                           "sigma11", "sigma12", "sigma13", "sigma22",
-                                                                           "sigma23", "sigma33", "sigmaIjUi_xj"};
+//  static constexpr int n_collect = 16;
+//  static constexpr std::array<std::string_view, n_collect> namelistCollect{"u_x", "u_y", "u_z", "v_x", "v_y", "v_z",
+//                                                                           "w_x", "w_y", "w_z",
+//                                                                           "sigma11", "sigma12", "sigma13", "sigma22",
+//                                                                           "sigma23", "sigma33", "sigmaIjUi_xj"};
+  static constexpr int n_collect = 10;
+  static constexpr std::array<std::string_view, n_collect> namelistCollect{"u", "v", "w", "sigma11", "sigma12",
+                                                                           "sigma13", "sigma22", "sigma23", "sigma33",
+                                                                           "sigmaIjUi_xj"};
+
   static constexpr int n_stat = 4;
   static constexpr std::array<std::string_view, n_stat> namelistStat{"<<greek>e</greek>><sub>F</sub>",
                                                                      "<greek>h</greek>", "t<sub><greek>h</greek></sub>",

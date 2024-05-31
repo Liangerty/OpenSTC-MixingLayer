@@ -443,7 +443,7 @@ MPI_Offset write_ud_stat_max_min(MPI_Offset offset, const Field &field, MPI_File
   return offset;
 }
 
-MPI_Offset write_ud_stat_data(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, int mem_sz) {
+MPI_Offset write_ud_stat_data(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, int64_t mem_sz) {
   MPI_Status status;
   for (int l = 0; l < UserDefineStat::n_stat; ++l) {
     MPI_File_write_at(fp, offset, field.user_defined_statistical_data[l], 1, ty, &status);
