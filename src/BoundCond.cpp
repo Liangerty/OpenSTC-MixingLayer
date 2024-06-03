@@ -406,6 +406,22 @@ cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, int, real>
     temperature = parameter.get_real("T_inf");
     parameter.update_parameter("if_compute_wall_distance", 1);
   }
+  if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<int>(info.at("fluctuation_type"));
+  if (fluctuation_type == 3){
+    if (info.find("fluctuation_frequency") != info.end())
+      fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
+    if (info.find("fluctuation_intensity") != info.end())
+      fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
+    if (info.find("streamwise_wavelength") != info.end())
+      streamwise_wavelength = std::get<real>(info.at("streamwise_wavelength"));
+    if (info.find("spanwise_wavelength") != info.end())
+      spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
+    if (info.find("fluctuation_x0") != info.end())
+      fluctuation_x0 = std::get<real>(info.at("fluctuation_x0"));
+    if (info.find("fluctuation_x1") != info.end())
+      fluctuation_x1 = std::get<real>(info.at("fluctuation_x1"));
+  }
+  
 }
 
 cfd::Symmetry::Symmetry(const std::string &inflow_name, cfd::Parameter &parameter) {

@@ -821,6 +821,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     }
     mw = 1 / mw;
   }
+  int if_fluctuation = wall->fluctuation_type;
 
   const real rho_wall = p * mw / (t_wall * cfd::R_u);
   bv(i, j, k, 0) = rho_wall;
@@ -830,6 +831,29 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
   bv(i, j, k, 4) = p;
   bv(i, j, k, 5) = t_wall;
   zone->vel(i, j, k) = 0;
+
+  if (if_fluctuation == 3) {
+    real A0 = wall->fluctuation_intensity;
+    real omega = 2.0 * pi * wall->fluctuation_frequency;
+    real beta = 2.0 * pi / wall->spanwise_wavelength;
+    real x0 = wall->fluctuation_x0;
+    real x1 = wall->fluctuation_x1;
+    real t = param->physical_time;
+
+    real x_middle = (x0 + x1) * 0.5;
+    real xi = 0;
+    real x = zone->x(i, j, k), z = zone->z(i, j, k);
+    if (x >= x0 && x <= x_middle) {
+      xi = (x - x0) / (x_middle - x0);
+    } else if (x >= x_middle && x <= x1) {
+      xi = (x1 - x) / (x1 - x_middle);
+    }
+    const real xi3 = xi * xi * xi;
+    bv(i, j, k, 2) =
+        A0 * (15.1875 * xi3 * xi * xi - 35.4375 * xi3 * xi + 20.25 * xi3) * cos(beta * z) * sin(omega * t) / rho_wall;
+    zone->vel(i, j, k) = bv(i, j, k, 2);
+  }
+
 
   // turbulent boundary condition
   if constexpr (TurbMethod<turb>::label == TurbMethodLabel::SST) {

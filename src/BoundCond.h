@@ -92,6 +92,13 @@ struct Wall {
   // If the wall thermal type is radiation equilibrium, this is set as the inflow temperature.
   real temperature{300};
   real emissivity{0.8};
+  int fluctuation_type = 0;
+  real fluctuation_intensity = 0;
+  real streamwise_wavelength = 0;
+  real spanwise_wavelength = 0;
+  real fluctuation_frequency = 0;
+  real fluctuation_x0 = 0;
+  real fluctuation_x1 = 0;
 };
 
 struct Outflow {
