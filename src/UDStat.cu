@@ -413,38 +413,32 @@ turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DPar
       const real v_x =
           0.5 * (xi_x * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
                  eta_x * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_x *
-                 (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
+                 zeta_x * (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
           counter_ud[collected_idx + 1];
       const real v_y =
           0.5 * (xi_y * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
                  eta_y * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_y *
-                 (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
+                 zeta_y * (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
           counter_ud[collected_idx + 1];
       const real v_z =
           0.5 * (xi_z * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
                  eta_z * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_z *
-                 (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
+                 zeta_z * (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
           counter_ud[collected_idx + 1];
       const real w_x =
           0.5 * (xi_x * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
                  eta_x * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_x *
-                 (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
+                 zeta_x * (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
           counter_ud[collected_idx + 2];
       const real w_y =
           0.5 * (xi_y * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
                  eta_y * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_y *
-                 (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
+                 zeta_y * (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
           counter_ud[collected_idx + 2];
       const real w_z =
           0.5 * (xi_z * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
                  eta_z * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_z *
-                 (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
+                 zeta_z * (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
           counter_ud[collected_idx + 2];
       rhoEps = collect(i, j, k, collected_idx + 9) / counter_ud[collected_idx + 9] -
                collect(i, j, k, collected_idx + 3) * u_x / counter_ud[collected_idx + 3]

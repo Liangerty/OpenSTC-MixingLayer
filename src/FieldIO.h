@@ -131,7 +131,7 @@ void FieldIO<mix_model, turb, output_time_choice>::write_header() {
       MPI_File_write_at(fp, offset, &parent_zone, 1, MPI_INT32_T, &status);
       offset += 4;
       // 4. Strand ID. -2 = pending strand ID for assignment by Tecplot; -1 = static strand ID; >= 0 valid strand ID
-      constexpr int32_t strand_id{-2};
+      constexpr int32_t strand_id{-1};
       MPI_File_write_at(fp, offset, &strand_id, 1, MPI_INT32_T, &status);
       offset += 4;
       // 5. Solution time. For steady, the value is set 0. For unsteady, please create a new class
@@ -788,7 +788,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_header() {
       MPI_File_write_at(fp, offset, &parent_zone, 1, MPI_INT32_T, &status);
       offset += 4;
       // 4. Strand ID. -2 = pending strand ID for assignment by Tecplot; -1 = static strand ID; >= 0 valid strand ID
-      constexpr int32_t strand_id{-2};
+      constexpr int32_t strand_id{-1};
       MPI_File_write_at(fp, offset, &strand_id, 1, MPI_INT32_T, &status);
       offset += 4;
       // 5. Solution time. For steady, the value is set 0. For unsteady, please create a new class
@@ -1141,7 +1141,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::print_field(int ste
     MPI_File_write_at(fp, offset, &parent_zone, 1, MPI_INT32_T, &status);
     offset += 4;
     // 4. Strand ID. -2 = pending strand ID for assignment by Tecplot; -1 = static strand ID; >= 0 valid strand ID
-    constexpr int32_t strand_id{-2};
+    constexpr int32_t strand_id{-1};
     MPI_File_write_at(fp, offset, &strand_id, 1, MPI_INT32_T, &status);
     offset += 4;
     // 5. Solution time. For steady, the value is set 0. For unsteady, please create a new class

@@ -95,7 +95,7 @@ compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent,
   if (tid < ngg - 1) {
     ig_shared[additional_loaded] = tid;
     const int g_idx[3]{idx[0] - (ngg - 1) * labels[0], idx[1] - (ngg - 1) * labels[1],
-                           idx[2] - (ngg - 1) * labels[2]};
+                       idx[2] - (ngg - 1) * labels[2]};
 
     for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
       cv[ig_shared[additional_loaded] * n_reconstruct + l] = zone->cv(g_idx[0], g_idx[1], g_idx[2], l);
@@ -127,7 +127,7 @@ compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent,
     for (int m = 0; m < n_more_left; ++m) {
       ig_shared[additional_loaded] = tid + m + 1;
       const int g_idx[3]{idx[0] - (ngg - 1 - m - 1) * labels[0], idx[1] - (ngg - 1 - m - 1) * labels[1],
-                             idx[2] - (ngg - 1 - m - 1) * labels[2]};
+                         idx[2] - (ngg - 1 - m - 1) * labels[2]};
 
       for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
         cv[ig_shared[additional_loaded] * n_reconstruct + l] = zone->cv(g_idx[0], g_idx[1], g_idx[2], l);
@@ -159,10 +159,10 @@ compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent,
   __syncthreads();
 
   // reconstruct the half-point left/right primitive variables with the chosen reconstruction method.
-  if (auto sch = param->inviscid_scheme; sch == 51) {
+  if (auto sch = param->inviscid_scheme; sch == 51 || sch == 71) {
     compute_weno_flux_cp<mix_model>(cv, param, tid, metric, jac, fc, i_shared, Fp, Fm, ig_shared, additional_loaded,
                                     f_1st);
-  } else if (sch == 52) {
+  } else if (sch == 52 || sch == 72) {
     compute_weno_flux_ch<mix_model>(cv, param, tid, metric, jac, fc, i_shared, Fp, Fm, ig_shared, additional_loaded,
                                     f_1st);
   }
@@ -297,9 +297,6 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
   const real gm1{gamma - 1};
 
   // Next, we compute the left characteristic matrix at i+1/2.
-//  real kx{0.5 * (metric[i_shared * 3] + metric[(i_shared + 1) * 3])};
-//  real ky{0.5 * (metric[i_shared * 3 + 1] + metric[(i_shared + 1) * 3 + 1])};
-//  real kz{0.5 * (metric[i_shared * 3 + 2] + metric[(i_shared + 1) * 3 + 2])};
   real kx{(jac[i_shared] * metric[i_shared * 3] + jac[i_shared + 1] * metric[(i_shared + 1) * 3]) /
           (jac[i_shared] + jac[i_shared + 1])};
   real ky{(jac[i_shared] * metric[i_shared * 3 + 1] + jac[i_shared + 1] * metric[(i_shared + 1) * 3 + 1]) /
@@ -742,22 +739,26 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
 
   const int n_var = param->n_var;
 
-  // Li Xinliang
-  compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
-                                  &Fp[i_shared * 5], &Fm[i_shared * 5]);
-  for (size_t i = 0; i < n_add; i++) {
-    compute_flux<MixtureModel::Air>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
-                                    jac[ig_shared[i]], &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
+  // 0: acans; 1: li xinliang(own flux splitting); 2: my(same spectral radius)
+  constexpr int method = 1;
+
+  if constexpr (method == 1) {
+    compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
+                                    &Fp[i_shared * 5], &Fm[i_shared * 5]);
+    for (size_t i = 0; i < n_add; i++) {
+      compute_flux<MixtureModel::Air>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
+                                      jac[ig_shared[i]], &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
+    }
+  } else if constexpr (method == 2) {
+    compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
+                                    &Fp[i_shared * 5]);
+    for (size_t i = 0; i < n_add; i++) {
+      compute_flux<MixtureModel::Air>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
+                                      jac[ig_shared[i]], &Fp[ig_shared[i] * n_var]);
+    }
   }
 
-  // My version
-//  compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
-//                                  &Fk[i_shared * 5]);
-//  for (size_t i = 0; i < n_add; i++) {
-//    compute_flux<MixtureModel::Air>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
-//                                    jac[ig_shared[i]], &Fk[ig_shared[i] * n_var]);
-//  }
-  // The first n_var in the cv array is conservative vars, followed by p and T.
+  // The first n_var in the cv array is conservative vars, followed by p and cm.
   const real *cvl{&cv[i_shared * (n_var + 2)]};
   const real *cvr{&cv[(i_shared + 1) * (n_var + 2)]};
   // First, compute the Roe average of the half-point variables.
@@ -775,9 +776,6 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
   const real cm{sqrt(cm2)};
 
   // Next, we compute the left characteristic matrix at i+1/2.
-//  real kx{0.5 * (metric[i_shared * 3] + metric[(i_shared + 1) * 3])};
-//  real ky{0.5 * (metric[i_shared * 3 + 1] + metric[(i_shared + 1) * 3 + 1])};
-//  real kz{0.5 * (metric[i_shared * 3 + 2] + metric[(i_shared + 1) * 3 + 2])};
   real kx{(jac[i_shared] * metric[i_shared * 3] + jac[i_shared + 1] * metric[(i_shared + 1) * 3]) /
           (jac[i_shared] + jac[i_shared + 1])};
   real ky{(jac[i_shared] * metric[i_shared * 3 + 1] + jac[i_shared + 1] * metric[(i_shared + 1) * 3 + 1]) /
@@ -824,7 +822,6 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
   real fChar[5];
   constexpr real eps{1e-40};
   const real jac1{jac[i_shared]}, jac2{jac[i_shared + 1]};
-//  const real eps_scaled = 1e-6 * param->weno_eps_scale;
   const real eps_scaled = eps * param->weno_eps_scale * 0.25 *
                           ((metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) *
                            (metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) +
@@ -832,119 +829,117 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
                            (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) +
                            (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2) *
                            (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2));
-//  const real eps_scaled = eps * param->weno_eps_scale *(jac[i_shared] + jac[i_shared + 1]) * 0.5; //
-//  real spec_rad[3];
-//  memset(spec_rad, 0, 3 * sizeof(real));
-//  for (int l = -2; l < 4; ++l) {
-//    const real *Q = &cv[(i_shared + l) * (n_var + 2)];
-//    real c = sqrt(gamma_air * Q[n_var] / Q[0]);
-//    real grad_k = sqrt(metric[(i_shared + l) * 3] * metric[(i_shared + l) * 3] +
-//                       metric[(i_shared + l) * 3 + 1] * metric[(i_shared + l) * 3 + 1] +
-//                       metric[(i_shared + l) * 3 + 2] * metric[(i_shared + l) * 3 + 2]);
-//    real Uk = (metric[(i_shared + l) * 3] * Q[1] + metric[(i_shared + l) * 3 + 1] * Q[2] +
-//               metric[(i_shared + l) * 3 + 2] * Q[3]) / Q[0];
-//    real ukPc = abs(Uk + c * grad_k);
-//    real ukMc = abs(Uk - c * grad_k);
-//    spec_rad[0] = max(spec_rad[0], ukMc);
-//    spec_rad[1] = max(spec_rad[1], abs(Uk));
-//    spec_rad[2] = max(spec_rad[2], ukPc);
-//  }
-//  spec_rad[0] = max(spec_rad[0], abs((Uk_bar - cm) * gradK));
-//  spec_rad[1] = max(spec_rad[1], abs(Uk_bar * gradK));
-//  spec_rad[2] = max(spec_rad[2], abs((Uk_bar + cm) * gradK));
-  real ap[3], an[3];
-  const auto max_spec_rad = abs(Uk_bar) + cm;
-  ap[0] = 0.5 * (Uk_bar - cm + max_spec_rad) * gradK;
-  ap[1] = 0.5 * (Uk_bar + max_spec_rad) * gradK;
-  ap[2] = 0.5 * (Uk_bar + cm + max_spec_rad) * gradK;
-  an[0] = 0.5 * (Uk_bar - cm - max_spec_rad) * gradK;
-  an[1] = 0.5 * (Uk_bar - max_spec_rad) * gradK;
-  an[2] = 0.5 * (Uk_bar + cm - max_spec_rad) * gradK;
 
-  for (int l = 0; l < 5; ++l) {
-    real lambda_p{ap[1]}, lambda_n{an[1]};
-    if (l == 0) {
-      lambda_p = ap[0];
-      lambda_n = an[0];
-    } else if (l == 4) {
-      lambda_p = ap[2];
-      lambda_n = an[2];
-    }
-
-    real v[5];
-    memset(v, 0, 5 * sizeof(real));
-    for (int m = 0; m < 5; ++m) {
-      // Li Xinliang version
-      for (int n = 0; n < 5; ++n) {
-        v[m] += LR(l, n) * Fp[(i_shared - 2 + m) * 5 + n];
+  if constexpr (method == 0) {
+    // ACANS version
+    real ap[3], an[3];
+    const auto max_spec_rad = abs(Uk_bar) + cm;
+    ap[0] = 0.5 * (Uk_bar - cm + max_spec_rad) * gradK;
+    ap[1] = 0.5 * (Uk_bar + max_spec_rad) * gradK;
+    ap[2] = 0.5 * (Uk_bar + cm + max_spec_rad) * gradK;
+    an[0] = 0.5 * (Uk_bar - cm - max_spec_rad) * gradK;
+    an[1] = 0.5 * (Uk_bar - max_spec_rad) * gradK;
+    an[2] = 0.5 * (Uk_bar + cm - max_spec_rad) * gradK;
+    if (param->inviscid_scheme == 52) {
+      for (int l = 0; l < 5; ++l) {
+        real vPlus[5], vMinus[5];
+        memset(vPlus, 0, 5 * sizeof(real));
+        memset(vMinus, 0, 5 * sizeof(real));
+        // ACANS version
+        real lambda_p{ap[1]}, lambda_n{an[1]};
+        if (l == 0) {
+          lambda_p = ap[0];
+          lambda_n = an[0];
+        } else if (l == 4) {
+          lambda_p = ap[2];
+          lambda_n = an[2];
+        }
+        for (int m = 0; m < 5; m++) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += lambda_p * LR(l, n) * cv[(i_shared - 2 + m) * (n_var + 2) + n] * 0.5 *
+                        (jac[i_shared] + jac[i_shared + 1]);
+            vMinus[m] += lambda_n * LR(l, n) * cv[(i_shared - 1 + m) * (n_var + 2) + n] * 0.5 *
+                         (jac[i_shared] + jac[i_shared + 1]);
+          }
+        }
+        fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
       }
-      // ACANS version
-//      for (int n = 0; n < 5; ++n) {
-//        v[m] +=
-//            lambda_p * LR(l, n) * cv[(i_shared - 2 + m) * (n_var + 2) + n] * 0.5 * (jac[i_shared] + jac[i_shared + 1]);
-//      }
-
-//      for (int n = 0; n < 5; ++n) {
-//        v[m] += LR(l, n) * (Fk[(i_shared - 2 + m) * 5 + n] + lambda_l * cv[(i_shared - 2 + m) * 7 + n] *
-//                                                             jac[i_shared - 2 + m]);
-//      }
-//      v[m] *= 0.5;
     }
-
-    // Reconstruct fPlusChar with WENO-Z-5.
-    constexpr real one6th{1.0 / 6};
-    real v0{one6th * (2 * v[2] + 5 * v[3] - v[4])};
-    real v1{one6th * (-v[1] + 5 * v[2] + 2 * v[3])};
-    real v2{one6th * (2 * v[0] - 7 * v[1] + 11 * v[2])};
-    constexpr real thirteen12th{13.0 / 12};
-    real beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-                 0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-    real beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-                 0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-    real beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-                 0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-    real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
-    constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
-    real a0{three10th + three10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0))};
-    real a1{six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1))};
-    real a2{one10th + one10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2))};
-    const real fPlusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-    memset(v, 0, 5 * sizeof(real));
-    for (int m = 0; m < 5; ++m) {
-      for (int n = 0; n < 5; ++n) {
-        v[m] += LR(l, n) * Fm[(i_shared - 1 + m) * 5 + n];
+  } else if constexpr (method == 1) {
+    // Li Xinliang version
+    if (param->inviscid_scheme == 52) {
+      for (int l = 0; l < 5; ++l) {
+        real vPlus[5], vMinus[5];
+        memset(vPlus, 0, 5 * sizeof(real));
+        memset(vMinus, 0, 5 * sizeof(real));
+        for (int m = 0; m < 5; m++) {
+          for (int n = 0; n < 5; n++) {
+            vPlus[m] += LR(l, n) * Fp[(i_shared - 2 + m) * 5 + n];
+            vMinus[m] += LR(l, n) * Fm[(i_shared - 1 + m) * 5 + n];
+          }
+        }
+        fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
       }
-
-//      for (int n = 0; n < 5; ++n) {
-//        v[m] +=
-//            lambda_n * LR(l, n) * cv[(i_shared - 1 + m) * (n_var + 2) + n] * 0.5 * (jac[i_shared] + jac[i_shared + 1]);
-//      }
-
-      //      for (int n = 0; n < 5; ++n) {
-//        v[m] += LR(l, n) * (Fk[(i_shared - 1 + m) * 5 + n] - lambda_l * cv[(i_shared - 1 + m) * 7 + n] *
-//                                                             jac[i_shared - 1 + m]);
-//      }
-//      v[m] *= 0.5;
+    } else if (param->inviscid_scheme == 72) {
+      for (int l = 0; l < 7; ++l) {
+        real vPlus[7], vMinus[7];
+        memset(vPlus, 0, 7 * sizeof(real));
+        memset(vMinus, 0, 7 * sizeof(real));
+        for (int m = 0; m < 7; ++m) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += LR(l, n) * Fp[(i_shared - 3 + m) * 5 + n];
+            vMinus[m] += LR(l, n) * Fm[(i_shared - 2 + m) * 5 + n];
+          }
+        }
+        fChar[l] = WENO7(vPlus, vMinus, eps_scaled);
+      }
     }
+  } else {
+    // My method
+    real spec_rad[3];
+    memset(spec_rad, 0, 3 * sizeof(real));
+    for (int l = -2; l < 4; ++l) {
+      const real *Q = &cv[(i_shared + l) * (n_var + 2)];
+      real c = sqrt(gamma_air * Q[n_var] / Q[0]);
+      real grad_k = sqrt(metric[(i_shared + l) * 3] * metric[(i_shared + l) * 3] +
+                         metric[(i_shared + l) * 3 + 1] * metric[(i_shared + l) * 3 + 1] +
+                         metric[(i_shared + l) * 3 + 2] * metric[(i_shared + l) * 3 + 2]);
+      real Uk = (metric[(i_shared + l) * 3] * Q[1] + metric[(i_shared + l) * 3 + 1] * Q[2] +
+                 metric[(i_shared + l) * 3 + 2] * Q[3]) / Q[0];
+      real ukPc = abs(Uk + c * grad_k);
+      real ukMc = abs(Uk - c * grad_k);
+      spec_rad[0] = max(spec_rad[0], ukMc);
+      spec_rad[1] = max(spec_rad[1], abs(Uk));
+      spec_rad[2] = max(spec_rad[2], ukPc);
+    }
+    spec_rad[0] = max(spec_rad[0], abs((Uk_bar - cm) * gradK));
+    spec_rad[1] = max(spec_rad[1], abs(Uk_bar * gradK));
+    spec_rad[2] = max(spec_rad[2], abs((Uk_bar + cm) * gradK));
+    if (param->inviscid_scheme == 52) {
+      for (int l = 0; l < 5; ++l) {
+        real lambda_l{spec_rad[1]};
+        if (l == 0) {
+          lambda_l = spec_rad[0];
+        } else if (l == 4) {
+          lambda_l = spec_rad[2];
+        }
 
-    // Reconstruct fMinusChar with WENO-Z-5.
-    v0 = one6th * (11 * v[2] - 7 * v[3] + 2 * v[4]);
-    v1 = one6th * (2 * v[1] + 5 * v[2] - v[3]);
-    v2 = one6th * (-v[0] + 5 * v[1] + 2 * v[2]);
-    beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-            0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-    beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-            0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-    beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-            0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-    tau5sqr = (beta0 - beta2) * (beta0 - beta2);
-    a0 = one10th + one10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0));
-    a1 = six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1));
-    a2 = three10th + three10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2));
-    const real fMinusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-    fChar[l] = fPlusChar + fMinusChar;
+        real vPlus[5], vMinus[5];
+        memset(vPlus, 0, 5 * sizeof(real));
+        memset(vMinus, 0, 5 * sizeof(real));
+        for (int m = 0; m < 5; ++m) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * 5 + n] + lambda_l * cv[(i_shared - 2 + m) * 7 + n] *
+                                                                     jac[i_shared - 2 + m]);
+            vMinus[m] += LR(l, n) * (Fm[(i_shared - 1 + m) * 5 + n] - lambda_l * cv[(i_shared - 1 + m) * 7 + n] *
+                                                                      jac[i_shared - 1 + m]);
+          }
+          vPlus[m] *= 0.5;
+          vMinus[m] *= 0.5;
+        }
+        fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
+      }
+    }
   }
 
   // Compute the right characteristic matrix
@@ -1120,6 +1115,117 @@ positive_preserving_limiter(const real *f_1st, int n_var, int tid, real *fc, con
     fc[tid * n_var + 5 + l] =
         min(theta_p, theta_m) * (fc[tid * n_var + 5 + l] - f_1st[tid * (n_var - 5) + l]) + f_1st[tid * (n_var - 5) + l];
   }
+}
+
+__device__ real WENO5(const real *vp, const real *vm, real eps) {
+  constexpr real one6th{1.0 / 6};
+  real v0{one6th * (2 * vp[2] + 5 * vp[3] - vp[4])};
+  real v1{one6th * (-vp[1] + 5 * vp[2] + 2 * vp[3])};
+  real v2{one6th * (2 * vp[0] - 7 * vp[1] + 11 * vp[2])};
+  constexpr real thirteen12th{13.0 / 12};
+  real beta0 = thirteen12th * (vp[2] + vp[4] - 2 * vp[3]) * (vp[2] + vp[4] - 2 * vp[3]) +
+               0.25 * (3 * vp[2] - 4 * vp[3] + vp[4]) * (3 * vp[2] - 4 * vp[3] + vp[4]);
+  real beta1 = thirteen12th * (vp[1] + vp[3] - 2 * vp[2]) * (vp[1] + vp[3] - 2 * vp[2]) +
+               0.25 * (vp[1] - vp[3]) * (vp[1] - vp[3]);
+  real beta2 = thirteen12th * (vp[0] + vp[2] - 2 * vp[1]) * (vp[0] + vp[2] - 2 * vp[1]) +
+               0.25 * (vp[0] - 4 * vp[1] + 3 * vp[2]) * (vp[0] - 4 * vp[1] + 3 * vp[2]);
+  real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
+  constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
+  real a0{three10th + three10th * tau5sqr / ((eps + beta0) * (eps + beta0))};
+  real a1{six10th + six10th * tau5sqr / ((eps + beta1) * (eps + beta1))};
+  real a2{one10th + one10th * tau5sqr / ((eps + beta2) * (eps + beta2))};
+  const real fPlus{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
+
+  v0 = one6th * (11 * vm[2] - 7 * vm[3] + 2 * vm[4]);
+  v1 = one6th * (2 * vm[1] + 5 * vm[2] - vm[3]);
+  v2 = one6th * (-vm[0] + 5 * vm[1] + 2 * vm[2]);
+  beta0 = thirteen12th * (vm[2] + vm[4] - 2 * vm[3]) * (vm[2] + vm[4] - 2 * vm[3]) +
+          0.25 * (3 * vm[2] - 4 * vm[3] + vm[4]) * (3 * vm[2] - 4 * vm[3] + vm[4]);
+  beta1 = thirteen12th * (vm[1] + vm[3] - 2 * vm[2]) * (vm[1] + vm[3] - 2 * vm[2]) +
+          0.25 * (vm[1] - vm[3]) * (vm[1] - vm[3]);
+  beta2 = thirteen12th * (vm[0] + vm[2] - 2 * vm[1]) * (vm[0] + vm[2] - 2 * vm[1]) +
+          0.25 * (vm[0] - 4 * vm[1] + 3 * vm[2]) * (vm[0] - 4 * vm[1] + 3 * vm[2]);
+  tau5sqr = (beta0 - beta2) * (beta0 - beta2);
+  a0 = one10th + one10th * tau5sqr / ((eps + beta0) * (eps + beta0));
+  a1 = six10th + six10th * tau5sqr / ((eps + beta1) * (eps + beta1));
+  a2 = three10th + three10th * tau5sqr / ((eps + beta2) * (eps + beta2));
+  const real fMinus{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
+
+  return (fPlus + fMinus);
+}
+
+__device__ real WENO7(const real *vp, const real *vm, real eps) {
+  constexpr real one6th{1.0 / 6};
+  // 1st order derivative
+  real s10{one6th * (-2 * vp[0] + 9 * vp[1] - 18 * vp[2] + 11 * vp[3])};
+  real s11{one6th * (vp[1] - 6 * vp[2] + 3 * vp[3] + 2 * vp[4])};
+  real s12{one6th * (-2 * vp[2] - 3 * vp[3] + 6 * vp[4] - vp[5])};
+  real s13{one6th * (-11 * vp[3] + 18 * vp[4] - 9 * vp[5] + 2 * vp[6])};
+  // 2nd order derivative
+  real s20{-vp[0] + 4 * vp[1] - 5 * vp[2] + 2 * vp[3]};
+  real s21{vp[2] - 2 * vp[3] + vp[4]};
+  real s22{vp[3] - 2 * vp[4] + vp[5]};
+  real s23{2 * vp[3] - 5 * vp[4] + 4 * vp[5] - vp[6]};
+  // 3rd order derivative
+  real s30{-vp[0] + 3 * vp[1] - 3 * vp[2] + vp[3]};
+  real s31{-vp[1] + 3 * vp[2] - 3 * vp[3] + vp[4]};
+  real s32{-vp[2] + 3 * vp[3] - 3 * vp[4] + vp[5]};
+  real s33{-vp[3] + 3 * vp[4] - 3 * vp[5] + vp[6]};
+
+  constexpr real d12{13.0 / 12.0}, d13{1043.0 / 960}, d14{1.0 / 12};
+  real beta0{s10 * s10 + d12 * s20 * s20 + d13 * s30 * s30 + d14 * s10 * s30};
+  real beta1{s11 * s11 + d12 * s21 * s21 + d13 * s31 * s31 + d14 * s11 * s31};
+  real beta2{s12 * s12 + d12 * s22 * s22 + d13 * s32 * s32 + d14 * s12 * s32};
+  real beta3{s13 * s13 + d12 * s23 * s23 + d13 * s33 * s33 + d14 * s13 * s33};
+
+  real tau7sqr{(beta0 - beta3) * (beta0 - beta3)};
+  constexpr real c0{1.0 / 35}, c1{12.0 / 35}, c2{18.0 / 35}, c3{4.0 / 35};
+  real a0{c0 + c0 * tau7sqr / ((eps + beta0) * (eps + beta0))};
+  real a1{c1 + c1 * tau7sqr / ((eps + beta1) * (eps + beta1))};
+  real a2{c2 + c2 * tau7sqr / ((eps + beta2) * (eps + beta2))};
+  real a3{c3 + c3 * tau7sqr / ((eps + beta3) * (eps + beta3))};
+
+  constexpr real one12th{1.0 / 12};
+  real v0{one12th * (-3 * vp[0] + 13 * vp[1] - 23 * vp[2] + 25 * vp[3])};
+  real v1{one12th * (vp[1] - 5 * vp[2] + 13 * vp[3] + 3 * vp[4])};
+  real v2{one12th * (-vp[2] + 7 * vp[3] + 7 * vp[4] - vp[5])};
+  real v3{one12th * (3 * vp[3] + 13 * vp[4] - 5 * vp[5] + vp[6])};
+  const real fPlus{(a0 * v0 + a1 * v1 + a2 * v2 + a3 * v3) / (a0 + a1 + a2 + a3)};
+
+  // Minus part
+  s10 = one6th * (-2 * vm[6] + 9 * vm[5] - 18 * vm[4] + 11 * vm[3]);
+  s11 = one6th * (vm[5] - 6 * vm[4] + 3 * vm[3] + 2 * vm[2]);
+  s12 = one6th * (-2 * vm[4] - 3 * vm[3] + 6 * vm[2] - vm[1]);
+  s13 = one6th * (-11 * vm[3] + 18 * vm[2] - 9 * vm[1] + 2 * vm[0]);
+
+  s20 = -vm[6] + 4 * vm[5] - 5 * vm[4] + 2 * vm[3];
+  s21 = vm[4] - 2 * vm[3] + vm[2];
+  s22 = vm[3] - 2 * vm[2] + vm[1];
+  s23 = 2 * vm[3] - 5 * vm[2] + 4 * vm[1] - vm[0];
+
+  s30 = -vm[6] + 3 * vm[5] - 3 * vm[4] + vm[3];
+  s31 = -vm[5] + 3 * vm[4] - 3 * vm[3] + vm[2];
+  s32 = -vm[4] + 3 * vm[3] - 3 * vm[2] + vm[1];
+  s33 = -vm[3] + 3 * vm[2] - 3 * vm[1] + vm[0];
+
+  beta0 = s10 * s10 + d12 * s20 * s20 + d13 * s30 * s30 + d14 * s10 * s30;
+  beta1 = s11 * s11 + d12 * s21 * s21 + d13 * s31 * s31 + d14 * s11 * s31;
+  beta2 = s12 * s12 + d12 * s22 * s22 + d13 * s32 * s32 + d14 * s12 * s32;
+  beta3 = s13 * s13 + d12 * s23 * s23 + d13 * s33 * s33 + d14 * s13 * s33;
+
+  tau7sqr = (beta0 - beta3) * (beta0 - beta3);
+  a0 = c0 + c0 * tau7sqr / ((eps + beta0) * (eps + beta0));
+  a1 = c1 + c1 * tau7sqr / ((eps + beta1) * (eps + beta1));
+  a2 = c2 + c2 * tau7sqr / ((eps + beta2) * (eps + beta2));
+  a3 = c3 + c3 * tau7sqr / ((eps + beta3) * (eps + beta3));
+
+  v0 = one12th * (-3 * vm[6] + 13 * vm[5] - 23 * vm[4] + 25 * vm[3]);
+  v1 = one12th * (vm[5] - 5 * vm[4] + 13 * vm[3] + 3 * vm[2]);
+  v2 = one12th * (-vm[4] + 7 * vm[3] + 7 * vm[2] - vm[1]);
+  v3 = one12th * (3 * vm[3] + 13 * vm[2] - 5 * vm[1] + vm[0]);
+  const real fMinus{(a0 * v0 + a1 * v1 + a2 * v2 + a3 * v3) / (a0 + a1 + a2 + a3)};
+
+  return (fPlus + fMinus);
 }
 
 template void

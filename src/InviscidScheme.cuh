@@ -69,4 +69,7 @@ __device__ void
 positive_preserving_limiter(const real *f_1st, int n_var, int tid, real *fc, const DParameter *param, int i_shared,
                             real dt, int idx_in_mesh, int max_extent, const real *cv, const real *jac);
 
+__device__ real WENO5(const real *vp, const real *vm, real eps);
+__device__ real WENO7(const real *vp, const real *vm, real eps);
+
 } // cfd
