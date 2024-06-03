@@ -359,18 +359,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
     alpha_l[l] *= cm2_inv;
   }
 
-  if constexpr (method == 0) {
-    real ap[3], an[3];
-    const auto max_spec_rad = abs(Uk_bar) + cm;
-    ap[0] = 0.5 * (Uk_bar - cm + max_spec_rad) * gradK;
-    ap[1] = 0.5 * (Uk_bar + max_spec_rad) * gradK;
-    ap[2] = 0.5 * (Uk_bar + cm + max_spec_rad) * gradK;
-    an[0] = 0.5 * (Uk_bar - cm - max_spec_rad) * gradK;
-    an[1] = 0.5 * (Uk_bar - max_spec_rad) * gradK;
-    an[2] = 0.5 * (Uk_bar + cm - max_spec_rad) * gradK;
-
-    printf("Not implemented.\n");
-  } else if constexpr (method == 1) {
+  if constexpr (method == 1) {
     // Li Xinliang's flux splitting
     bool pp_limiter{param->positive_preserving};
     if (pp_limiter) {
@@ -405,109 +394,54 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
         coeff_alpha_s = -kz;
       }
 
-      real v[5];
-      memset(v, 0, 5 * sizeof(real));
-      for (int m = 0; m < 5; ++m) {
-        for (int n = 0; n < 5; ++n) {
-          v[m] += LR(l, n) * Fp[(i_shared - 2 + m) * n_var + n];
+      if (param->inviscid_scheme == 52) {
+        real vPlus[5], vMinus[5];
+        memset(vPlus, 0, 5 * sizeof(real));
+        memset(vMinus, 0, 5 * sizeof(real));
+        for (int m = 0; m < 5; ++m) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += LR(l, n) * Fp[(i_shared - 2 + m) * n_var + n];
+            vMinus[m] += LR(l, n) * Fm[(i_shared - 1 + m) * n_var + n];
+          }
+          for (int n = 0; n < n_spec; ++n) {
+            vPlus[m] += coeff_alpha_s * alpha_l[n] * Fp[(i_shared - 2 + m) * n_var + 5 + n];
+            vMinus[m] += coeff_alpha_s * alpha_l[n] * Fm[(i_shared - 1 + m) * n_var + 5 + n];
+          }
         }
-        for (int n = 0; n < n_spec; ++n) {
-          v[m] += coeff_alpha_s * alpha_l[n] * Fp[(i_shared - 2 + m) * n_var + 5 + n];
+        fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
+      } else if (param->inviscid_scheme == 72) {
+        real vPlus[7], vMinus[7];
+        memset(vPlus, 0, 7 * sizeof(real));
+        memset(vMinus, 0, 7 * sizeof(real));
+        for (int m = 0; m < 7; ++m) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += LR(l, n) * Fp[(i_shared - 3 + m) * n_var + n];
+            vMinus[m] += LR(l, n) * Fm[(i_shared - 2 + m) * n_var + n];
+          }
+          for (int n = 0; n < n_spec; ++n) {
+            vPlus[m] += coeff_alpha_s * alpha_l[n] * Fp[(i_shared - 3 + m) * n_var + 5 + n];
+            vMinus[m] += coeff_alpha_s * alpha_l[n] * Fm[(i_shared - 2 + m) * n_var + 5 + n];
+          }
         }
+        fChar[l] = WENO7(vPlus, vMinus, eps_scaled);
       }
-      // Reconstruct fPlusChar with WENO-Z-5.
-      constexpr real one6th{1.0 / 6};
-      real v0{one6th * (2 * v[2] + 5 * v[3] - v[4])};
-      real v1{one6th * (-v[1] + 5 * v[2] + 2 * v[3])};
-      real v2{one6th * (2 * v[0] - 7 * v[1] + 11 * v[2])};
-      constexpr real thirteen12th{13.0 / 12};
-      real beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-                   0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-      real beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-                   0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-      real beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-                   0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-      real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
-      constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
-      real a0{three10th + three10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0))};
-      real a1{six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1))};
-      real a2{one10th + one10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2))};
-      const real fPlusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-      memset(v, 0, 5 * sizeof(real));
-      for (int m = 0; m < 5; ++m) {
-        for (int n = 0; n < 5; ++n) {
-          v[m] += LR(l, n) * Fm[(i_shared - 1 + m) * n_var + n];
-        }
-        for (int n = 0; n < n_spec; ++n) {
-          v[m] += coeff_alpha_s * alpha_l[n] * Fm[(i_shared - 1 + m) * n_var + 5 + n];
-        }
-      }
-
-      // Reconstruct fMinusChar with WENO-Z-5.
-      v0 = one6th * (11 * v[2] - 7 * v[3] + 2 * v[4]);
-      v1 = one6th * (2 * v[1] + 5 * v[2] - v[3]);
-      v2 = one6th * (-v[0] + 5 * v[1] + 2 * v[2]);
-      beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-              0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-      beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-              0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-      beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-              0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-      tau5sqr = (beta0 - beta2) * (beta0 - beta2);
-      a0 = one10th + one10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0));
-      a1 = six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1));
-      a2 = three10th + three10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2));
-      const real fMinusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-      fChar[l] = fPlusChar + fMinusChar;
     }
     for (int l = 0; l < n_spec; ++l) {
-      real v[5];
-      memset(v, 0, 5 * sizeof(real));
-      for (int m = 0; m < 5; ++m) {
-        v[m] = -svm[l] * Fp[(i_shared - 2 + m) * n_var] + Fp[(i_shared - 2 + m) * n_var + 5 + l];
+      if (param->inviscid_scheme == 52) {
+        real vPlus[5], vMinus[5];
+        for (int m = 0; m < 5; ++m) {
+          vPlus[m] = -svm[l] * Fp[(i_shared - 2 + m) * n_var] + Fp[(i_shared - 2 + m) * n_var + 5 + l];
+          vMinus[m] = -svm[l] * Fm[(i_shared - 1 + m) * n_var] + Fm[(i_shared - 1 + m) * n_var + 5 + l];
+        }
+        fChar[5 + l] = WENO5(vPlus, vMinus, eps_scaled);
+      } else if (param->inviscid_scheme == 72) {
+        real vPlus[7], vMinus[7];
+        for (int m = 0; m < 7; ++m) {
+          vPlus[m] = -svm[l] * Fp[(i_shared - 3 + m) * n_var] + Fp[(i_shared - 3 + m) * n_var + 5 + l];
+          vMinus[m] = -svm[l] * Fm[(i_shared - 2 + m) * n_var] + Fm[(i_shared - 2 + m) * n_var + 5 + l];
+        }
+        fChar[5 + l] = WENO7(vPlus, vMinus, eps_scaled);
       }
-      // Reconstruct fPlusChar with WENO-Z-5.
-      constexpr real one6th{1.0 / 6};
-      real v0{one6th * (2 * v[2] + 5 * v[3] - v[4])};
-      real v1{one6th * (-v[1] + 5 * v[2] + 2 * v[3])};
-      real v2{one6th * (2 * v[0] - 7 * v[1] + 11 * v[2])};
-      constexpr real thirteen12th{13.0 / 12};
-      real beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-                   0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-      real beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-                   0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-      real beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-                   0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-      real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
-      constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
-      real a0{three10th + three10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0))};
-      real a1{six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1))};
-      real a2{one10th + one10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2))};
-      const real fPlusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-      memset(v, 0, 5 * sizeof(real));
-      for (int m = 0; m < 5; ++m) {
-        v[m] = -svm[l] * Fm[(i_shared - 1 + m) * n_var] + Fm[(i_shared - 1 + m) * n_var + 5 + l];
-      }
-      // Reconstruct fMinusChar with WENO-Z-5.
-      v0 = one6th * (11 * v[2] - 7 * v[3] + 2 * v[4]);
-      v1 = one6th * (2 * v[1] + 5 * v[2] - v[3]);
-      v2 = one6th * (-v[0] + 5 * v[1] + 2 * v[2]);
-      beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-              0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-      beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-              0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-      beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-              0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-      tau5sqr = (beta0 - beta2) * (beta0 - beta2);
-      a0 = one10th + one10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0));
-      a1 = six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1));
-      a2 = three10th + three10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2));
-      const real fMinusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-      fChar[l + 5] = fPlusChar + fMinusChar;
     }
   } else {
     // My method
@@ -561,124 +495,83 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
         coeff_alpha_s = -kz;
       }
 
-      real v[5];
-      memset(v, 0, 5 * sizeof(real));
-      for (int m = 0; m < 5; ++m) {
-        for (int n = 0; n < 5; ++n) {
-          v[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * n_var + n] + lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + n] *
-                                                                   jac[i_shared - 2 + m]);
+      if (param->inviscid_scheme == 52) {
+        real vPlus[5], vMinus[5];
+        memset(vPlus, 0, 5 * sizeof(real));
+        memset(vMinus, 0, 5 * sizeof(real));
+        for (int m = 0; m < 5; ++m) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * n_var + n] +
+                                    lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + n] * jac[i_shared - 2 + m]);
+            vMinus[m] += LR(l, n) * (Fp[(i_shared - 1 + m) * n_var + n] -
+                                     lambda_l * cv[(i_shared - 1 + m) * (n_var + 2) + n] * jac[i_shared - 1 + m]);
+          }
+          for (int n = 0; n < n_spec; ++n) {
+            vPlus[m] += coeff_alpha_s * alpha_l[n] * (Fp[(i_shared - 2 + m) * n_var + 5 + n] +
+                                                      lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + n + 5] *
+                                                      jac[i_shared - 2 + m]);
+            vMinus[m] += coeff_alpha_s * alpha_l[n] * (Fp[(i_shared - 1 + m) * n_var + 5 + n] -
+                                                       lambda_l * cv[(i_shared - 1 + m) * (n_var + 2) + n + 5] *
+                                                       jac[i_shared - 1 + m]);
+          }
+          vPlus[m] *= 0.5;
+          vMinus[m] *= 0.5;
         }
-        for (int n = 0; n < n_spec; ++n) {
-          v[m] += coeff_alpha_s * alpha_l[n] * (Fp[(i_shared - 2 + m) * n_var + 5 + n] +
-                                                lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + n + 5] *
-                                                jac[i_shared - 2 + m]);
+        fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
+      } else if (param->inviscid_scheme == 72) {
+        real vPlus[7], vMinus[7];
+        memset(vPlus, 0, 7 * sizeof(real));
+        memset(vMinus, 0, 7 * sizeof(real));
+        for (int m = 0; m < 7; ++m) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += LR(l, n) * (Fp[(i_shared - 3 + m) * n_var + n] +
+                                    lambda_l * cv[(i_shared - 3 + m) * (n_var + 2) + n] * jac[i_shared - 3 + m]);
+            vMinus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * n_var + n] -
+                                     lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + n] * jac[i_shared - 2 + m]);
+          }
+          for (int n = 0; n < n_spec; ++n) {
+            vPlus[m] += coeff_alpha_s * alpha_l[n] * (Fp[(i_shared - 3 + m) * n_var + 5 + n] +
+                                                      lambda_l * cv[(i_shared - 3 + m) * (n_var + 2) + 5 + n] *
+                                                      jac[i_shared - 3 + m]);
+            vMinus[m] += coeff_alpha_s * alpha_l[n] * (Fp[(i_shared - 2 + m) * n_var + 5 + n] -
+                                                       lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + 5 + n] *
+                                                       jac[i_shared - 2 + m]);
+          }
+          vPlus[m] *= 0.5;
+          vMinus[m] *= 0.5;
         }
-        v[m] *= 0.5;
+        fChar[l] = WENO7(vPlus, vMinus, eps_scaled);
       }
-      // Reconstruct fPlusChar with WENO-Z-5.
-      constexpr real one6th{1.0 / 6};
-      real v0{one6th * (2 * v[2] + 5 * v[3] - v[4])};
-      real v1{one6th * (-v[1] + 5 * v[2] + 2 * v[3])};
-      real v2{one6th * (2 * v[0] - 7 * v[1] + 11 * v[2])};
-      constexpr real thirteen12th{13.0 / 12};
-      real beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-                   0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-      real beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-                   0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-      real beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-                   0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-      real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
-      constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
-      real a0{three10th + three10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0))};
-      real a1{six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1))};
-      real a2{one10th + one10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2))};
-      const real fPlusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-      memset(v, 0, 5 * sizeof(real));
-      for (int m = 0; m < 5; ++m) {
-        for (int n = 0; n < 5; ++n) {
-          v[m] += LR(l, n) * (Fp[(i_shared - 1 + m) * n_var + n] -
-                              lambda_l * cv[(i_shared - 1 + m) * (n_var + 2) + n] * jac[i_shared - 1 + m]);
-        }
-        for (int n = 0; n < n_spec; ++n) {
-          v[m] += coeff_alpha_s * alpha_l[n] * (Fp[(i_shared - 1 + m) * n_var + 5 + n] -
-                                                lambda_l * cv[(i_shared - 1 + m) * (n_var + 2) + n + 5] *
-                                                jac[i_shared - 1 + m]);
-        }
-        v[m] *= 0.5;
-      }
-
-      // Reconstruct fMinusChar with WENO-Z-5.
-      v0 = one6th * (11 * v[2] - 7 * v[3] + 2 * v[4]);
-      v1 = one6th * (2 * v[1] + 5 * v[2] - v[3]);
-      v2 = one6th * (-v[0] + 5 * v[1] + 2 * v[2]);
-      beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-              0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-      beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-              0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-      beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-              0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-      tau5sqr = (beta0 - beta2) * (beta0 - beta2);
-      a0 = one10th + one10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0));
-      a1 = six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1));
-      a2 = three10th + three10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2));
-      const real fMinusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-      fChar[l] = fPlusChar + fMinusChar;
     }
     for (int l = 0; l < n_spec; ++l) {
       const real lambda_l{spec_rad[1]};
-      real v[5];
-      memset(v, 0, 5 * sizeof(real));
-      for (int m = 0; m < 5; ++m) {
-        v[m] = 0.5 * ((Fp[(i_shared - 2 + m) * n_var + 5 + l] +
-                       lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 2 + m]) -
-                      svm[l] * (Fp[(i_shared - 2 + m) * n_var] +
-                                lambda_l * cv[(i_shared - 2 + m) * (n_var + 2)] * jac[i_shared - 2 + m]));
+      if (param->inviscid_scheme == 52) {
+        real vPlus[5], vMinus[5];
+        for (int m = 0; m < 5; ++m) {
+          vPlus[m] = 0.5 * ((Fp[(i_shared - 2 + m) * n_var + 5 + l] +
+                             lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 2 + m]) -
+                            svm[l] * (Fp[(i_shared - 2 + m) * n_var] +
+                                      lambda_l * cv[(i_shared - 2 + m) * (n_var + 2)] * jac[i_shared - 2 + m]));
+          vMinus[m] = 0.5 * ((Fp[(i_shared - 1 + m) * n_var + 5 + l] -
+                              lambda_l * cv[(i_shared - 1 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 1 + m]) -
+                             svm[l] * (Fp[(i_shared - 1 + m) * n_var] -
+                                       lambda_l * cv[(i_shared - 1 + m) * (n_var + 2)] * jac[i_shared - 1 + m]));
+        }
+        fChar[5 + l] = WENO5(vPlus, vMinus, eps_scaled);
+      } else if (param->inviscid_scheme == 72) {
+        real vPlus[7], vMinus[7];
+        for (int m = 0; m < 7; ++m) {
+          vPlus[m] = 0.5 * ((Fp[(i_shared - 3 + m) * n_var + 5 + l] +
+                             lambda_l * cv[(i_shared - 3 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 3 + m]) -
+                            svm[l] * (Fp[(i_shared - 3 + m) * n_var] +
+                                      lambda_l * cv[(i_shared - 3 + m) * (n_var + 2)] * jac[i_shared - 3 + m]));
+          vMinus[m] = 0.5 * ((Fp[(i_shared - 2 + m) * n_var + 5 + l] -
+                              lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 2 + m]) -
+                             svm[l] * (Fp[(i_shared - 2 + m) * n_var] -
+                                       lambda_l * cv[(i_shared - 2 + m) * (n_var + 2)] * jac[i_shared - 2 + m]));
+        }
+        fChar[5 + l] = WENO7(vPlus, vMinus, eps_scaled);
       }
-      // Reconstruct fPlusChar with WENO-Z-5.
-      constexpr real one6th{1.0 / 6};
-      real v0{one6th * (2 * v[2] + 5 * v[3] - v[4])};
-      real v1{one6th * (-v[1] + 5 * v[2] + 2 * v[3])};
-      real v2{one6th * (2 * v[0] - 7 * v[1] + 11 * v[2])};
-      constexpr real thirteen12th{13.0 / 12};
-      real beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-                   0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-      real beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-                   0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-      real beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-                   0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-      real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
-      constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
-      real a0{three10th + three10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0))};
-      real a1{six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1))};
-      real a2{one10th + one10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2))};
-      const real fPlusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-      memset(v, 0, 5 * sizeof(real));
-      for (int m = 0; m < 5; ++m) {
-        v[m] = 0.5 * ((Fp[(i_shared - 1 + m) * n_var + 5 + l] -
-                       lambda_l * cv[(i_shared - 1 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 1 + m]) -
-                      svm[l] * (Fp[(i_shared - 1 + m) * n_var] -
-                                lambda_l * cv[(i_shared - 1 + m) * (n_var + 2)] * jac[i_shared - 1 + m]));
-      }
-      // Reconstruct fMinusChar with WENO-Z-5.
-      v0 = one6th * (11 * v[2] - 7 * v[3] + 2 * v[4]);
-      v1 = one6th * (2 * v[1] + 5 * v[2] - v[3]);
-      v2 = one6th * (-v[0] + 5 * v[1] + 2 * v[2]);
-      beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-              0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-      beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-              0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-      beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-              0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-      tau5sqr = (beta0 - beta2) * (beta0 - beta2);
-      a0 = one10th + one10th * tau5sqr / ((eps_scaled + beta0) * (eps_scaled + beta0));
-      a1 = six10th + six10th * tau5sqr / ((eps_scaled + beta1) * (eps_scaled + beta1));
-      a2 = three10th + three10th * tau5sqr / ((eps_scaled + beta2) * (eps_scaled + beta2));
-      const real fMinusChar{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-      fChar[l + 5] = fPlusChar + fMinusChar;
     }
   }
 
@@ -1024,53 +917,39 @@ compute_weno_flux_cp(const real *cv, DParameter *param, int tid, const real *met
       eps_here = eps_scaled[2];
     }
 
-    real v[5];
-    v[0] = Fp[(i_shared - 2) * n_var + l];
-    v[1] = Fp[(i_shared - 1) * n_var + l];
-    v[2] = Fp[i_shared * n_var + l];
-    v[3] = Fp[(i_shared + 1) * n_var + l];
-    v[4] = Fp[(i_shared + 2) * n_var + l];
+    if (param->inviscid_scheme == 51) {
+      real vp[5], vm[5];
+      vp[0] = Fp[(i_shared - 2) * n_var + l];
+      vp[1] = Fp[(i_shared - 1) * n_var + l];
+      vp[2] = Fp[i_shared * n_var + l];
+      vp[3] = Fp[(i_shared + 1) * n_var + l];
+      vp[4] = Fp[(i_shared + 2) * n_var + l];
+      vm[0] = Fm[(i_shared - 1) * n_var + l];
+      vm[1] = Fm[i_shared * n_var + l];
+      vm[2] = Fm[(i_shared + 1) * n_var + l];
+      vm[3] = Fm[(i_shared + 2) * n_var + l];
+      vm[4] = Fm[(i_shared + 3) * n_var + l];
 
-    constexpr real one6th{1.0 / 6};
-    real v0{one6th * (2 * v[2] + 5 * v[3] - v[4])};
-    real v1{one6th * (-v[1] + 5 * v[2] + 2 * v[3])};
-    real v2{one6th * (2 * v[0] - 7 * v[1] + 11 * v[2])};
-    constexpr real thirteen12th{13.0 / 12};
-    real beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-                 0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-    real beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-                 0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-    real beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-                 0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-    constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
-    real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
-    real a0{three10th + three10th * tau5sqr / ((eps_here + beta0) * (eps_here + beta0))};
-    real a1{six10th + six10th * tau5sqr / ((eps_here + beta1) * (eps_here + beta1))};
-    real a2{one10th + one10th * tau5sqr / ((eps_here + beta2) * (eps_here + beta2))};
-    const real fPlusCp{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
+      fci[l] = WENO5(vp, vm, eps_here);
+    } else if (param->inviscid_scheme == 71) {
+      real vp[7], vm[7];
+      vp[0] = Fp[(i_shared - 3) * n_var + l];
+      vp[1] = Fp[(i_shared - 2) * n_var + l];
+      vp[2] = Fp[(i_shared - 1) * n_var + l];
+      vp[3] = Fp[i_shared * n_var + l];
+      vp[4] = Fp[(i_shared + 1) * n_var + l];
+      vp[5] = Fp[(i_shared + 2) * n_var + l];
+      vp[6] = Fp[(i_shared + 3) * n_var + l];
+      vm[0] = Fm[(i_shared - 2) * n_var + l];
+      vm[1] = Fm[(i_shared - 1) * n_var + l];
+      vm[2] = Fm[i_shared * n_var + l];
+      vm[3] = Fm[(i_shared + 1) * n_var + l];
+      vm[4] = Fm[(i_shared + 2) * n_var + l];
+      vm[5] = Fm[(i_shared + 3) * n_var + l];
+      vm[6] = Fm[(i_shared + 4) * n_var + l];
 
-    v[0] = Fm[(i_shared - 1) * n_var + l];
-    v[1] = Fm[i_shared * n_var + l];
-    v[2] = Fm[(i_shared + 1) * n_var + l];
-    v[3] = Fm[(i_shared + 2) * n_var + l];
-    v[4] = Fm[(i_shared + 3) * n_var + l];
-
-    v0 = one6th * (11 * v[2] - 7 * v[3] + 2 * v[4]);
-    v1 = one6th * (2 * v[1] + 5 * v[2] - v[3]);
-    v2 = one6th * (-v[0] + 5 * v[1] + 2 * v[2]);
-    beta0 = thirteen12th * (v[2] + v[4] - 2 * v[3]) * (v[2] + v[4] - 2 * v[3]) +
-            0.25 * (3 * v[2] - 4 * v[3] + v[4]) * (3 * v[2] - 4 * v[3] + v[4]);
-    beta1 = thirteen12th * (v[1] + v[3] - 2 * v[2]) * (v[1] + v[3] - 2 * v[2]) +
-            0.25 * (v[1] - v[3]) * (v[1] - v[3]);
-    beta2 = thirteen12th * (v[0] + v[2] - 2 * v[1]) * (v[0] + v[2] - 2 * v[1]) +
-            0.25 * (v[0] - 4 * v[1] + 3 * v[2]) * (v[0] - 4 * v[1] + 3 * v[2]);
-    tau5sqr = (beta0 - beta2) * (beta0 - beta2);
-    a0 = one10th + one10th * tau5sqr / ((eps_here + beta0) * (eps_here + beta0));
-    a1 = six10th + six10th * tau5sqr / ((eps_here + beta1) * (eps_here + beta1));
-    a2 = three10th + three10th * tau5sqr / ((eps_here + beta2) * (eps_here + beta2));
-    const real fMinusCp{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
-
-    fci[l] = fPlusCp + fMinusCp;
+      fci[l] = WENO7(vp, vm, eps_here);
+    }
   }
 }
 
