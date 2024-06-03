@@ -87,7 +87,7 @@ cfd::Species::Species(Parameter &parameter) {
 
     if (parameter.get_int("myid") == 0) {
       fmt::print("Mixture composed of {} species will be simulated.\n", n_spec);
-      integer counter_spec{0};
+      int counter_spec{0};
       for (auto &[name, label]: spec_list) {
         fmt::print("{}\t", name);
         ++counter_spec;
@@ -144,7 +144,7 @@ void cfd::Species::compute_cp(real temp, real *cp) const &{
 #endif
 }
 
-void cfd::Species::set_nspec(integer n_sp, integer n_elem) {
+void cfd::Species::set_nspec(int n_sp, int n_elem) {
   n_spec = n_sp;
   elem_comp.resize(n_sp, n_elem);
   mw.resize(n_sp, 0);
@@ -197,9 +197,9 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
   bool has_trans{false};
 #ifdef HighTempMultiPart
   std::vector<std::vector<real>> temporary_range(n_spec, {T_low, T_mid, T_high});
-  std::vector<integer> n_temperature_spec(n_spec, 3);
+  std::vector<int> n_temperature_spec(n_spec, 3);
   std::vector<gxl::MatrixDyn<real>> therm_poly_tempo(n_spec);
-  integer range_max = 2;
+  int range_max = 2;
 #endif
   while (gxl::getline_to_stream(therm_dat, input, line, gxl::Case::upper)) {
     if (input[0] == '!' || input.empty()) {
@@ -344,8 +344,8 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
       while (line >> key) {
         temp_range.push_back(std::stod(key));
       }
-      n_temperature_spec[curr_sp] = (integer) temp_range.size();
-      n_temperature_range[curr_sp] = (integer) temp_range.size() - 1;
+      n_temperature_spec[curr_sp] = (int) temp_range.size();
+      n_temperature_range[curr_sp] = (int) temp_range.size() - 1;
       range_max = std::max(range_max, n_temperature_range[curr_sp]);
       temporary_range[curr_sp].resize(n_temperature_range[curr_sp] + 1);
       for (int i = 0; i < n_temperature_range[curr_sp] + 1; ++i) {
@@ -488,7 +488,7 @@ bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech
 void cfd::Species::read_tran(std::ifstream &tran_dat) {
   std::string input{}, key{};
   std::istringstream line(input);
-  integer n_read{0};
+  int n_read{0};
   std::vector<int> have_read;
 
   std::vector<double> eps_kb(n_spec, 0), sigma(n_spec, 0), mu(n_spec, 0), alpha(n_spec, 0);
@@ -569,13 +569,13 @@ void cfd::Species::read_tran(std::ifstream &tran_dat) {
   }
 }
 
-integer cfd::Species::is_polar(real dipole_moment) {
+int cfd::Species::is_polar(real dipole_moment) {
   return dipole_moment == 0 ? 0 : 1;
 }
 
-real cfd::Species::compute_xi(integer j, integer k, real *dipole_moment, real *sigma, real *eps_kb, const real *alpha) {
+real cfd::Species::compute_xi(int j, int k, real *dipole_moment, real *sigma, real *eps_kb, const real *alpha) {
   // labels for n(non-polar), p(polar)
-  integer n{0}, p{0};
+  int n{0}, p{0};
   if (is_polar(dipole_moment[j])) {
     p = j;
     n = k;
@@ -590,7 +590,7 @@ real cfd::Species::compute_xi(integer j, integer k, real *dipole_moment, real *s
   return xi;
 }
 
-real cfd::Species::compute_reduced_dipole_moment(integer i, real *dipole_moment, const real *eps_kb, const real *sigma) {
+real cfd::Species::compute_reduced_dipole_moment(int i, real *dipole_moment, const real *eps_kb, const real *sigma) {
   if (!is_polar(dipole_moment[i])) {
     return 0;
   }
@@ -622,10 +622,10 @@ cfd::Reaction::Reaction(Parameter &parameter, const Species &species) {
     // Currently, we just use the default ones, here is blanked.
   }
 
-  integer has_read{0};
-  const integer ns{species.n_spec};
+  int has_read{0};
+  const int ns{species.n_spec};
   set_nreac(100, ns);
-  std::vector<integer> duplicate_reactions{};
+  std::vector<int> duplicate_reactions{};
   gxl::getline_to_stream(file, input, line, gxl::Case::upper);
   while (input != "END") {
     if (input[0] == '!' || input.empty()) {
@@ -646,10 +646,10 @@ cfd::Reaction::Reaction(Parameter &parameter, const Species &species) {
 
     if (is_dup) {
       bool found = false;
-      integer dup{}, pos{};
+      int dup{}, pos{};
       for (auto r = 0; r < duplicate_reactions.size(); ++r) {
         bool all_same{true};
-        const integer idx_dup{duplicate_reactions[r]};
+        const int idx_dup{duplicate_reactions[r]};
         for (int i = 0; i < ns; ++i) {
           if (stoi_f(idx_dup, i) != stoi_f(has_read, i) || stoi_b(idx_dup, i) != stoi_b(has_read, i)) {
             all_same = false;
@@ -690,7 +690,7 @@ cfd::Reaction::Reaction(Parameter &parameter, const Species &species) {
   parameter.update_parameter("n_reac", n_reac);
 }
 
-void cfd::Reaction::set_nreac(integer nr, integer ns) {
+void cfd::Reaction::set_nreac(int nr, int ns) {
   n_reac = nr;
   label.resize(nr, 1); // By default, reactions are reversible ones.
   rev_type.resize(nr); // By default, reactions are elementary ones; 1 is used for REV type.
@@ -710,7 +710,7 @@ void cfd::Reaction::set_nreac(integer nr, integer ns) {
   troe_t2.resize(nr, 0);
 }
 
-void cfd::Reaction::read_reaction_line(std::string input, integer idx, const Species &species) {
+void cfd::Reaction::read_reaction_line(std::string input, int idx, const Species &species) {
   // First determine if the reaction is pressure dependent or needs catalyst
   // clean the equation for further use.
   // std::erase(input, ' ');
@@ -771,7 +771,7 @@ void cfd::Reaction::read_reaction_line(std::string input, integer idx, const Spe
       ++it_plus;
     }
 
-    integer stoi = 1;
+    int stoi = 1;
     std::string reactant1;
     if (isdigit(reactantString[0])) {
       stoi = std::stoi(reactantString.substr(0, 1));
@@ -785,7 +785,7 @@ void cfd::Reaction::read_reaction_line(std::string input, integer idx, const Spe
     reactantString.erase(0, reactant1.size() + 1);
   }
   //Next put the last reactant into the map.
-  integer stoi = 1;
+  int stoi = 1;
   if (isdigit(reactantString[0])) {
     stoi = std::stoi(reactantString.substr(0, 1));
     reactantString.erase(0, 1);
@@ -819,7 +819,7 @@ void cfd::Reaction::read_reaction_line(std::string input, integer idx, const Spe
   order[idx] += stoi;
 }
 
-std::string cfd::Reaction::get_auxi_info(std::ifstream &file, integer idx, const cfd::Species &species, bool &is_dup) {
+std::string cfd::Reaction::get_auxi_info(std::ifstream &file, int idx, const cfd::Species &species, bool &is_dup) {
   std::string input, key;
   while (gxl::getline(file, input, gxl::Case::upper)) {//&&input.find("=")==std::string::npos
     std::replace(input.begin(), input.end(), '/', ' ');

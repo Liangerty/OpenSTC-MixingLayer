@@ -18,7 +18,7 @@ int cfd::add_other_variable_name(std::vector<std::string> &var_name) {
   /**********************************************************************************************/
 
   auto z_iter = var_name.cbegin() + 3;
-  integer counter{0};
+  int counter{0};
   for (const auto &name: static_auxiliary_var_name) {
     var_name.insert(z_iter, name);
     ++counter;
@@ -35,7 +35,7 @@ int cfd::add_other_variable_name(std::vector<std::string> &var_name) {
 }
 
 // Next, the variables that would not change during the whole simulation, such as, wall distance.
-MPI_Offset cfd::write_static_max_min(MPI_Offset offset, const Field &field, integer ngg, MPI_File &fp) {
+MPI_Offset cfd::write_static_max_min(MPI_Offset offset, const Field &field, int ngg, MPI_File &fp) {
   if constexpr (UserDefineIO::n_static_auxiliary <= 0)
     return offset;
 
@@ -60,10 +60,10 @@ MPI_Offset cfd::write_static_max_min(MPI_Offset offset, const Field &field, inte
 
 // Next, the variables that would not change during the whole simulation, such as, wall distance.
 MPI_Offset
-cfd::write_dynamic_max_min_first_step(MPI_Offset offset, const cfd::Field &field, integer ngg, MPI_File &fp) {
+cfd::write_dynamic_max_min_first_step(MPI_Offset offset, const cfd::Field &field, int ngg, MPI_File &fp) {
   constexpr real zero{0};
   MPI_Status status;
-  for (integer l = 0; l < UserDefineIO::n_dynamic_auxiliary; ++l) {
+  for (int l = 0; l < UserDefineIO::n_dynamic_auxiliary; ++l) {
     MPI_File_write_at(fp, offset, &zero, 1, MPI_DOUBLE, &status);
     offset += 8;
     MPI_File_write_at(fp, offset, &zero, 1, MPI_DOUBLE, &status);
@@ -72,10 +72,10 @@ cfd::write_dynamic_max_min_first_step(MPI_Offset offset, const cfd::Field &field
   return offset;
 }
 
-MPI_Offset cfd::write_dynamic_max_min(MPI_Offset offset, const cfd::Field &field, integer ngg, MPI_File &fp) {
+MPI_Offset cfd::write_dynamic_max_min(MPI_Offset offset, const cfd::Field &field, int ngg, MPI_File &fp) {
   MPI_Status status;
   const auto &b = field.block;
-  for (integer l = 0; l < UserDefineIO::n_dynamic_auxiliary; ++l) {
+  for (int l = 0; l < UserDefineIO::n_dynamic_auxiliary; ++l) {
     real min_val = field.udv(-ngg, -ngg, -ngg, l);
     real max_val = field.udv(-ngg, -ngg, -ngg, l);
     for (int k = -ngg; k < b.mz + ngg; ++k) {
@@ -111,7 +111,7 @@ cfd::write_static_array(MPI_Offset offset, const Field &field, MPI_File &fp, MPI
 MPI_Offset
 cfd::write_dynamic_array(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, long long int mem_sz) {
   MPI_Status status;
-  for (integer l = 0; l < UserDefineIO::n_dynamic_auxiliary; ++l) {
+  for (int l = 0; l < UserDefineIO::n_dynamic_auxiliary; ++l) {
     MPI_File_write_at(fp, offset, field.udv[l], 1, ty, &status);
     offset += mem_sz;
   }
@@ -119,10 +119,10 @@ cfd::write_dynamic_array(MPI_Offset offset, const Field &field, MPI_File &fp, MP
   return offset;
 }
 
-void cfd::copy_auxiliary_data_from_device(cfd::Field &field, integer size) {
+void cfd::copy_auxiliary_data_from_device(cfd::Field &field, int size) {
   auto &udv = field.udv;
   auto &h_ptr = field.h_ptr;
-  for (integer l = 0; l < UserDefineIO::n_dynamic_auxiliary; ++l) {
+  for (int l = 0; l < UserDefineIO::n_dynamic_auxiliary; ++l) {
     cudaMemcpy(udv[l], h_ptr->udv[l], size * sizeof(real), cudaMemcpyDeviceToHost);
   }
 }

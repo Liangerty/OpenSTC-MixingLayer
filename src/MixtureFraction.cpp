@@ -8,10 +8,10 @@ namespace cfd {
 MixtureFraction::MixtureFraction(Inflow &fuel, Inflow &oxidizer, const Species &chem_data) :
     n_spec{chem_data.n_spec}, elem_comp{chem_data.elem_comp}, mw{chem_data.mw} {}
 
-BilgerH::BilgerH(Inflow &fuel, Inflow &oxidizer, const Species &spec, integer myid) :
+BilgerH::BilgerH(Inflow &fuel, Inflow &oxidizer, const Species &spec, int myid) :
     MixtureFraction(fuel, oxidizer, spec) {
   auto &elem_list = spec.elem_list;
-  const auto n_elem = static_cast<integer>(elem_list.size());
+  const auto n_elem = static_cast<int>(elem_list.size());
   std::vector<real> nu_fuel(n_elem, 0), xk_fuel(n_spec, 0), xk_oxidizer(n_spec, 0);
   // First, compute the fuel side H-O ratio
   for (int i = 0; i < n_spec; ++i) {
@@ -147,10 +147,10 @@ real cfd::BilgerCH::compute_mixture_fraction(std::vector<real> &yk) {
   return (beta - beta_o) / beta_diff;
 }
 
-BilgerCH::BilgerCH(Inflow &fuel, Inflow &oxidizer, const Species &spec, integer myid) :
+BilgerCH::BilgerCH(Inflow &fuel, Inflow &oxidizer, const Species &spec, int myid) :
     MixtureFraction(fuel, oxidizer, spec) {
   auto &elem_list = spec.elem_list;
-  const auto n_elem = static_cast<integer>(elem_list.size());
+  const auto n_elem = static_cast<int>(elem_list.size());
   std::vector<real> nu_fuel(n_elem, 0), xk_fuel(n_spec, 0), xk_oxidizer(n_spec, 0);
   // First, compute the fuel side C-H-O ratio
   for (int i = 0; i < n_spec; ++i) {
@@ -276,7 +276,7 @@ acquire_mixture_fraction_expression(const Species &spec, const real *fuel, const
   mw_oxidizer = 1 / mw_oxidizer;
 
   auto &elem_list = spec.elem_list;
-  const auto n_elem = static_cast<integer>(elem_list.size());
+  const auto n_elem = static_cast<int>(elem_list.size());
   std::vector<real> nu_fuel(n_elem, 0), xk_fuel(n_spec, 0), xk_oxidizer(n_spec, 0);
   // First, compute the fuel side C-H-O ratio
   const auto &elem_comp = spec.elem_comp;

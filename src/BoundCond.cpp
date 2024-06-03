@@ -8,16 +8,16 @@
 
 cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
-  label = std::get<integer>(info.at("label"));
-  if (info.find("inflow_type") != info.end()) inflow_type = std::get<integer>(info.at("inflow_type"));
+  label = std::get<int>(info.at("label"));
+  if (info.find("inflow_type") != info.end()) inflow_type = std::get<int>(info.at("inflow_type"));
   if (parameter.get_int("problem_type") == 1)
     inflow_type = 2;
   if (parameter.get_int("problem_type") == 0 && inflow_type == 2)
     inflow_type = 0;
-  if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<integer>(info.at("fluctuation_type"));
+  if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<int>(info.at("fluctuation_type"));
 
-  const integer n_scalar = parameter.get_int("n_scalar");
-  const integer n_spec{spec.n_spec};
+  const int n_scalar = parameter.get_int("n_scalar");
+  const int n_spec{spec.n_spec};
   real gamma{gamma_air};
   real c{-1};
   if (inflow_type == 2) {
@@ -178,7 +178,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       }
     }
 
-    if (const integer n_profile = parameter.get_int("n_profile"); n_profile > 0) {
+    if (const int n_profile = parameter.get_int("n_profile"); n_profile > 0) {
       // Instead of reading the profiles here, we store the info about all profiles temporarily.
       // We will read these profiles until we initialize the Profile struct.
 
@@ -224,16 +224,21 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
           parameter.update_parameter("need_rng", need_rng);
         }
       } else {
-        parameter.update_parameter("need_rng", std::vector<integer>{label});
+        parameter.update_parameter("need_rng", std::vector<int>{label});
       }
-      if (info.find("fluctuation_intensity") != info.end()) {
+      if (info.find("fluctuation_intensity") != info.end())
         fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
-      }
+      if (info.find("spanwise_wavelength") != info.end())
+        spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
     } else if (fluctuation_type == 2) {
-      if (info.find("fluctuation_frequency") != info.end()) fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
-      if (info.find("fluctuation_intensity") != info.end()) fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
-      if (info.find("streamwise_wavelength") != info.end()) streamwise_wavelength = std::get<real>(info.at("streamwise_wavelength"));
-      if (info.find("spanwise_wavelength") != info.end()) spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
+      if (info.find("fluctuation_frequency") != info.end())
+        fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
+      if (info.find("fluctuation_intensity") != info.end())
+        fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
+      if (info.find("streamwise_wavelength") != info.end())
+        streamwise_wavelength = std::get<real>(info.at("streamwise_wavelength"));
+      if (info.find("spanwise_wavelength") != info.end())
+        spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
 
       // The fluctuation is given by the profile with real and imaginary parts acquired by stability analysis.
       // Only perfect gas is supported for now.
@@ -253,10 +258,10 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
           auto fluctuation_profile_related_bc_name = parameter.get_string_array("fluctuation_profile_related_bc_name");
           fluctuation_profile_related_bc_name.push_back(inflow_name);
           parameter.update_parameter("fluctuation_profile_related_bc_name", fluctuation_profile_related_bc_name);
-          fluc_prof_idx = (int)(need_fluctuation_profile.size()) - 1;
+          fluc_prof_idx = (int) (need_fluctuation_profile.size()) - 1;
         }
       } else {
-        parameter.update_parameter("need_fluctuation_profile", std::vector<integer>{label});
+        parameter.update_parameter("need_fluctuation_profile", std::vector<int>{label});
         parameter.update_parameter("fluctuation_profile_file",
                                    std::vector<std::string>{std::get<std::string>(info.at("fluctuation_file"))});
         parameter.update_parameter("fluctuation_profile_related_bc_name", std::vector<std::string>{inflow_name});
@@ -272,7 +277,7 @@ std::tuple<real, real, real, real, real, real> cfd::Inflow::var_info() const {
 
 cfd::Inflow::Inflow(const std::string &inflow_name, const cfd::Species &spec, const cfd::Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
-  label = std::get<integer>(info.at("label"));
+  label = std::get<int>(info.at("label"));
   // In default, the mach number, pressure and temperature should be given.
   // If other combinations are given, then implement it later.
   // Currently, 2 combinations are achieved. One is to give (mach, pressure,
@@ -285,14 +290,14 @@ cfd::Inflow::Inflow(const std::string &inflow_name, const cfd::Species &spec, co
   if (info.find("u") != info.end()) u = std::get<real>(info.at("u"));
   if (info.find("v") != info.end()) v = std::get<real>(info.at("v"));
   if (info.find("w") != info.end()) w = std::get<real>(info.at("w"));
-  if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<integer>(info.at("fluctuation_type"));
+  if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<int>(info.at("fluctuation_type"));
 
-  const integer n_scalar = parameter.get_int("n_scalar");
+  const int n_scalar = parameter.get_int("n_scalar");
   sv = new real[n_scalar];
   for (int i = 0; i < n_scalar; ++i) {
     sv[i] = 0;
   }
-  const integer n_spec{spec.n_spec};
+  const int n_spec{spec.n_spec};
 
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.
@@ -372,54 +377,8 @@ cfd::Inflow::Inflow(const std::string &inflow_name, const cfd::Species &spec, co
   }
 }
 
-//cfd::Wall::Wall(integer type_label, std::ifstream &bc_file) : label(type_label) {
-//  std::map<std::string, std::string> opt;
-//  std::map<std::string, double> par;
-//  std::string input{}, key{}, name{};
-//  double val{};
-//  std::istringstream line(input);
-//  while (gxl::getline_to_stream(bc_file, input, line, gxl::Case::lower)) {
-//    line >> key;
-//    if (key == "double") {
-//      line >> name >> key >> val;
-//      par.emplace(std::make_pair(name, val));
-//    } else if (key == "option") {
-//      line >> name >> key >> key;
-//      opt.emplace(std::make_pair(name, key));
-//    }
-//    if (key == "label" || key == "end") {
-//      break;
-//    }
-//  }
-//  if (opt.contains("thermal_type")) {
-//    if (opt["thermal_type"] == "isothermal")
-//      thermal_type = ThermalType::isothermal;
-//    else if (opt["thermal_type"] == "adiabatic")
-//      thermal_type = ThermalType::adiabatic;
-//    else if (opt["thermal_type"] == "equilibrium_radiation")
-//      thermal_type = ThermalType::equilibrium_radiation;
-//    else {
-//      printf("Unknown thermal type, isothermal is set as default.\n");
-//      thermal_type = ThermalType::isothermal;
-//    }
-//  }
-//  if (thermal_type == ThermalType::isothermal) {
-//    if (par.contains("temperature")) {
-//      temperature = par["temperature"];
-//    } else {
-//      printf("Isothermal wall does not specify wall temperature, is set as 300K in default.\n");
-//    }
-//  } else if (thermal_type == ThermalType::equilibrium_radiation) {
-//    if (par.contains("emissivity")) {
-//      emissivity = par["emissivity"];
-//    } else {
-//      printf("Equilibrium radiation wall does not specify emissivity, is set as 0.8 in default.\n");
-//    }
-//  }
-//}
-
-cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, integer, real>> &info, cfd::Parameter &parameter)
-    : label(std::get<integer>(info.at("label"))) {
+cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, int, real>> &info, cfd::Parameter &parameter)
+    : label(std::get<int>(info.at("label"))) {
   if (info.contains("thermal_type")) {
     if (std::get<std::string>(info.at("thermal_type")) == "isothermal")
       thermal_type = ThermalType::isothermal;
@@ -447,21 +406,37 @@ cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, integer, r
     temperature = parameter.get_real("T_inf");
     parameter.update_parameter("if_compute_wall_distance", 1);
   }
+  if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<int>(info.at("fluctuation_type"));
+  if (fluctuation_type == 3){
+    if (info.find("fluctuation_frequency") != info.end())
+      fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
+    if (info.find("fluctuation_intensity") != info.end())
+      fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
+    if (info.find("streamwise_wavelength") != info.end())
+      streamwise_wavelength = std::get<real>(info.at("streamwise_wavelength"));
+    if (info.find("spanwise_wavelength") != info.end())
+      spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
+    if (info.find("fluctuation_x0") != info.end())
+      fluctuation_x0 = std::get<real>(info.at("fluctuation_x0"));
+    if (info.find("fluctuation_x1") != info.end())
+      fluctuation_x1 = std::get<real>(info.at("fluctuation_x1"));
+  }
+  
 }
 
 cfd::Symmetry::Symmetry(const std::string &inflow_name, cfd::Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
-  label = std::get<integer>(info.at("label"));
+  label = std::get<int>(info.at("label"));
 }
 
 cfd::Outflow::Outflow(const std::string &inflow_name, cfd::Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
-  label = std::get<integer>(info.at("label"));
+  label = std::get<int>(info.at("label"));
 }
 
 cfd::FarField::FarField(cfd::Species &spec, cfd::Parameter &parameter) {
   auto &info = parameter.get_struct("farfield");
-  label = std::get<integer>(info.at("label"));
+  label = std::get<int>(info.at("label"));
 
   // In default, the mach number, pressure and temperature should be given.
   // If other combinations are given, then implement it later.
@@ -479,12 +454,12 @@ cfd::FarField::FarField(cfd::Species &spec, cfd::Parameter &parameter) {
   if (info.find("w") != info.end()) w = std::get<real>(info.at("w"));
   if (info.find("reynolds_number") != info.end()) reynolds_number = std::get<real>(info.at("reynolds_number"));
 
-  const integer n_scalar = parameter.get_int("n_scalar");
+  const int n_scalar = parameter.get_int("n_scalar");
   sv = new real[n_scalar];
   for (int i = 0; i < n_scalar; ++i) {
     sv[i] = 0;
   }
-  const integer n_spec{spec.n_spec};
+  const int n_spec{spec.n_spec};
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.
     // Should be done after knowing the order of species.
@@ -578,14 +553,14 @@ cfd::FarField::FarField(cfd::Species &spec, cfd::Parameter &parameter) {
 }
 
 cfd::SubsonicInflow::SubsonicInflow(const std::string &inflow_name, cfd::Parameter &parameter) {
-  const integer n_spec{parameter.get_int("n_spec")};
+  const int n_spec{parameter.get_int("n_spec")};
   if (n_spec > 0) {
     printf("Subsonic inflow boundary condition does not support multi-species simulation.\n");
     MpiParallel::exit();
   }
 
   auto &info = parameter.get_struct(inflow_name);
-  label = std::get<integer>(info.at("label"));
+  label = std::get<int>(info.at("label"));
 
   const real pt_pRef{std::get<real>(info.at("pt_pRef_ratio"))};
   const real Tt_TRef{std::get<real>(info.at("Tt_TRef_ratio"))};
@@ -595,7 +570,7 @@ cfd::SubsonicInflow::SubsonicInflow(const std::string &inflow_name, cfd::Paramet
   if (info.find("v") != info.end()) v = std::get<real>(info.at("v"));
   if (info.find("w") != info.end()) w = std::get<real>(info.at("w"));
 
-  const integer n_scalar = parameter.get_int("n_scalar");
+  const int n_scalar = parameter.get_int("n_scalar");
   sv = new real[n_scalar];
   for (int i = 0; i < n_scalar; ++i) {
     sv[i] = 0;
@@ -623,14 +598,14 @@ cfd::SubsonicInflow::SubsonicInflow(const std::string &inflow_name, cfd::Paramet
 }
 
 cfd::BackPressure::BackPressure(const std::string &name, cfd::Parameter &parameter) {
-  const integer n_spec{parameter.get_int("n_spec")};
+  const int n_spec{parameter.get_int("n_spec")};
   if (n_spec > 0) {
     printf("Back pressure boundary condition does not support multi-species simulation.\n");
     MpiParallel::exit();
   }
 
   auto &info = parameter.get_struct(name);
-  label = std::get<integer>(info.at("label"));
+  label = std::get<int>(info.at("label"));
 
   if (info.find("pressure") != info.end()) pressure = std::get<real>(info.at("pressure"));
   if (pressure < 0) {
@@ -645,5 +620,5 @@ cfd::BackPressure::BackPressure(const std::string &name, cfd::Parameter &paramet
 
 cfd::Periodic::Periodic(const std::string &name, cfd::Parameter &parameter) {
   auto &info = parameter.get_struct(name);
-  label = std::get<integer>(info.at("label"));
+  label = std::get<int>(info.at("label"));
 }

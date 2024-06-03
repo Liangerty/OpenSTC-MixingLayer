@@ -13,15 +13,15 @@ struct DZone;
 
 template<MixtureModel mixture_model, class turb_method>
 __global__ void compute_DQ_0(DZone *zone, const DParameter *param, real diag_factor = 0) {
-  const integer extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  const int extent[3]{zone->mx, zone->my, zone->mz};
+  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   const real dt_local = zone->dt_local(i, j, k);
   auto &dq = zone->dq;
-  for (integer l = 0; l < param->n_var; ++l) {
+  for (int l = 0; l < param->n_var; ++l) {
     dq(i, j, k, l) *= dt_local;
   }
 
@@ -31,14 +31,14 @@ __global__ void compute_DQ_0(DZone *zone, const DParameter *param, real diag_fac
 //  if (param->viscous_scheme > 0)
 //    diag += 2 * dt_local *
 //            (zone->visc_spectr_rad(i, j, k)[0] + zone->visc_spectr_rad(i, j, k)[1] + zone->visc_spectr_rad(i, j, k)[2]);
-  const integer n_spec{param->n_spec};
+  const int n_spec{param->n_spec};
   if constexpr (mixture_model == MixtureModel::Air || mixture_model == MixtureModel::Mixture) {
-    for (integer l = 0; l < 5 + n_spec; ++l) {
+    for (int l = 0; l < 5 + n_spec; ++l) {
       dq(i, j, k, l) /= diag;
     }
   } else if constexpr (mixture_model == MixtureModel::FR) {
     // Use point implicit method to treat the chemical source
-    for (integer l = 0; l < 5; ++l) {
+    for (int l = 0; l < 5; ++l) {
       dq(i, j, k, l) /= diag;
     }
     // Point implicit
@@ -53,23 +53,23 @@ __global__ void compute_DQ_0(DZone *zone, const DParameter *param, real diag_fac
         break;
       case 0: // explicit treat
       default:
-        for (integer l = 0; l < n_spec; ++l) {
+        for (int l = 0; l < n_spec; ++l) {
           dq(i, j, k, l + 5) /= diag;
         }
         break;
     }
   } else if constexpr (mixture_model == MixtureModel::FL) {
-    for (integer l = 0; l < 5; ++l) {
+    for (int l = 0; l < 5; ++l) {
       dq(i, j, k, l) /= diag;
     }
-    for (integer l = param->i_fl_cv; l < param->n_var; ++l) {
+    for (int l = param->i_fl_cv; l < param->n_var; ++l) {
       dq(i, j, k, l) /= diag;
     }
   } else if constexpr (mixture_model == MixtureModel::MixtureFraction) {
-    for (integer l = 0; l < 5 + n_spec; ++l) {
+    for (int l = 0; l < 5 + n_spec; ++l) {
       dq(i, j, k, l) /= diag;
     }
-    for (integer l = param->i_fl_cv; l < param->n_var; ++l) {
+    for (int l = param->i_fl_cv; l < param->n_var; ++l) {
       dq(i, j, k, l) /= diag;
     }
   }
@@ -89,8 +89,8 @@ __global__ void compute_DQ_0(DZone *zone, const DParameter *param, real diag_fac
 
 template<MixtureModel mixture_model>
 __device__ void
-compute_jacobian_times_dq(const DParameter *param, DZone *zone, const integer i, const integer j, const integer k,
-                          const integer dir, real pm_spectral_radius, real *convJacTimesDq) {
+compute_jacobian_times_dq(const DParameter *param, DZone *zone, int i, int j, int k, int dir, real pm_spectral_radius,
+                          real *convJacTimesDq) {
   const auto &m = zone->metric(i, j, k);
   const auto xi_x{m(dir + 1, 1)}, xi_y{m(dir + 1, 2)}, xi_z{m(dir + 1, 3)};
 
@@ -140,7 +140,7 @@ compute_jacobian_times_dq(const DParameter *param, DZone *zone, const integer i,
   convJacTimesDq[3] = w * b1 + xi_z * b2 + lmd1 * dq(i, j, k, 3) + xi_z * (b3 - b4);
   convJacTimesDq[4] = h * b1 + U * b2 + lmd1 * dq(i, j, k, 4) + U * (b3 - b4);
 
-  for (integer l = 0; l < param->n_scalar_transported; ++l) {
+  for (int l = 0; l < param->n_scalar_transported; ++l) {
     if constexpr (mixture_model != MixtureModel::FL) {
       convJacTimesDq[5 + l] = lmd1 * dq(i, j, k, 5 + l) + sv(i, j, k, l) * b1;
     } else {
@@ -156,25 +156,25 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
   // E.g., i=2 needs ii=1 and ii=3, while i=4 needs ii=3 and ii=5, thus the ii=3 is recomputed.
   // If we use a kernel in i direction, with each thread computing an ii, for ii=-1~blockDim,
   // then all threads in the block except threadID=0 and blockDim, can use the just computed convJacTimesDq.
-  const integer extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  const int extent[3]{zone->mx, zone->my, zone->mz};
+  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
-  constexpr integer n_var_max = 5 + MAX_SPEC_NUMBER + 4; // 5+n_spec+n_turb(n_turb<=2)
+  constexpr int n_var_max = 5 + MAX_SPEC_NUMBER + 4; // 5+n_spec+n_turb(n_turb<=2)
   real convJacTimesDq[n_var_max], dq_total[n_var_max];
   memset(dq_total, 0, n_var_max * sizeof(real));
 
-  const integer n_var{param->n_var};
+  const int n_var{param->n_var};
   const auto &inviscid_spectral_radius = zone->inv_spectr_rad;
 //  const auto &viscous_spectral_radius = zone->visc_spectr_rad;
-  integer ii{i - 1}, jj{j - 1}, kk{k - 1};
+  int ii{i - 1}, jj{j - 1}, kk{k - 1};
   if (i > 0) {
     compute_jacobian_times_dq<mixture_model>(param, zone, ii, j, k, 0, inviscid_spectral_radius(ii, j, k)[0]
 //                                                                       + 2 * viscous_spectral_radius(ii, j, k)[0]
         , convJacTimesDq);
-    for (integer l = 0; l < n_var; ++l) {
+    for (int l = 0; l < n_var; ++l) {
       dq_total[l] += 0.5 * convJacTimesDq[l];
     }
   }
@@ -182,7 +182,7 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
     compute_jacobian_times_dq<mixture_model>(param, zone, i, jj, k, 1, inviscid_spectral_radius(i, jj, k)[1]
 //                                                 + 2 * viscous_spectral_radius(i, jj, k)[1]
         , convJacTimesDq);
-    for (integer l = 0; l < n_var; ++l) {
+    for (int l = 0; l < n_var; ++l) {
       dq_total[l] += 0.5 * convJacTimesDq[l];
     }
   }
@@ -190,7 +190,7 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
     compute_jacobian_times_dq<mixture_model>(param, zone, i, j, kk, 2, inviscid_spectral_radius(i, j, kk)[2]
 //                                                 +2 * viscous_spectral_radius(i, j, kk)[2]
         , convJacTimesDq);
-    for (integer l = 0; l < n_var; ++l) {
+    for (int l = 0; l < n_var; ++l) {
       dq_total[l] += 0.5 * convJacTimesDq[l];
     }
   }
@@ -199,8 +199,8 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
     ii = i + 1;
     compute_jacobian_times_dq<mixture_model>(param, zone, ii, j, k, 0, -inviscid_spectral_radius(ii, j, k)[0]
 //                                                 -2 * viscous_spectral_radius(ii, j, k)[0]
-        ,convJacTimesDq);
-    for (integer l = 0; l < n_var; ++l) {
+        , convJacTimesDq);
+    for (int l = 0; l < n_var; ++l) {
       dq_total[l] -= 0.5 * convJacTimesDq[l];
     }
   }
@@ -208,8 +208,8 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
     jj = j + 1;
     compute_jacobian_times_dq<mixture_model>(param, zone, i, jj, k, 1, -inviscid_spectral_radius(i, jj, k)[1]
 //                                                 -2 * viscous_spectral_radius(i, jj, k)[1]
-        ,convJacTimesDq);
-    for (integer l = 0; l < n_var; ++l) {
+        , convJacTimesDq);
+    for (int l = 0; l < n_var; ++l) {
       dq_total[l] -= 0.5 * convJacTimesDq[l];
     }
   }
@@ -217,8 +217,8 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
     kk = k + 1;
     compute_jacobian_times_dq<mixture_model>(param, zone, i, j, kk, 2, -inviscid_spectral_radius(i, j, kk)[2]
 //                                                 -2 * viscous_spectral_radius(i, j, kk)[2]
-        ,convJacTimesDq);
-    for (integer l = 0; l < n_var; ++l) {
+        , convJacTimesDq);
+    for (int l = 0; l < n_var; ++l) {
       dq_total[l] -= 0.5 * convJacTimesDq[l];
     }
   }
@@ -230,15 +230,15 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
 //                                zone->visc_spectr_rad(i, j, k)[2]);
   auto &dqk = zone->dqk;
   const auto &dq0 = zone->dq0;
-  const integer n_spec{param->n_spec};
+  const int n_spec{param->n_spec};
   if constexpr (mixture_model == MixtureModel::Air || mixture_model == MixtureModel::Mixture) {
-    for (integer l = 0; l < 5 + n_spec; ++l) {
+    for (int l = 0; l < 5 + n_spec; ++l) {
       dqk(i, j, k, l) = dq0(i, j, k, l) + dt_local * dq_total[l] / diag;
     }
   } else if constexpr (mixture_model == MixtureModel::FR) {
     // Use point implicit method to dispose chemical source
 #pragma unroll
-    for (integer l = 0; l < 5; ++l) {
+    for (int l = 0; l < 5; ++l) {
       dqk(i, j, k, l) = dq0(i, j, k, l) + dt_local * dq_total[l] / diag;
     }
     // Point implicit
@@ -254,7 +254,7 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
         break;
       case 0: // explicit treat
       default:
-        for (integer l = 0; l < n_spec; ++l) {
+        for (int l = 0; l < n_spec; ++l) {
           dqk(i, j, k, 5 + l) = dq0(i, j, k, 5 + l) + dt_local * dq_total[5 + l] / diag;
         }
         break;
@@ -262,14 +262,14 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
   } else if constexpr (mixture_model == MixtureModel::FL) {
     // For flamelet model
 #pragma unroll
-    for (integer l = 0; l < 5; ++l) {
+    for (int l = 0; l < 5; ++l) {
       dqk(i, j, k, l) = dq0(i, j, k, l) + dt_local * dq_total[l] / diag;
     }
     const auto i_fl_cv{param->i_fl_cv};
     dqk(i, j, k, i_fl_cv) = dq0(i, j, k, i_fl_cv) + dt_local * dq_total[i_fl_cv] / diag;
     dqk(i, j, k, i_fl_cv + 1) = dq0(i, j, k, i_fl_cv + 1) + dt_local * dq_total[i_fl_cv + 1] / diag;
   } else if constexpr (mixture_model == MixtureModel::MixtureFraction) {
-    for (integer l = 0; l < 5 + n_spec; ++l) {
+    for (int l = 0; l < 5 + n_spec; ++l) {
       dqk(i, j, k, l) = dq0(i, j, k, l) + dt_local * dq_total[l] / diag;
     }
     const auto i_fl_cv{param->i_fl_cv};
@@ -300,8 +300,8 @@ void set_wall_dq_to_0(const Block &block, const DParameter *param, DZone *zone, 
 template<MixtureModel mixture_model, class turb_method>
 void DPLUR(const Block &block, const DParameter *param, DZone *d_ptr, DZone *h_ptr, const Parameter &parameter,
            DBoundCond &bound_cond, real diag_factor = 0) {
-  const integer extent[3]{block.mx, block.my, block.mz};
-  const integer dim{extent[2] == 1 ? 2 : 3};
+  const int extent[3]{block.mx, block.my, block.mz};
+  const int dim{extent[2] == 1 ? 2 : 3};
   dim3 tpb{8, 8, 4};
   if (dim == 2) {
     tpb = {16, 16, 1};
@@ -315,7 +315,7 @@ void DPLUR(const Block &block, const DParameter *param, DZone *d_ptr, DZone *h_p
   const auto mem_sz = h_ptr->dq.size() * parameter.get_int("n_var") * sizeof(real);
   cudaMemcpy(h_ptr->dq0.data(), h_ptr->dq.data(), mem_sz, cudaMemcpyDeviceToDevice);
 
-  for (integer iter = 0; iter < parameter.get_int("DPLUR_inner_step"); ++iter) {
+  for (int iter = 0; iter < parameter.get_int("DPLUR_inner_step"); ++iter) {
     set_wall_dq_to_0(block, param, d_ptr, bound_cond);
 
     DPLUR_inner_iteration<mixture_model, turb_method><<<bpg, tpb>>>(param, d_ptr, diag_factor);

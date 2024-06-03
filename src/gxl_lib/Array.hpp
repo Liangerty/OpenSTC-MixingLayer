@@ -208,7 +208,7 @@ public:
     return val[j * disp1 + i + dispt + l * sz];
   }
 
-  __device__ const T &operator()(const int i, const int j, const int k, const int l) const {
+  __device__ const T &operator()(const int i, const int j, const int l) const {
     return val[j * disp1 + i + dispt + l * sz];
   }
 
@@ -239,7 +239,7 @@ inline cudaError_t VectorField2D<T>::allocate_memory(int dim1, int dim2, int dim
   // Column major
   disp1 = n1 + 2 * ng;
   dispt = (disp1 + 1) * ng;
-  sz = (n1 + 2 * ng) * (n2 + 2 * ng) * (n3 + 2 * ng);
+  sz = (n1 + 2 * ng) * (n2 + 2 * ng);
   cudaError_t err = cudaMalloc(&val, sz * n3 * sizeof(T));
   return err;
 }
@@ -260,7 +260,7 @@ public:
     return val[j * disp1 + i + dispt + l * sz];
   }
 
-  const T &operator()(const int i, const int j, const int k, const int l) const {
+  const T &operator()(const int i, const int j, const int l) const {
     return val[j * disp1 + i + dispt + l * sz];
   }
 
@@ -291,7 +291,7 @@ inline cudaError_t VectorField2DHost<T>::allocate_memory(int dim1, int dim2, int
   // Column major
   disp1 = n1 + 2 * ng;
   dispt = (disp1 + 1) * ng;
-  sz = (n1 + 2 * ng) * (n2 + 2 * ng) * (n3 + 2 * ng);
+  sz = (n1 + 2 * ng) * (n2 + 2 * ng);
   if (val != nullptr)
     cudaFreeHost(val);
   cudaError_t err = cudaHostAlloc(&val, sz * n3 * sizeof(T), cudaHostAllocDefault);

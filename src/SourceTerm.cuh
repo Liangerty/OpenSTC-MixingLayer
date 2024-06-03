@@ -10,10 +10,10 @@
 namespace cfd {
 template<MixtureModel mix_model, class turb_method>
 __global__ void compute_source(cfd::DZone *zone, DParameter *param) {
-  const integer extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+  const int extent[3]{zone->mx, zone->my, zone->mz};
+  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   if constexpr (TurbMethod<turb_method>::hasMut) {

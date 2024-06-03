@@ -11,16 +11,16 @@ namespace cfd {
 struct DParameter;
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_fv_2nd_order(const integer idx[3], DZone *zone, real *fv, DParameter *param);
+__device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DParameter *param);
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_gv_2nd_order(const integer idx[3], DZone *zone, real *fv, DParameter *param);
+__device__ void compute_gv_2nd_order(const int idx[3], DZone *zone, real *fv, DParameter *param);
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_hv_2nd_order(const integer idx[3], DZone *zone, real *fv, DParameter *param);
+__device__ void compute_hv_2nd_order(const int idx[3], DZone *zone, real *fv, DParameter *param);
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_fv_2nd_order(const integer idx[3], DZone *zone, real *fv, DParameter *param) {
+__device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DParameter *param) {
   const auto i = idx[0], j = idx[1], k = idx[2];
   const auto &m = zone->metric(i, j, k);
   const auto &m1 = zone->metric(i + 1, j, k);
@@ -119,7 +119,7 @@ __device__ void compute_fv_2nd_order(const integer idx[3], DZone *zone, real *fv
     // Here, we only consider the influence of species diffusion.
     // That is, if we are solving mixture or finite rate, this part will compute the viscous term of species eqns and energy eqn.
     // If we are solving flamelet model, this part only contribute to the energy eqn.
-    const integer n_spec{param->n_spec};
+    const int n_spec{param->n_spec};
     const auto &y = zone->sv;
 
     real turb_diffusivity{0};
@@ -198,7 +198,7 @@ __device__ void compute_fv_2nd_order(const integer idx[3], DZone *zone, real *fv
   }
 
   if constexpr (TurbMethod<turb_method>::label == TurbMethodLabel::SST) {
-    const integer it = param->n_spec;
+    const int it = param->n_spec;
     auto &sv = zone->sv;
 
     const real k_xi = sv(i + 1, j, k, it) - sv(i, j, k, it);
@@ -244,7 +244,7 @@ __device__ void compute_fv_2nd_order(const integer idx[3], DZone *zone, real *fv
     const real sigma_k = sst::sigma_k2 + sst::delta_sigma_k * f1;
     const real sigma_omega = sst::sigma_omega2 + sst::delta_sigma_omega * f1;
 
-    const integer i_turb_cv{param->i_turb_cv};
+    const int i_turb_cv{param->i_turb_cv};
     fv[i_turb_cv] = (mul + mut * sigma_k) * (xi_x_div_jac * k_x + xi_y_div_jac * k_y + xi_z_div_jac * k_z);
     fv[i_turb_cv + 1] =
         (mul + mut * sigma_omega) * (xi_x_div_jac * omega_x + xi_y_div_jac * omega_y + xi_z_div_jac * omega_z);
@@ -252,7 +252,7 @@ __device__ void compute_fv_2nd_order(const integer idx[3], DZone *zone, real *fv
 
   if constexpr (mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) {
     // For flamelet model, we need to compute the viscous term for the mixture fraction and also its variance.
-    const integer i_fl{param->i_fl}, i_fl_cv{param->i_fl_cv};
+    const int i_fl{param->i_fl}, i_fl_cv{param->i_fl_cv};
     const auto &sv = zone->sv;
 
     // First, compute the mixture fraction gradient
@@ -288,7 +288,7 @@ __device__ void compute_fv_2nd_order(const integer idx[3], DZone *zone, real *fv
 }
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_gv_2nd_order(const integer *idx, DZone *zone, real *gv, cfd::DParameter *param) {
+__device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, cfd::DParameter *param) {
   const auto i = idx[0], j = idx[1], k = idx[2];
   const auto &m = zone->metric(i, j, k);
   const auto &m1 = zone->metric(i, j + 1, k);
@@ -388,7 +388,7 @@ __device__ void compute_gv_2nd_order(const integer *idx, DZone *zone, real *gv, 
     // Here, we only consider the influence of species diffusion.
     // That is, if we are solving mixture or finite rate, this part will compute the viscous term of species eqns and energy eqn.
     // If we are solving flamelet model, this part only contribute to the energy eqn.
-    const integer n_spec{param->n_spec};
+    const int n_spec{param->n_spec};
     const auto &y = zone->sv;
 
     real turb_diffusivity{0};
@@ -467,7 +467,7 @@ __device__ void compute_gv_2nd_order(const integer *idx, DZone *zone, real *gv, 
   }
 
   if constexpr (TurbMethod<turb_method>::label == TurbMethodLabel::SST) {
-    const integer it = param->n_spec;
+    const int it = param->n_spec;
     auto &sv = zone->sv;
 
     const real k_xi =
@@ -513,7 +513,7 @@ __device__ void compute_gv_2nd_order(const integer *idx, DZone *zone, real *gv, 
     const real sigma_k = sst::sigma_k2 + sst::delta_sigma_k * f1;
     const real sigma_omega = sst::sigma_omega2 + sst::delta_sigma_omega * f1;
 
-    const integer i_turb_cv{param->i_turb_cv};
+    const int i_turb_cv{param->i_turb_cv};
     gv[i_turb_cv] = (mul + mut * sigma_k) * (eta_x_div_jac * k_x + eta_y_div_jac * k_y + eta_z_div_jac * k_z);
     gv[i_turb_cv + 1] =
         (mul + mut * sigma_omega) * (eta_x_div_jac * omega_x + eta_y_div_jac * omega_y + eta_z_div_jac * omega_z);
@@ -521,7 +521,7 @@ __device__ void compute_gv_2nd_order(const integer *idx, DZone *zone, real *gv, 
 
   if constexpr (mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) {
     // For flamelet model, we need to compute the viscous term for the mixture fraction and also its variance.
-    const integer i_fl{param->i_fl}, i_fl_cv{param->i_fl_cv};
+    const int i_fl{param->i_fl}, i_fl_cv{param->i_fl_cv};
     const auto &sv = zone->sv;
 
     // First, compute the mixture fraction gradient
@@ -557,7 +557,7 @@ __device__ void compute_gv_2nd_order(const integer *idx, DZone *zone, real *gv, 
 }
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_hv_2nd_order(const integer *idx, DZone *zone, real *hv, cfd::DParameter *param) {
+__device__ void compute_hv_2nd_order(const int *idx, DZone *zone, real *hv, cfd::DParameter *param) {
   const auto i = idx[0], j = idx[1], k = idx[2];
   const auto &m = zone->metric(i, j, k);
   const auto &m1 = zone->metric(i, j, k + 1);
@@ -653,7 +653,7 @@ __device__ void compute_hv_2nd_order(const integer *idx, DZone *zone, real *hv, 
     // Here, we only consider the influence of species diffusion.
     // That is, if we are solving mixture or finite rate, this part will compute the viscous term of species eqns and energy eqn.
     // If we are solving flamelet model, this part only contribute to the energy eqn.
-    const integer n_spec{param->n_spec};
+    const int n_spec{param->n_spec};
     const auto &y = zone->sv;
 
     real turb_diffusivity{0};
@@ -732,7 +732,7 @@ __device__ void compute_hv_2nd_order(const integer *idx, DZone *zone, real *hv, 
   }
 
   if constexpr (TurbMethod<turb_method>::label == TurbMethodLabel::SST) {
-    const integer it = param->n_spec;
+    const int it = param->n_spec;
     auto &sv = zone->sv;
     const real k_xi =
         0.25 * (sv(i + 1, j, k, it) - sv(i - 1, j, k, it) + sv(i + 1, j, k + 1, it) - sv(i - 1, j, k + 1, it));
@@ -776,7 +776,7 @@ __device__ void compute_hv_2nd_order(const integer *idx, DZone *zone, real *hv, 
     const real sigma_k = sst::sigma_k2 + sst::delta_sigma_k * f1;
     const real sigma_omega = sst::sigma_omega2 + sst::delta_sigma_omega * f1;
 
-    const integer i_turb_cv{param->i_turb_cv};
+    const int i_turb_cv{param->i_turb_cv};
     hv[i_turb_cv] = (mul + mut * sigma_k) * (zeta_x_div_jac * k_x + zeta_y_div_jac * k_y + zeta_z_div_jac * k_z);
     hv[i_turb_cv + 1] =
         (mul + mut * sigma_omega) *
@@ -785,7 +785,7 @@ __device__ void compute_hv_2nd_order(const integer *idx, DZone *zone, real *hv, 
 
   if constexpr (mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) {
     // For flamelet model, we need to compute the viscous term for the mixture fraction and also its variance.
-    const integer i_fl{param->i_fl}, i_fl_cv{param->i_fl_cv};
+    const int i_fl{param->i_fl}, i_fl_cv{param->i_fl_cv};
     const auto &sv = zone->sv;
 
     // First, compute the mixture fraction gradient

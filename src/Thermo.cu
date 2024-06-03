@@ -28,7 +28,7 @@ __device__ void cfd::compute_enthalpy(real t, real *enthalpy, const cfd::DParame
           coeff(0, j, i) + coeff(1, j, i) * tt + coeff(2, j, i) * tt2 + coeff(3, j, i) * tt3 + coeff(4, j, i) * tt4;
       enthalpy[i] += cp * (t - tt); // Do a linear interpolation for enthalpy
     } else {
-      for (integer j = 0; j < param->n_temperature_range[i]; ++j) {
+      for (int j = 0; j < param->n_temperature_range[i]; ++j) {
         if (param->temperature_cuts(i, j) <= t && t <= param->temperature_cuts(i, j + 1)) {
           enthalpy[i] =
               coeff(0, j, i) * t + 0.5 * coeff(1, j, i) * t2 + coeff(2, j, i) * t3 / 3 + 0.25 * coeff(3, j, i) * t4 +
@@ -63,7 +63,7 @@ __device__ void cfd::compute_enthalpy_and_cp(real t, real *enthalpy, real *cp, c
       cp[i] = coeff(0, j, i) + coeff(1, j, i) * tt + coeff(2, j, i) * tt2 + coeff(3, j, i) * tt3 + coeff(4, j, i) * tt4;
       enthalpy[i] += cp[i] * (t - tt); // Do a linear interpolation for enthalpy
     } else {
-      for (integer j = 0; j < param->n_temperature_range[i]; ++j) {
+      for (int j = 0; j < param->n_temperature_range[i]; ++j) {
         if (param->temperature_cuts(i, j) <= t && t <= param->temperature_cuts(i, j + 1)) {
           enthalpy[i] =
               coeff(0, j, i) * t + 0.5 * coeff(1, j, i) * t2 + coeff(2, j, i) * t3 / 3 + 0.25 * coeff(3, j, i) * t4 +
@@ -92,7 +92,7 @@ __device__ void cfd::compute_cp(real t, real *cp, cfd::DParameter *param) {
       const auto j = param->n_temperature_range[i] - 1;
       cp[i] = coeff(0, j, i) + coeff(1, j, i) * tt + coeff(2, j, i) * tt2 + coeff(3, j, i) * tt3 + coeff(4, j, i) * tt4;
     } else {
-      for (integer j = 0; j < param->n_temperature_range[i]; ++j) {
+      for (int j = 0; j < param->n_temperature_range[i]; ++j) {
         if (param->temperature_cuts(i, j) <= t && t <= param->temperature_cuts(i, j + 1)) {
           cp[i] = coeff(0, j, i) + coeff(1, j, i) * t + coeff(2, j, i) * t2 + coeff(3, j, i) * t3 + coeff(4, j, i) * t4;
           break;
@@ -121,7 +121,7 @@ __device__ void cfd::compute_gibbs_div_rt(real t, const cfd::DParameter *param, 
                     coeff(3, j, i) * tt3 / 12.0 - coeff(4, j, i) * tt4 * 0.05 + coeff(5, j, i) * tt_inv -
                     coeff(6, j, i);
     } else {
-      for (integer j = 0; j < param->n_temperature_range[i]; ++j) {
+      for (int j = 0; j < param->n_temperature_range[i]; ++j) {
         if (param->temperature_cuts(i, j) <= t && t <= param->temperature_cuts(i, j + 1)) {
           gibbs_rt[i] = coeff(0, j, i) * (1.0 - log_t) - 0.5 * coeff(1, j, i) * t - coeff(2, j, i) * t2 / 6.0 -
                         coeff(3, j, i) * t3 / 12.0 - coeff(4, j, i) * t4 * 0.05 + coeff(5, j, i) * t_inv -

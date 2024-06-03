@@ -7,14 +7,14 @@ namespace cfd {
 
 template<MixtureModel mix_model>
 __device__ void
-AWENO_interpolation(const real *pv, real *pv_l, real *pv_r, integer idx_shared, integer n_var, const real *metric,
+AWENO_interpolation(const real *pv, real *pv_l, real *pv_r, int idx_shared, int n_var, const real *metric,
                     DParameter *param) {
   // For mixture, this is not implemented.
 }
 
 template<>
 __device__ void
-AWENO_interpolation<MixtureModel::Air>(const real *cv, real *pv_l, real *pv_r, integer idx_shared, integer n_var,
+AWENO_interpolation<MixtureModel::Air>(const real *cv, real *pv_l, real *pv_r, int idx_shared, int n_var,
                                        const real *metric, DParameter *param) {
   // The first n_var in the cv array is conservative vars, followed by p and T.
   const real *cvl{&cv[idx_shared * (n_var + 2)]};
@@ -83,7 +83,7 @@ AWENO_interpolation<MixtureModel::Air>(const real *cv, real *pv_l, real *pv_r, i
   memset(v_minus, 0, 5 * sizeof(real));
   if (param->reconstruction == 4) {
     // WENO 5
-    for (integer l = 0; l < 5; ++l) {
+    for (int l = 0; l < 5; ++l) {
       // We reconstruct each characteristic variable to reduce the memory to be used.
       // WENO5(L.data(), cv, n_var, idx_shared, l);
       auto v2 = WENO5(LR.data(), cv, 5, idx_shared, l);
@@ -92,7 +92,7 @@ AWENO_interpolation<MixtureModel::Air>(const real *cv, real *pv_l, real *pv_r, i
     }
   } else if (param->reconstruction == 5) {
     // WENO 7
-    for (integer l = 0; l < 5; ++l) {
+    for (int l = 0; l < 5; ++l) {
       // We reconstruct each characteristic variable to reduce the memory to be used.
       // WENO5(L.data(), cv, n_var, idx_shared, l);
       auto v2 = WENO7(LR.data(), cv, 5, idx_shared, l);
@@ -130,10 +130,10 @@ AWENO_interpolation<MixtureModel::Air>(const real *cv, real *pv_l, real *pv_r, i
 
   // Project the "v+" and "v-" back to physical space
   real ql[5], qr[5];
-  for (integer m = 0; m < 5; ++m) {
+  for (int m = 0; m < 5; ++m) {
     ql[m] = 0;
     qr[m] = 0;
-    for (integer n = 0; n < 5; ++n) {
+    for (int n = 0; n < 5; ++n) {
       ql[m] += LR(m, n) * v_minus[n];
       qr[m] += LR(m, n) * v_plus[n];
     }
@@ -155,17 +155,17 @@ AWENO_interpolation<MixtureModel::Air>(const real *cv, real *pv_l, real *pv_r, i
   pv_r[n_var] = qr[4];
 }
 
-__device__ double2 WENO5(const real *L, const real *cv, integer n_var, integer i_shared, integer l_row) {
+__device__ double2 WENO5(const real *L, const real *cv, int n_var, int i_shared, int l_row) {
   // The indices for them are i-2 to i+3.
   // 0 - i-2, 1 - i-1, 2 - i, 3 - i+1, 4 - i+2, 5 - i+3
 
   // Project to characteristic space
   real v[6];
   memset(v, 0, 6 * sizeof(real));
-  for (integer i = -2; i < 4; ++i) {
-    const integer idx{i_shared + i};
+  for (int i = -2; i < 4; ++i) {
+    const int idx{i_shared + i};
     const real *U{&cv[idx * (n_var + 2)]};
-    for (integer j = 0; j < n_var; ++j) {
+    for (int j = 0; j < n_var; ++j) {
       v[i + 2] += L[l_row * n_var + j] * U[j];
     }
   }
@@ -212,17 +212,17 @@ __device__ double2 WENO5(const real *L, const real *cv, integer n_var, integer i
   return double2{v_minus, v_plus};
 }
 
-__device__ double2 WENO7(const real *L, const real *cv, integer n_var, integer i_shared, integer l_row) {
+__device__ double2 WENO7(const real *L, const real *cv, int n_var, int i_shared, int l_row) {
   // The indices for them are i-3 to i+4.
   // 0 - i-3, 1 - i-2, 2 - i-1, 3 - i, 4 - i+1, 5 - i+2, 6 - i+3, 7 - i+4
 
   // Project to characteristic space
   real v[8];
   memset(v, 0, 8 * sizeof(real));
-  for (integer i = -3; i < 5; ++i) {
-    const integer idx{i_shared + i};
+  for (int i = -3; i < 5; ++i) {
+    const int idx{i_shared + i};
     const real *U{&cv[idx * (n_var + 2)]};
-    for (integer j = 0; j < n_var; ++j) {
+    for (int j = 0; j < n_var; ++j) {
       v[i + 3] += L[l_row * n_var + j] * U[j];
     }
   }
@@ -284,24 +284,24 @@ __device__ double2 WENO7(const real *L, const real *cv, integer n_var, integer i
 }
 
 template<MixtureModel mix_model>
-__global__ void CDSPart1D(cfd::DZone *zone, integer direction, integer max_extent, DParameter *param) {
+__global__ void CDSPart1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param) {
   printf("Not implemented.\n");
 }
 
 template<>
 __global__ void
-CDSPart1D<MixtureModel::Air>(cfd::DZone *zone, integer direction, integer max_extent, DParameter *param) {
-  integer labels[3]{0, 0, 0};
+CDSPart1D<MixtureModel::Air>(cfd::DZone *zone, int direction, int max_extent, DParameter *param) {
+  int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const auto tid = (integer) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const auto block_dim = (integer) (blockDim.x * blockDim.y * blockDim.z);
+  const auto tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const auto block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
-//  const integer n_point = block_dim + 2 * ngg - 1;
+//  const int n_point = block_dim + 2 * ngg - 1;
 
-  integer idx[3];
-  idx[0] = (integer) ((blockDim.x - 2 * ngg * labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (integer) ((blockDim.y - 2 * ngg * labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (integer) ((blockDim.z - 2 * ngg * labels[2]) * blockIdx.z + threadIdx.z);
+  int idx[3];
+  idx[0] = (int) ((blockDim.x - 2 * ngg * labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = (int) ((blockDim.y - 2 * ngg * labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = (int) ((blockDim.z - 2 * ngg * labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= ngg;
   if (idx[direction] >= max_extent - ngg) return;
 
@@ -335,7 +335,7 @@ CDSPart1D<MixtureModel::Air>(cfd::DZone *zone, integer direction, integer max_ex
   if (param->reconstruction == 4) {
     // WENO5
     constexpr real c1{-19.0 / 3840}, c2{13.0 / 320}, c3{-17.0 / 256};
-    for (integer l = 0; l < n_var; ++l) {
+    for (int l = 0; l < n_var; ++l) {
       zone->dq(idx[0], idx[1], idx[2], l) +=
           c1 * (f[(tid + 3) * n_var + l] - f[(tid - 3) * n_var + l]) +
           c2 * (f[(tid + 2) * n_var + l] - f[(tid - 2) * n_var + l]) +
@@ -344,7 +344,7 @@ CDSPart1D<MixtureModel::Air>(cfd::DZone *zone, integer direction, integer max_ex
   } else if (param->reconstruction == 5) {
     // WENO7
     constexpr real c4{-81.0 / 71680}, c3{1261.0 / 107520}, c2{-289.0 / 5120}, c1{421.0 / 5120};
-    for (integer l = 0; l < n_var; ++l) {
+    for (int l = 0; l < n_var; ++l) {
       zone->dq(idx[0], idx[1], idx[2], l) +=
           c4 * (f[(tid + 4) * n_var + l] - f[(tid - 4) * n_var + l]) +
           c3 * (f[(tid + 3) * n_var + l] - f[(tid - 3) * n_var + l]) +
@@ -355,31 +355,31 @@ CDSPart1D<MixtureModel::Air>(cfd::DZone *zone, integer direction, integer max_ex
 }
 
 template __device__ void
-AWENO_interpolation<MixtureModel::Mixture>(const real *cv, real *pv_l, real *pv_r, integer idx_shared, integer n_var,
+AWENO_interpolation<MixtureModel::Mixture>(const real *cv, real *pv_l, real *pv_r, int idx_shared, int n_var,
                                            const real *metric, DParameter *param);
 
 template __device__ void
-AWENO_interpolation<MixtureModel::FR>(const real *cv, real *pv_l, real *pv_r, integer idx_shared, integer n_var,
+AWENO_interpolation<MixtureModel::FR>(const real *cv, real *pv_l, real *pv_r, int idx_shared, int n_var,
                                       const real *metric, DParameter *param);
 
 template __device__ void
-AWENO_interpolation<MixtureModel::FL>(const real *cv, real *pv_l, real *pv_r, integer idx_shared, integer n_var,
+AWENO_interpolation<MixtureModel::FL>(const real *cv, real *pv_l, real *pv_r, int idx_shared, int n_var,
                                       const real *metric, DParameter *param);
 
 template __device__ void
-AWENO_interpolation<MixtureModel::MixtureFraction>(const real *cv, real *pv_l, real *pv_r, integer idx_shared,
-                                                   integer n_var, const real *metric, DParameter *param);
+AWENO_interpolation<MixtureModel::MixtureFraction>(const real *cv, real *pv_l, real *pv_r, int idx_shared,
+                                                   int n_var, const real *metric, DParameter *param);
 
 template __global__ void
-CDSPart1D<MixtureModel::Mixture>(cfd::DZone *zone, integer direction, integer max_extent, DParameter *param);
+CDSPart1D<MixtureModel::Mixture>(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
 
 template __global__ void
-CDSPart1D<MixtureModel::FR>(cfd::DZone *zone, integer direction, integer max_extent, DParameter *param);
+CDSPart1D<MixtureModel::FR>(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
 
 template __global__ void
-CDSPart1D<MixtureModel::FL>(cfd::DZone *zone, integer direction, integer max_extent, DParameter *param);
+CDSPart1D<MixtureModel::FL>(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
 
 template __global__ void
-CDSPart1D<MixtureModel::MixtureFraction>(cfd::DZone *zone, integer direction, integer max_extent, DParameter *param);
+CDSPart1D<MixtureModel::MixtureFraction>(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
 
 }

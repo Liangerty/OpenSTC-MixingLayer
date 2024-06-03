@@ -39,7 +39,7 @@ void cfd::Parameter::read_param_from_file() {
 
   update_parameter("n_var", 5);
   update_parameter("n_turb", 0);
-  integer n_scalar{0};
+  int n_scalar{0};
   if (bool_parameters["turbulence"] == 1) {
     if (int_parameters["turbulence_method"] == 1 || int_parameters["turbulence_method"] == 2) { // RANS or DES
       if (int_parameters["RANS_model"] == 1) {// SA
@@ -156,7 +156,7 @@ void cfd::Parameter::read_one_file(std::ifstream &file) {
 }
 
 template<typename T>
-integer cfd::Parameter::read_line_to_array(std::istringstream &line, std::vector<T> &arr) {
+int cfd::Parameter::read_line_to_array(std::istringstream &line, std::vector<T> &arr) {
   std::string temp{};
   while (line >> temp) {
     if (temp == "}") {
@@ -170,7 +170,7 @@ integer cfd::Parameter::read_line_to_array(std::istringstream &line, std::vector
     T val{};
     if constexpr (std::is_same_v<T, real>) {
       val = std::stod(temp);
-    } else if constexpr (std::is_same_v<T, integer>) {
+    } else if constexpr (std::is_same_v<T, int>) {
       val = std::stoi(temp);
     } else if constexpr (std::is_same_v<T, std::string>) {
       val = temp;
@@ -180,8 +180,8 @@ integer cfd::Parameter::read_line_to_array(std::istringstream &line, std::vector
   return 1; // Which means we need to read the next line
 }
 
-std::map<std::string, std::variant<std::string, integer, real>> cfd::Parameter::read_struct(std::ifstream &file) {
-  std::map<std::string, std::variant<std::string, integer, real>> struct_to_read;
+std::map<std::string, std::variant<std::string, int, real>> cfd::Parameter::read_struct(std::ifstream &file) {
+  std::map<std::string, std::variant<std::string, int, real>> struct_to_read;
   std::string input{}, key{}, temp{};
   std::istringstream line(input);
   while (gxl::getline_to_stream(file, input, line)) {
@@ -194,7 +194,7 @@ std::map<std::string, std::variant<std::string, integer, real>> cfd::Parameter::
       line >> key >> temp >> val;
       struct_to_read.emplace(std::make_pair(key, val));
     } else if (key == "int") {
-      integer val{};
+      int val{};
       line >> key >> temp >> val;
       struct_to_read.emplace(std::make_pair(key, val));
     } else if (key == "real") {
@@ -211,8 +211,8 @@ void cfd::Parameter::deduce_known_info() {
   // For common 2nd order schemes, we need 2 ghost grids.
   // Here, because we now only implement 2nd order central difference for viscous flux, we need 2 ghost grids.
   // The main concern for the number of ghost grids is the inviscid flux, which in turn is decided from the reconstruction method.
-  integer ngg{2};
-  integer reconstruction_scheme = get_int("reconstruction");
+  int ngg{2};
+  int reconstruction_scheme = get_int("reconstruction");
   switch (reconstruction_scheme) {
     case 4: // WENO5
       ngg = 3;
@@ -227,6 +227,8 @@ void cfd::Parameter::deduce_known_info() {
   int inviscid_scheme{get_int("inviscid_scheme")};
   if (inviscid_scheme == 51 || inviscid_scheme == 52) {
     ngg = 3;
+  } else if (inviscid_scheme == 71 || inviscid_scheme == 72) {
+    ngg = 4;
   }
 
   update_parameter("ngg", ngg);
@@ -238,8 +240,8 @@ void cfd::Parameter::deduce_known_info() {
   // them. Because, the reconstructed variables would be conservative variables, and there may be additional operations,
   // such as characteristic reconstruction, high-order central difference, etc.
   // Summary: 2-Roe, 3-AUSM+, 4-HLLC, 14-HLLC+WENO
-  integer inviscid_tag{get_int("inviscid_scheme")};
-  integer inviscid_type{0};
+  int inviscid_tag{get_int("inviscid_scheme")};
+  int inviscid_type{0};
   if (inviscid_tag == 2) {
     inviscid_type = 2;
   }
@@ -247,13 +249,13 @@ void cfd::Parameter::deduce_known_info() {
     inviscid_type = 1;
     // WENO reconstructions
   }
-  if (inviscid_scheme == 51 || inviscid_scheme == 52) {
+  if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 71 || inviscid_scheme == 72) {
     inviscid_type = 3;
   }
 //  update_parameter("inviscid_tag", inviscid_tag);
   update_parameter("inviscid_type", inviscid_type);
 
-  if (bool_parameters["steady"]==0 && int_parameters["temporal_scheme"] == 3) {
+  if (bool_parameters["steady"] == 0 && int_parameters["temporal_scheme"] == 3) {
     // RK-3, the chemical source should be treated explicitly.
     update_parameter("chemSrcMethod", 0);
   }

@@ -10,14 +10,14 @@ struct IOManager {
   FieldIO<mix_model, turb, OutputTimeChoice::Instance> field_io;
   BoundaryIO<mix_model, turb, OutputTimeChoice::Instance> boundary_io;
 
-  explicit IOManager(integer _myid, const Mesh &_mesh, std::vector<Field> &_field, const Parameter &_parameter,
-                     const Species &spec, integer ngg_out);
+  explicit IOManager(int _myid, const Mesh &_mesh, std::vector<Field> &_field, const Parameter &_parameter,
+                     const Species &spec, int ngg_out);
 
-  void print_field(integer step, const Parameter &parameter, real physical_time = 0);
+  void print_field(int step, const Parameter &parameter, real physical_time = 0);
 };
 
 template<MixtureModel mix_model, class turb>
-void IOManager<mix_model, turb>::print_field(integer step, const Parameter &parameter, real physical_time) {
+void IOManager<mix_model, turb>::print_field(int step, const Parameter &parameter, real physical_time) {
   field_io.print_field(step, physical_time);
   boundary_io.print_boundary();
 
@@ -29,8 +29,8 @@ void IOManager<mix_model, turb>::print_field(integer step, const Parameter &para
 }
 
 template<MixtureModel mix_model, class turb>
-IOManager<mix_model, turb>::IOManager(integer _myid, const Mesh &_mesh, std::vector<Field> &_field,
-                                      const Parameter &_parameter, const Species &spec, integer ngg_out):
+IOManager<mix_model, turb>::IOManager(int _myid, const Mesh &_mesh, std::vector<Field> &_field,
+                                      const Parameter &_parameter, const Species &spec, int ngg_out):
     field_io(_myid, _mesh, _field, _parameter, spec, ngg_out), boundary_io(_parameter, _mesh, spec, _field) {
 
 }
@@ -40,25 +40,25 @@ struct TimeSeriesIOManager {
   FieldIO<mix_model, turb_method, OutputTimeChoice::TimeSeries> field_io;
 //  BoundaryIO<mix_model, turb_method, OutputTimeChoice::TimeSeries> boundary_io;
 
-  explicit TimeSeriesIOManager(integer _myid, const Mesh &_mesh, std::vector<Field> &_field,
+  explicit TimeSeriesIOManager(int _myid, const Mesh &_mesh, std::vector<Field> &_field,
                                const Parameter &_parameter,
-                               const Species &spec, integer ngg_out);
+                               const Species &spec, int ngg_out);
 
-  void print_field(integer step, const Parameter &parameter, real physical_time);
+  void print_field(int step, const Parameter &parameter, real physical_time);
 };
 
 template<MixtureModel mix_model, class turb_method>
-TimeSeriesIOManager<mix_model, turb_method>::TimeSeriesIOManager(integer _myid, const Mesh &_mesh,
+TimeSeriesIOManager<mix_model, turb_method>::TimeSeriesIOManager(int _myid, const Mesh &_mesh,
                                                                  std::vector<Field> &_field,
                                                                  const Parameter &_parameter, const Species &spec,
-                                                                 integer ngg_out):
+                                                                 int ngg_out):
     field_io(_myid, _mesh, _field, _parameter, spec, ngg_out)/*, boundary_io(_parameter, _mesh, spec, _field)*/ {
 
 }
 
 template<MixtureModel mix_model, class turb_method>
 void
-TimeSeriesIOManager<mix_model, turb_method>::print_field(integer step, const Parameter &parameter, real physical_time) {
+TimeSeriesIOManager<mix_model, turb_method>::print_field(int step, const Parameter &parameter, real physical_time) {
   field_io.print_field(step, physical_time);
 }
 

@@ -14,7 +14,7 @@ __device__ constexpr real c[3]{1.0, 0.25, 2.0 / 3.0};
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt, integer rk);
+__global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt, int rk);
 
 __global__ void update_physical_time(DParameter *param, real t);
 
@@ -30,18 +30,18 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
 
   dim3 tpb{8, 8, 4};
   auto &mesh{driver.mesh};
-  const integer n_block{mesh.n_block};
+  const int n_block{mesh.n_block};
   if (mesh.dimension == 2) {
     tpb = {16, 16, 1};
   }
   dim3 *bpg = new dim3[n_block];
-  for (integer b = 0; b < n_block; ++b) {
+  for (int b = 0; b < n_block; ++b) {
     const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
     bpg[b] = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
   }
 
   std::vector<cfd::Field> &field{driver.field};
-  const integer ng_1 = 2 * mesh[0].ngg - 1;
+  const int ng_1 = 2 * mesh[0].ngg - 1;
   DParameter *param{driver.param};
   for (auto b = 0; b < n_block; ++b) {
     // Store the initial value of the flow field
@@ -64,14 +64,14 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
 
   Monitor monitor(parameter, driver.spec, mesh);
-  const integer if_monitor{parameter.get_int("if_monitor")};
+  const int if_monitor{parameter.get_int("if_monitor")};
 
-  integer step{parameter.get_int("step")};
-  integer total_step{parameter.get_int("total_step") + step};
-  const integer output_screen = parameter.get_int("output_screen");
-  const integer n_var{parameter.get_int("n_var")};
+  int step{parameter.get_int("step")};
+  int total_step{parameter.get_int("total_step") + step};
+  const int output_screen = parameter.get_int("output_screen");
+  const int n_var{parameter.get_int("n_var")};
   real total_simulation_time{parameter.get_real("total_simulation_time")};
-  const integer output_file = parameter.get_int("output_file");
+  const int output_file = parameter.get_int("output_file");
 
   bool finished{false};
   // This should be got from a Parameter later, which may be got from a previous simulation.
@@ -111,7 +111,7 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
     }
 
     // Rk inner iteration
-    for (integer rk = 0; rk < 3; ++rk) {
+    for (int rk = 0; rk < 3; ++rk) {
       for (auto b = 0; b < n_block; ++b) {
         // Set dq to 0
         cudaMemset(field[b].h_ptr->dq.data(), 0, field[b].h_ptr->dq.size() * n_var * sizeof(real));
@@ -168,8 +168,8 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
 
       // update physical properties such as Mach number, transport coefficients et, al.
       for (auto b = 0; b < n_block; ++b) {
-        integer mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
-        dim3 BPG{(mx + 1) / tpb.x + 1, (my + 1) / tpb.y + 1, (mz + 1) / tpb.z + 1};
+        int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+        dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
         update_physical_properties<mix_model><<<BPG, tpb>>>(field[b].d_ptr, param);
       }
     }
@@ -219,18 +219,18 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt, integer rk) {
-  const integer extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (integer) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (integer) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (integer) (blockDim.z * blockIdx.z + threadIdx.z);
+__global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt, int rk) {
+  const int extent[3]{zone->mx, zone->my, zone->mz};
+  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   auto &cv = zone->cv;
   auto &qn = zone->qn;
 
   real dt_div_jac = dt / zone->jac(i, j, k);
-  for (integer l = 0; l < param->n_var; ++l) {
+  for (int l = 0; l < param->n_var; ++l) {
     cv(i, j, k, l) = SSPRK3::a[rk] * qn(i, j, k, l) + SSPRK3::b[rk] * cv(i, j, k, l) +
                      SSPRK3::c[rk] * dt_div_jac * zone->dq(i, j, k, l);
   }
@@ -251,18 +251,18 @@ __global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt
   auto &sv = zone->sv;
   if constexpr (mix_model != MixtureModel::FL) {
     // For multiple species or RANS methods, there will be scalars to be computed
-    for (integer l = 0; l < param->n_scalar; ++l) {
+    for (int l = 0; l < param->n_scalar; ++l) {
       sv(i, j, k, l) = cv(i, j, k, 5 + l) * density_inv;
     }
   } else {
     // Flamelet model
-    for (integer l = 0; l < param->n_scalar_transported; ++l) {
+    for (int l = 0; l < param->n_scalar_transported; ++l) {
       sv(i, j, k, l + param->n_spec) = cv(i, j, k, 5 + l) * density_inv;
     }
     real yk_ave[MAX_SPEC_NUMBER];
     memset(yk_ave, 0, sizeof(real) * param->n_spec);
     compute_massFraction_from_MixtureFraction(zone, i, j, k, param, yk_ave);
-    for (integer l = 0; l < param->n_spec; ++l) {
+    for (int l = 0; l < param->n_spec; ++l) {
       sv(i, j, k, l) = yk_ave[l];
     }
   }

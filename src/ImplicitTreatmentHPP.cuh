@@ -11,9 +11,9 @@ implicit_treatment(const Block &block, const DParameter *param, DZone *d_ptr, co
   switch (parameter.get_int("implicit_method")) {
     case 0: // Explicit
       if constexpr (mixture_model == MixtureModel::FR) {
-        if (const integer chem_src_method = parameter.get_int("chemSrcMethod");chem_src_method != 0) {
-          const integer extent[3]{block.mx, block.my, block.mz};
-          const integer dim{extent[2] == 1 ? 2 : 3};
+        if (const int chem_src_method = parameter.get_int("chemSrcMethod");chem_src_method != 0) {
+          const int extent[3]{block.mx, block.my, block.mz};
+          const int dim{extent[2] == 1 ? 2 : 3};
           dim3 tpb{8, 8, 4};
           if (dim == 2) {
             tpb = {16, 16, 1};
@@ -33,8 +33,8 @@ implicit_treatment(const Block &block, const DParameter *param, DZone *d_ptr, co
       }
       if constexpr (TurbMethod<turb_method>::hasImplicitTreat) {
         if (parameter.get_int("turb_implicit") == 1) {
-          const integer extent[3]{block.mx, block.my, block.mz};
-          const integer dim{extent[2] == 1 ? 2 : 3};
+          const int extent[3]{block.mx, block.my, block.mz};
+          const int dim{extent[2] == 1 ? 2 : 3};
           dim3 tpb{8, 8, 4};
           if (dim == 2) {
             tpb = {16, 16, 1};

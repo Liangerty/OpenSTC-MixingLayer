@@ -31,9 +31,9 @@ __global__ void initialize_mixing_layer_with_info(DZone *zone, const real *var_i
  * @return an array of orders. 0~5 means density, u, v, w, p, T; 6~5+ns means the species order, 6+ns~... means other variables such as mut...
  */
 template<MixtureModel mix_model, class turb_method>
-std::vector<integer>
+std::vector<int>
 identify_variable_labels(cfd::Parameter &parameter, std::vector<std::string> &var_name, Species &species,
-                         std::array<integer, 2> &old_data_info);
+                         std::array<int, 2> &old_data_info);
 
 void initialize_spec_from_inflow(cfd::Parameter &parameter, const cfd::Mesh &mesh,
                                  std::vector<Field> &field, Species &species);
@@ -49,7 +49,7 @@ void expand_2D_to_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> 
 // Implementations
 template<MixtureModel mix_model, class turb>
 void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species) {
-  const integer init_method = parameter.get_int("initial");
+  const int init_method = parameter.get_int("initial");
   // No matter which method is used to initialize the flowfield,
   // the default inflow is first read and initialize the inf parameters.
   // Otherwise, for simulations that begin from previous simulations,
@@ -75,7 +75,7 @@ void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vec
 
 template<MixtureModel mix_model, class turb>
 void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vector<Field> &field, Species &species) {
-  const std::filesystem::path out_dir("output/field");
+  const std::filesystem::path out_dir("output");
   if (!exists(out_dir)) {
     printf("The directory to flowfield files does not exist!\n");
   }
@@ -88,7 +88,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
   offset += 16;
   // "solution file"
   gxl::read_str_from_plt_MPI_ver(fp, offset);
-  integer n_var_old{5};
+  int n_var_old{5};
   MPI_File_read_at(fp, offset, &n_var_old, 1, MPI_INT, &status);
   offset += 4;
   std::vector<std::string> var_name;
@@ -102,10 +102,10 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
   std::array old_data_info{0, 0};
   auto index_order = cfd::identify_variable_labels<mix_model, turb>(parameter, var_name, species,
                                                                     old_data_info);
-  const integer n_spec{species.n_spec};
-  const integer n_turb{parameter.get_int("n_turb")};
+  const int n_spec{species.n_spec};
+  const int n_turb{parameter.get_int("n_turb")};
 
-  auto *mx = new integer[mesh.n_block_total], *my = new integer[mesh.n_block_total], *mz = new integer[mesh.n_block_total];
+  auto *mx = new int[mesh.n_block_total], *my = new int[mesh.n_block_total], *mz = new int[mesh.n_block_total];
   real solution_time{0};
   for (int b = 0; b < mesh.n_block_total; ++b) {
     // 1. Zone marker. Value = 299.0, indicates a V112 header.
@@ -136,11 +136,11 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
   std::vector<std::string> zone_name;
   // Next, data section
   // Jump the front part for process 0 ~ myid-1
-  integer n_jump_blk{0};
+  int n_jump_blk{0};
   for (int i = 0; i < parameter.get_int("myid"); ++i) {
     n_jump_blk += mesh.nblk[i];
   }
-  integer i_blk{0};
+  int i_blk{0};
   for (int b = 0; b < n_jump_blk; ++b) {
     offset += 16 + 20 * n_var_old;
     const int64_t N = mx[b] * my[b] * mz[b];
@@ -169,11 +169,11 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
     // Other variables
     const auto &b = mesh[blk];
     MPI_Datatype ty;
-    integer lsize[3]{mx[i_blk], my[i_blk], mz[i_blk]};
+    int lsize[3]{mx[i_blk], my[i_blk], mz[i_blk]};
     const int64_t memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    integer memsize[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
-    const integer ngg_file{(mx[i_blk] - b.mx) / 2};
-    integer start_idx[3]{b.ngg - ngg_file, b.ngg - ngg_file, b.ngg - ngg_file};
+    int memsize[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
+    const int ngg_file{(mx[i_blk] - b.mx) / 2};
+    int start_idx[3]{b.ngg - ngg_file, b.ngg - ngg_file, b.ngg - ngg_file};
     MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
     for (size_t l = 3; l < n_var_old; ++l) {
@@ -250,7 +250,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
   }
 
   std::ifstream step_file{"output/message/step.txt"};
-  integer step{0};
+  int step{0};
   step_file >> step;
   step_file.close();
   parameter.update_parameter("step", step);
@@ -261,14 +261,14 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
 }
 
 template<MixtureModel mix_model, class turb>
-std::vector<integer>
+std::vector<int>
 identify_variable_labels(cfd::Parameter &parameter, std::vector<std::string> &var_name, Species &species,
-                         std::array<integer, 2> &old_data_info) {
-  std::vector<integer> labels;
-  const integer n_spec = species.n_spec;
-  const integer n_turb = parameter.get_int("n_turb");
+                         std::array<int, 2> &old_data_info) {
+  std::vector<int> labels;
+  const int n_spec = species.n_spec;
+  const int n_turb = parameter.get_int("n_turb");
   for (auto &name: var_name) {
-    integer l = 999;
+    int l = 999;
     // The first three names are x, y and z, they are assigned value 0 and no match would be found.
     auto n = gxl::to_upper(name);
     if (n == "DENSITY" || n == "ROE" || n == "RHO") {
@@ -344,7 +344,7 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
   offset += 16;
   // "solution file"
   gxl::read_str_from_plt_MPI_ver(fp, offset);
-  integer n_var_old{5};
+  int n_var_old{5};
   MPI_File_read_at(fp, offset, &n_var_old, 1, MPI_INT, &status);
   offset += 4;
   std::vector<std::string> var_name;
@@ -358,9 +358,9 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
   std::array old_data_info{0, 0};
   auto index_order = cfd::identify_variable_labels<mix_model, turb>(parameter, var_name, species,
                                                                     old_data_info);
-  const integer n_spec{species.n_spec};
-  const integer n_turb{parameter.get_int("n_turb")};
-  auto *mx = new integer[mesh.n_block_total], *my = new integer[mesh.n_block_total], *mz = new integer[mesh.n_block_total];
+  const int n_spec{species.n_spec};
+  const int n_turb{parameter.get_int("n_turb")};
+  auto *mx = new int[mesh.n_block_total], *my = new int[mesh.n_block_total], *mz = new int[mesh.n_block_total];
   real solution_time{0};
   for (int b = 0; b < mesh.n_block_total; ++b) {
     // 1. Zone marker. Value = 299.0, indicates a V112 header.
@@ -391,14 +391,14 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
   std::vector<std::string> zone_name;
   // Next, data section
   // Jump the front part for process 0 ~ myid-1
-  integer n_jump_blk{0};
+  int n_jump_blk{0};
   for (int i = 0; i < parameter.get_int("myid"); ++i) {
     n_jump_blk += mesh.nblk[i];
   }
-  integer i_blk{0};
+  int i_blk{0};
   for (int b = 0; b < n_jump_blk; ++b) {
     offset += 16 + 20 * n_var_old;
-    const integer N = mx[b] * my[b] * mz[b];
+    const int N = mx[b] * my[b] * mz[b];
     // We always write double precision out
     offset += n_var_old * N * 8;
     ++i_blk;
@@ -419,17 +419,17 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
     offset += 8 * 2 * n_var_old;
     // zone data
     // First, the coordinates x, y and z.
-    const integer N = mx[i_blk] * my[i_blk] * mz[i_blk];
+    const int N = mx[i_blk] * my[i_blk] * mz[i_blk];
     offset += 3 * N * 8;
     // Other variables
     const auto &b = mesh[blk];
     MPI_Datatype ty;
     // The mz here will be 1.
-    integer lsize[3]{mx[i_blk], my[i_blk], mz[i_blk]};
+    int lsize[3]{mx[i_blk], my[i_blk], mz[i_blk]};
     const auto memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    integer memsize[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
-    const integer ngg_file{(mx[i_blk] - b.mx) / 2};
-    integer start_idx[3]{b.ngg - ngg_file, b.ngg - ngg_file, b.ngg - ngg_file};
+    int memsize[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
+    const int ngg_file{(mx[i_blk] - b.mx) / 2};
+    int start_idx[3]{b.ngg - ngg_file, b.ngg - ngg_file, b.ngg - ngg_file};
     MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
     for (size_t l = 3; l < n_var_old; ++l) {
@@ -509,7 +509,7 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
   }
 
   std::ifstream step_file{"output/message/step.txt"};
-  integer step{0};
+  int step{0};
   step_file >> step;
   step_file.close();
   parameter.update_parameter("step", step);

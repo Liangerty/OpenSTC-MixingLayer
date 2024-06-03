@@ -3,7 +3,8 @@
 #include <filesystem>
 #include <fstream>
 
-void cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Field> &field, const Parameter &parameter) {
+void
+cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Field> &field, const Parameter &parameter) {
   const std::filesystem::path out_dir("output/wall");
   if (!exists(out_dir)) {
     create_directories(out_dir);
@@ -47,8 +48,8 @@ void cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Fie
 }
 
 __global__ void cfd::wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction, real *heat_flux, real dyn_pressure) {
-  const integer i = blockDim.x * blockIdx.x + threadIdx.x;
-  if (i>=zone->mx) return;
+  const int i = blockDim.x * blockIdx.x + threadIdx.x;
+  if (i >= zone->mx) return;
 
   auto &pv = zone->bv;
 
@@ -69,7 +70,140 @@ __global__ void cfd::wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction,
 
 }
 
-void cfd::wall_friction_heatflux_3d(const cfd::Mesh &mesh, const std::vector<cfd::Field> &field,
-                                    const cfd::Parameter &parameter) {
+void cfd::wall_friction_heatFlux_3d(const cfd::Mesh &mesh, const std::vector<cfd::Field> &field,
+                                    const cfd::Parameter &parameter, DParameter *param) {
+  const std::filesystem::path out_dir("output");
+  if (!exists(out_dir)) {
+    create_directories(out_dir);
+  }
+  const auto path_name = out_dir.string();
 
+  bool stat_on{parameter.get_bool("if_collect_statistics")};
+  bool spanwise_ave{parameter.get_bool("perform_spanwise_average")};
+  for (int b = 0; b < mesh.n_block; ++b) {
+    int mx{mesh[b].mx}, mz{mesh[b].mz};
+    if (spanwise_ave) {
+      mz = 1;
+    }
+
+    ggxl::VectorField2DHost<real> cfQw_host;
+    printf("mx=%d,mz=%d\n", mx, mz);
+    cfQw_host.allocate_memory(mx, mz, 2, 0);
+    ggxl::VectorField2D<real> cfQw_device_hPtr;
+    ggxl::VectorField2D<real> *cfQw_device = nullptr;
+    cfQw_device_hPtr.allocate_memory(mx, mz, 2, 0);
+    cudaMalloc(&cfQw_device, sizeof(ggxl::VectorField2D<real>));
+    cudaMemcpy(cfQw_device, &cfQw_device_hPtr, sizeof(ggxl::VectorField2D<real>), cudaMemcpyHostToDevice);
+
+    dim3 tpb(32, 1, 32);
+    if (spanwise_ave) {
+      tpb = dim3{128, 1, 1};
+    }
+    dim3 bpg((mx - 1) / tpb.x + 1, 1, (mz - 1) / tpb.z + 1);
+
+
+    wall_friction_heatFlux_3d<<<bpg, tpb>>>(field[b].d_ptr, cfQw_device, param, stat_on, spanwise_ave);
+    cudaMemcpy(cfQw_host.data(), cfQw_device_hPtr.data(), mx * mz * 2 * sizeof(real), cudaMemcpyDeviceToHost);
+    if (!spanwise_ave) {
+      std::ofstream f(path_name + "/friction_heatFlux-block-" + std::to_string(b) + ".dat");
+      f << "variables = \"x\", \"z\", \"cf\", \"y_plus\"\n";
+      f << "zone,i=" << mx << ",j=" << mz << ",f=point\n";
+      for (int kk = 0; kk < mz; ++kk) {
+        for (int ii = 0; ii < mx; ++ii) {
+          f << mesh[b].x(ii, 0, kk) << '\t' << mesh[b].z(ii, 0, kk) << '\t' << cfQw_host(ii, kk, 0) << '\t'
+            << cfQw_host(ii, kk, 1) << '\n';
+        }
+      }
+      f.close();
+    } else {
+      std::ofstream f(path_name + "/spanaveraged_friction_heatFlux-block-" + std::to_string(b) + ".dat");
+      f << "variables = \"x\", \"cf\", \"y_plus\"\n";
+      for (int ii = 0; ii < mx; ++ii) {
+        f << mesh[b].x(ii, 0, 0) << '\t' << cfQw_host(ii, 0, 0) << '\t' << cfQw_host(ii, 0, 1) << '\n';
+      }
+      f.close();
+    }
+
+
+    cfQw_host.deallocate_memory();
+    cfQw_device_hPtr.deallocate_memory();
+  }
+}
+
+__global__ void
+cfd::wall_friction_heatFlux_3d(cfd::DZone *zone, ggxl::VectorField2D<real> *cfQw, cfd::DParameter *param, bool stat_on,
+                               bool spanwise_ave) {
+  const int i = blockDim.x * blockIdx.x + threadIdx.x;
+  const int k = blockDim.z * blockIdx.z + threadIdx.z;
+  if (i >= zone->mx || k >= zone->mz) return;
+
+
+  const int j = 1;
+  auto &metric = zone->metric(i, j, k);
+
+  // const real u=pv(i,j,k,1),v=pv(i,j,k,2),w=pv(i,j,k,3);
+  // const real T1=pv(i,j,k,5),T0=pv(i,j-1,k,5);
+  // const real rhow=pv(i,j-1,k,0);
+  // const real dy=zone->y(i,j,k)-zone->y(i,j-1,k);
+  real u, v, w;
+  real T1, T0;
+  real rhow;
+  const real dy = zone->y(i, j, k) - zone->y(i, j - 1, k);
+  if (!stat_on) {
+    auto &pv = zone->bv;
+    u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
+    T1 = pv(i, j, k, 5), T0 = pv(i, j - 1, k, 5);
+    rhow = pv(i, j - 1, k, 0);
+  } else {
+    auto &pv = zone->mean_value;
+    u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
+    T1 = pv(i, j, k, 5), T0 = pv(i, j - 1, k, 5);
+    rhow = pv(i, j - 1, k, 0);
+  }
+  // const real xi_x = metric(1, 1), xi_y = metric(1, 2), xi_z = metric(1, 3);
+  // const real eta_x = metric(2, 1), eta_y = metric(2, 2), eta_z = metric(2, 3);
+  // const real zeta_x = metric(3, 1), zeta_y = metric(3, 2), zeta_z = metric(3, 3);
+  const real rho_ref = param->rho_ref, v_ref = param->v_ref;
+  gxl::Matrix<real, 3, 3, 1> bdjin;
+  real d1 = metric(2, 1);
+  real d2 = metric(2, 2);
+  real d3 = metric(2, 3);
+  real kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
+  bdjin(1, 1) = d1 / kk;
+  bdjin(1, 2) = d2 / kk;
+  bdjin(1, 3) = d3 / kk;
+
+  d1 = bdjin(1, 2) - bdjin(1, 3);
+  d2 = bdjin(1, 3) - bdjin(1, 1);
+  d3 = bdjin(1, 1) - bdjin(1, 2);
+  kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
+  bdjin(2, 1) = d1 / kk;
+  bdjin(2, 2) = d2 / kk;
+  bdjin(2, 3) = d3 / kk;
+
+  d1 = bdjin(1, 2) * bdjin(2, 3) - bdjin(1, 3) * bdjin(2, 2);
+  d2 = bdjin(1, 3) * bdjin(2, 1) - bdjin(1, 1) * bdjin(2, 3);
+  d3 = bdjin(1, 1) * bdjin(2, 2) - bdjin(1, 2) * bdjin(2, 1);
+  kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
+  bdjin(3, 1) = d1 / kk;
+  bdjin(3, 2) = d2 / kk;
+  bdjin(3, 3) = d3 / kk;
+
+  real vt = bdjin(2, 1) * u + bdjin(2, 2) * v + bdjin(2, 3) * w;
+  real vs = bdjin(3, 1) * u + bdjin(3, 2) * v + bdjin(3, 3) * w;
+  real velocity_tau = sqrt(vt * vt + vs * vs);
+
+  real tau = velocity_tau / dy * zone->mul(i, j - 1, k);
+  real cf = tau / (0.5 * (rho_ref * v_ref * v_ref));
+  real u_tau = sqrt(tau / rhow);
+  real y_plus = rhow * u_tau * dy / zone->mul(i, j - 1, k);
+
+  //printf("i=%d,k=%d,u=%e,w=%e,mu=%e,cf=%e,y_plus=%e\n",i,k,u,w,zone->mul(i,j-1,k),sqrt(u*u+w*w)/dy*zone->mul(i,j-1,k)/(0.5*(rho_ref*v_ref*v_ref)),rhow*sqrt(sqrt(u*u+w*w)/dy*zone->mul(i,j-1,k)/rhow)*dy/zone->mul(i,j-1,k));
+  // (*cfQw)(i,k,0)=sqrt(u*u+w*w)/dy*zone->mul(i,j-1,k)/(0.5*(rho_ref*v_ref*v_ref));
+  // (*cfQw)(i,k,1)=rhow*sqrt(sqrt(u*u+w*w)/dy*zone->mul(i,j-1,k)/rhow)*dy/zone->mul(i,j-1,k);
+  (*cfQw)(i, k, 0) = cf;
+  (*cfQw)(i, k, 1) = y_plus;
+
+
+  // real Qw = (T1-T0)/dy;
 }

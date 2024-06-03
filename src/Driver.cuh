@@ -18,7 +18,7 @@ struct Driver {
   void initialize_computation();
 
 public:
-  integer myid = 0;
+  int myid = 0;
   gxl::Time time;
   const Mesh &mesh;
   Parameter &parameter;
@@ -40,7 +40,7 @@ struct Driver<MixtureModel::FL, turb> {
   void initialize_computation();
 //  void simulate();
 
-  integer myid = 0;
+  int myid = 0;
   gxl::Time time;
   const Mesh &mesh;
   Parameter &parameter;
@@ -57,5 +57,5 @@ struct Driver<MixtureModel::FL, turb> {
 
 void write_reference_state(const Parameter &parameter, const Species &species);
 
-__global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, integer n_point_times3);
+__global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, int n_point_times3);
 } // cfd

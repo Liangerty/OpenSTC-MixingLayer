@@ -31,11 +31,11 @@ public:
 private:
   // Basic info
   bool if_collect_statistics{false};
-  integer start_iter{0};
+  int start_iter{0};
 public:
-  integer counter{0};
+  int counter{0};
 private:
-  integer myid{0};
+  int myid{0};
   // Data to be bundled
   const Parameter &parameter;
   const Mesh &mesh;
@@ -47,12 +47,12 @@ private:
   // User-defined statistical data name
   std::array<std::string, UserDefineStat::n_collect> ud_collect_name;
 public:
-  std::array<integer, UserDefineStat::n_collect> counter_ud{0};
-  integer *counter_ud_device = nullptr;
+  std::array<int, UserDefineStat::n_collect> counter_ud{0};
+  int *counter_ud_device = nullptr;
 private:
   // plot-related variables
   MPI_Offset offset_header{0};
-  integer n_plot{0};
+  int n_plot{0};
   MPI_Offset *offset_minmax_var = nullptr;
   MPI_Offset *offset_var = nullptr;
 
@@ -69,10 +69,10 @@ private:
   int32_t acquire_variable_names(std::vector<std::string> &var_name, const Species &species);
 };
 
-__global__ void compute_statistical_data(DZone *zone, DParameter *param, integer counter, const integer *counter_ud);
+__global__ void compute_statistical_data(DZone *zone, DParameter *param, int counter, const int *counter_ud);
 
 __global__ void
-compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, integer counter, const integer *counter_ud);
+compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, int counter, const int *counter_ud);
 
 template<MixtureModel mix_model, class turb>
 void StatisticsCollector::initialize_statistics_collector(const Species &species) {
@@ -83,12 +83,12 @@ void StatisticsCollector::initialize_statistics_collector(const Species &species
   }
 
   prepare_for_statistical_data_plot<mix_model, turb>(species);
-  cudaMalloc(&counter_ud_device, sizeof(integer) * UserDefineStat::n_collect);
+  cudaMalloc(&counter_ud_device, sizeof(int) * UserDefineStat::n_collect);
 }
 
 template<MixtureModel mix_model, class turb>
 void StatisticsCollector::prepare_for_statistical_data_plot(const Species &species) {
-  const std::filesystem::path out_dir("output/stat");
+  const std::filesystem::path out_dir("output");
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/stat_data.plt").c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY,
                 MPI_INFO_NULL, &fp);
@@ -153,7 +153,7 @@ void StatisticsCollector::prepare_for_statistical_data_plot(const Species &speci
       MPI_File_write_at(fp, offset, &parent_zone, 1, MPI_INT32_T, &status);
       offset += 4;
       // 4. Strand ID. -2 = pending strand ID for assignment by Tecplot; -1 = static strand ID; >= 0 valid strand ID
-      constexpr int32_t strand_id{-2};
+      constexpr int32_t strand_id{-1};
       MPI_File_write_at(fp, offset, &strand_id, 1, MPI_INT32_T, &status);
       offset += 4;
       // 5. Solution time. For steady, the value is set 0. For unsteady, please create a new class
@@ -214,12 +214,12 @@ void StatisticsCollector::prepare_for_statistical_data_plot(const Species &speci
   MPI_Bcast(&n_plot, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
 
   MPI_Offset new_offset{0};
-  integer i_blk{0};
+  int i_blk{0};
   for (int p = 0; p < myid; ++p) {
-    const integer n_blk = mesh.nblk[p];
+    const int n_blk = mesh.nblk[p];
     for (int b = 0; b < n_blk; ++b) {
       new_offset += 16 + 20 * n_plot;
-      const integer mx{mesh.mx_blk[i_blk]}, my{mesh.my_blk[i_blk]};
+      const int mx{mesh.mx_blk[i_blk]}, my{mesh.my_blk[i_blk]};
       int mz{mesh.mz_blk[i_blk]};
       if (parameter.get_bool("perform_spanwise_average"))
         mz = 1;
@@ -320,11 +320,11 @@ void StatisticsCollector::prepare_for_statistical_data_plot(const Species &speci
 
     // 7. Zone Data.
     MPI_Datatype ty;
-    integer lsize[3]{mx, my, mz};
+    int lsize[3]{mx, my, mz};
 
     const int64_t memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    integer memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, b.mz + 2 * b.ngg};
-    integer start_idx[3]{b.ngg, b.ngg, b.ngg};
+    int memsize[3]{mx + 2 * b.ngg, my + 2 * b.ngg, b.mz + 2 * b.ngg};
+    int start_idx[3]{b.ngg, b.ngg, b.ngg};
     MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
     MPI_File_write_at(fp, offset, b.x.data(), 1, ty, &status);
@@ -353,7 +353,7 @@ void StatisticsCollector::prepare_for_statistical_data_plot(const Species &speci
 
 template<MixtureModel mix_model, class turb>
 int32_t StatisticsCollector::acquire_variable_names(std::vector<std::string> &var_name, const Species &species) {
-  auto nv = (integer) (var_name.size()); // x,y,z + rho,u,v,w,p,T,Mach
+  auto nv = (int) (var_name.size()); // x,y,z + rho,u,v,w,p,T,Mach
   const auto nv_old = nv;
   if constexpr (mix_model != MixtureModel::Air) {
     nv += parameter.get_int("n_spec"); // Y_k
@@ -381,7 +381,7 @@ int32_t StatisticsCollector::acquire_variable_names(std::vector<std::string> &va
 template<MixtureModel mix_model, class turb_method>
 void StatisticsCollector::collect_data(DParameter *param) {
   ++counter;
-  for (integer l = 0; l < UserDefineStat::n_collect; ++l) {
+  for (int l = 0; l < UserDefineStat::n_collect; ++l) {
     ++counter_ud[l];
   }
 
@@ -390,7 +390,7 @@ void StatisticsCollector::collect_data(DParameter *param) {
     tpb = {16, 16, 1};
   }
 
-  for (integer b = 0; b < mesh.n_block; ++b) {
+  for (int b = 0; b < mesh.n_block; ++b) {
     const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
     dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
     collect_statistics<<<bpg, tpb>>>(field[b].d_ptr, param);
@@ -399,5 +399,5 @@ void StatisticsCollector::collect_data(DParameter *param) {
 
 MPI_Offset write_ud_stat_max_min(MPI_Offset offset, const Field &field, MPI_File &fp, int mz);
 
-MPI_Offset write_ud_stat_data(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, integer mem_sz);
+MPI_Offset write_ud_stat_data(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, int64_t mem_sz);
 } // cfd

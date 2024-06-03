@@ -2,7 +2,6 @@
 #include "Initialize.cuh"
 #include "DataCommunication.cuh"
 #include "TimeAdvanceFunc.cuh"
-#include "MPIIO.hpp"
 #include "WallDistance.cuh"
 #include "MixingLayer.cuh"
 
@@ -14,7 +13,7 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     spec(parameter), reac(parameter, spec), stat_collector(parameter, mesh, field) {
   printf("Initialize driver on process %d\n", myid);
   // Allocate the memory for every block
-  for (integer blk = 0; blk < mesh.n_block; ++blk) {
+  for (int blk = 0; blk < mesh.n_block; ++blk) {
     field.emplace_back(parameter, mesh[blk]);
   }
 
@@ -26,7 +25,7 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     res_scale_in.close();
   }
 
-  for (integer blk = 0; blk < mesh.n_block; ++blk) {
+  for (int blk = 0; blk < mesh.n_block; ++blk) {
     field[blk].setup_device_memory(parameter);
   }
   bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter);
@@ -71,7 +70,7 @@ void Driver<mix_model, turb>::initialize_computation() {
   }
 
   // Second, apply boundary conditions to all boundaries, including face communication between faces
-  for (integer b = 0; b < mesh.n_block; ++b) {
+  for (int b = 0; b < mesh.n_block; ++b) {
     bound_cond.apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param);
   }
   printf("Boundary conditions are applied successfully for initialization on process %d\n", myid);
@@ -79,7 +78,7 @@ void Driver<mix_model, turb>::initialize_computation() {
 
   // First, compute the conservative variables from basic variables
   for (auto i = 0; i < mesh.n_block; ++i) {
-    integer mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
+    int mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
     dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
     compute_velocity<<<bpg, tpb>>>(field[i].d_ptr);
     if constexpr (TurbMethod<turb>::hasMut == true) {
@@ -95,7 +94,7 @@ void Driver<mix_model, turb>::initialize_computation() {
   cudaDeviceSynchronize();
 
   for (auto b = 0; b < mesh.n_block; ++b) {
-    integer mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
     dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
     update_physical_properties<mix_model><<<bpg, tpb>>>(field[b].d_ptr, param);
   }
@@ -105,19 +104,19 @@ void Driver<mix_model, turb>::initialize_computation() {
   }
 }
 
-__global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, integer n_point_times3) {
-  const integer ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  integer i = (integer) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  integer j = (integer) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  integer k = (integer) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
+__global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, int n_point_times3) {
+  const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
+  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   const real x{zone->x(i, j, k)}, y{zone->y(i, j, k)}, z{zone->z(i, j, k)};
-  const integer n_wall_point = n_point_times3 / 3;
+  const int n_wall_point = n_point_times3 / 3;
   auto &wall_dist = zone->wall_distance(i, j, k);
   wall_dist = 1e+6;
-  for (integer l = 0; l < n_wall_point; ++l) {
-    const integer idx = 3 * l;
+  for (int l = 0; l < n_wall_point; ++l) {
+    const int idx = 3 * l;
     real d = (x - wall_point_coor[idx]) * (x - wall_point_coor[idx]) +
              (y - wall_point_coor[idx + 1]) * (y - wall_point_coor[idx + 1]) +
              (z - wall_point_coor[idx + 2]) * (z - wall_point_coor[idx + 2]);

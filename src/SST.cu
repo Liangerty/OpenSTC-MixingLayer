@@ -6,14 +6,14 @@
 namespace cfd {
 
 __global__ void implicit_treat_for_SST(DZone *zone, const DParameter *param) {
-  const integer extent[3]{zone->mx, zone->my, zone->mz};
-  const integer i = blockDim.x * blockIdx.x + threadIdx.x;
-  const integer j = blockDim.y * blockIdx.y + threadIdx.y;
-  const integer k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int extent[3]{zone->mx, zone->my, zone->mz};
+  const int i = blockDim.x * blockIdx.x + threadIdx.x;
+  const int j = blockDim.y * blockIdx.y + threadIdx.y;
+  const int k = blockDim.z * blockIdx.z + threadIdx.z;
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   // Used in explicit temporal scheme
-  const integer i_turb_cv{param->i_turb_cv};
+  const int i_turb_cv{param->i_turb_cv};
   auto &dq = zone->dq;
   const real dt_local = zone->dt_local(i, j, k);
   const auto &src_jac = zone->turb_src_jac;
@@ -43,7 +43,7 @@ __device__ real Zeman_compressibility_correction(real Mt, real gammaP1) {
 
 template<TurbSimLevel level>
 __device__ void
-SST<level>::compute_mut(cfd::DZone *zone, integer i, integer j, integer k, real mul, const DParameter *param) {
+SST<level>::compute_mut(cfd::DZone *zone, int i, int j, int k, real mul, const DParameter *param) {
   const auto &m = zone->metric(i, j, k);
   const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
   const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
@@ -75,7 +75,7 @@ SST<level>::compute_mut(cfd::DZone *zone, integer i, integer j, integer k, real 
   // Theoretically, this should be computed after updating the basic variables, but after that we won't need it until now.
   // Besides, we need the velocity gradients in the computation, which are also needed when computing source terms.
   // In order to alleviate the computational burden, we put the computation of mut here.
-  const integer n_spec{param->n_spec};
+  const int n_spec{param->n_spec};
   const real density = zone->bv(i, j, k, 0);
   const real tke = zone->sv(i, j, k, n_spec);
   const real rhoK = density * tke;
@@ -119,8 +119,8 @@ SST<level>::compute_mut(cfd::DZone *zone, integer i, integer j, integer k, real 
 
 template<TurbSimLevel level>
 __device__ void
-SST<level>::compute_source_and_mut(cfd::DZone *zone, integer i, integer j, integer k, DParameter *param) {
-  const integer n_spec{param->n_spec};
+SST<level>::compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParameter *param) {
+  const int n_spec{param->n_spec};
 
   const auto &m = zone->metric(i, j, k);
   const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
@@ -285,7 +285,7 @@ SST<level>::compute_source_and_mut(cfd::DZone *zone, integer i, integer j, integ
       diss_k = betaStar * rhoK * omega;
     }
     const real jac = zone->jac(i, j, k);
-    const integer i_turb_cv{param->i_turb_cv};
+    const int i_turb_cv{param->i_turb_cv};
     zone->dq(i, j, k, i_turb_cv) += jac * (prod_k - diss_k);
 
     // omega source term
@@ -303,9 +303,9 @@ SST<level>::compute_source_and_mut(cfd::DZone *zone, integer i, integer j, integ
 
 template<TurbSimLevel level>
 __device__ void
-SST<level>::implicit_treat_for_dq0(DZone *zone, real diag, integer i, integer j, integer k, const DParameter *param) {
+SST<level>::implicit_treat_for_dq0(DZone *zone, real diag, int i, int j, int k, const DParameter *param) {
   // Used in DPLUR, called from device
-  const integer i_turb_cv{param->i_turb_cv};
+  const int i_turb_cv{param->i_turb_cv};
   auto &dq = zone->dq;
   const real dt_local = zone->dt_local(i, j, k);
   const auto &src_jac = zone->turb_src_jac;
@@ -315,10 +315,10 @@ SST<level>::implicit_treat_for_dq0(DZone *zone, real diag, integer i, integer j,
 
 template<TurbSimLevel level>
 __device__ void
-SST<level>::implicit_treat_for_dqk(DZone *zone, real diag, integer i, integer j, integer k, const real *dq_total,
+SST<level>::implicit_treat_for_dqk(DZone *zone, real diag, int i, int j, int k, const real *dq_total,
                                    const DParameter *param) {
   // Used in DPLUR, called from device
-  const integer i_turb_cv{param->i_turb_cv};
+  const int i_turb_cv{param->i_turb_cv};
   auto &dqk = zone->dqk;
   const auto &dq0 = zone->dq0;
   const real dt_local = zone->dt_local(i, j, k);

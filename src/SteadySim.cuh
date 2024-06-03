@@ -24,14 +24,14 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
   }
 
   bool converged{false};
-  integer step{parameter.get_int("step")};
-  integer total_step{parameter.get_int("total_step") + step};
-  const integer n_block{mesh.n_block};
-  const integer n_var{parameter.get_int("n_var")};
-  const integer ngg{mesh[0].ngg};
-  const integer ng_1 = 2 * ngg - 1;
-  const integer output_screen = parameter.get_int("output_screen");
-  const integer output_file = parameter.get_int("output_file");
+  int step{parameter.get_int("step")};
+  int total_step{parameter.get_int("total_step") + step};
+  const int n_block{mesh.n_block};
+  const int n_var{parameter.get_int("n_var")};
+  const int ngg{mesh[0].ngg};
+  const int ng_1 = 2 * ngg - 1;
+  const int output_screen = parameter.get_int("output_screen");
+  const int output_file = parameter.get_int("output_file");
 
   IOManager<mix_model, turb> ioManager(driver.myid, mesh, field, parameter, driver.spec, 0);
 
@@ -40,7 +40,7 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
     tpb = {16, 16, 1};
   }
   dim3 *bpg = new dim3[n_block];
-  for (integer b = 0; b < n_block; ++b) {
+  for (int b = 0; b < n_block; ++b) {
     const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
     bpg[b] = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
   }
@@ -115,9 +115,9 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
 
     // update physical properties such as Mach number, transport coefficients et, al.
     for (auto b = 0; b < n_block; ++b) {
-      integer mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
-      dim3 BPG{(mx + 1) / tpb.x + 1, (my + 1) / tpb.y + 1, (mz + 1) / tpb.z + 1};
-      update_physical_properties<mix_model><<<BPG, tpb>>>(field[b].d_ptr, param);
+      int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+      dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
+      update_physical_properties<mix_model><<<bpg, tpb>>>(field[b].d_ptr, param);
     }
 
     // Finally, test if the simulation reaches convergence state
@@ -131,8 +131,8 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
     cudaDeviceSynchronize();
     if (step % output_file == 0 || converged) {
       if constexpr (mix_model == MixtureModel::FL) {
-        integer n_fl_step{0};
-        cudaMemcpy(&n_fl_step, &(param->n_fl_step), sizeof(integer), cudaMemcpyDeviceToHost);
+        int n_fl_step{0};
+        cudaMemcpy(&n_fl_step, &(param->n_fl_step), sizeof(int), cudaMemcpyDeviceToHost);
         parameter.update_parameter("n_fl_step", n_fl_step);
       }
       ioManager.print_field(step, parameter);

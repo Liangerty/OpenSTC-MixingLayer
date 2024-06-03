@@ -10,7 +10,7 @@ Driver<MixtureModel::FL, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     myid(parameter.get_int("myid")), time(), mesh(mesh_), parameter(parameter),
     spec(parameter), flameletLib(parameter), stat_collector(parameter, mesh, field) {
   // Allocate the memory for every block
-  for (integer blk = 0; blk < mesh.n_block; ++blk) {
+  for (int blk = 0; blk < mesh.n_block; ++blk) {
     field.emplace_back(parameter, mesh[blk]);
   }
 
@@ -22,7 +22,7 @@ Driver<MixtureModel::FL, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     res_scale_in.close();
   }
 
-  for (integer blk = 0; blk < mesh.n_block; ++blk) {
+  for (int blk = 0; blk < mesh.n_block; ++blk) {
     field[blk].setup_device_memory(parameter);
   }
   bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter);
@@ -60,7 +60,7 @@ void Driver<MixtureModel::FL, turb>::initialize_computation() {
   }
 
   // Second, apply boundary conditions to all boundaries, including face communication between faces
-  for (integer b = 0; b < mesh.n_block; ++b) {
+  for (int b = 0; b < mesh.n_block; ++b) {
     bound_cond.apply_boundary_conditions<MixtureModel::FL, turb>(mesh[b], field[b], param);
   }
   if (myid == 0) {
@@ -69,7 +69,7 @@ void Driver<MixtureModel::FL, turb>::initialize_computation() {
 
   // First, compute the conservative variables from basic variables
   for (auto i = 0; i < mesh.n_block; ++i) {
-    integer mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
+    int mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
     dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
     compute_velocity<<<bpg, tpb>>>(field[i].d_ptr);
 //    compute_cv_from_bv<MixtureModel::FL, turb_method><<<bpg, tpb>>>(field[i].d_ptr, param);
@@ -87,7 +87,7 @@ void Driver<MixtureModel::FL, turb>::initialize_computation() {
   cudaDeviceSynchronize();
 
   for (auto b = 0; b < mesh.n_block; ++b) {
-    integer mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
     dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
     update_physical_properties<MixtureModel::FL><<<bpg, tpb>>>(field[b].d_ptr, param);
   }
