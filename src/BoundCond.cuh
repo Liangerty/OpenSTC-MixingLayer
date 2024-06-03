@@ -850,7 +850,8 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     }
     const real xi3 = xi * xi * xi;
     bv(i, j, k, 2) =
-        A0 * (15.1875 * xi3 * xi * xi - 35.4375 * xi3 * xi + 20.25 * xi3) * cos(beta * z) * sin(omega * t) / rho_wall;
+        A0 * (15.1875 * xi3 * xi * xi - 35.4375 * xi3 * xi + 20.25 * xi3) * cos(beta * z) * sin(omega * t) / rho_wall *
+        param->rho_ref * param->v_ref;
     zone->vel(i, j, k) = bv(i, j, k, 2);
   }
 
