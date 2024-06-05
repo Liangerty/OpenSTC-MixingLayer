@@ -647,11 +647,6 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
     totalEnthalpy[igShared] =
         (zone->cv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 4) + pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 4)) /
         pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 0);
-//    ig_shared[additional_loaded] = tid + 2 * ngg - 1;
-//    g_idx[additional_loaded][0] = idx[0] + ngg * labels[0];
-//    g_idx[additional_loaded][1] = idx[1] + ngg * labels[1];
-//    g_idx[additional_loaded][2] = idx[2] + ngg * labels[2];
-//    ++additional_loaded;
   }
   if (idx[direction] == max_extent - 1 && tid < ngg - 1) {
     int n_more_left = ngg - 1 - tid - 1;
@@ -677,11 +672,6 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
       totalEnthalpy[igShared] =
           (zone->cv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 4) + pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 4)) /
           pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 0);
-//      ig_shared[additional_loaded] = i_shared + m + 1;
-//      g_idx[additional_loaded][0] = idx[0] + (m + 1) * labels[0];
-//      g_idx[additional_loaded][1] = idx[1] + (m + 1) * labels[1];
-//      g_idx[additional_loaded][2] = idx[2] + (m + 1) * labels[2];
-//      ++additional_loaded;
     }
   }
   for (int g = 0; g < additional_loaded; ++g) {
@@ -746,19 +736,12 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
 
   constexpr real central_1[3]{0.75, -3.0 / 20, 1.0 / 60};
   for (int l = 0; l < n_var; ++l) {
-    real dql = 2 * (central_1[0] * tilde_op[i_shared * n_var * 3 + l]
-                    + central_1[1] *
-                      (tilde_op[i_shared * n_var * 3 + n_var + l] + tilde_op[(i_shared - 1) * n_var * 3 + n_var + l])
-                    + central_1[2] * (tilde_op[i_shared * n_var * 3 + 2 * n_var + l] +
-                                      tilde_op[(i_shared - 1) * n_var * 3 + 2 * n_var + l] +
-                                      tilde_op[(i_shared - 2) * n_var * 3 + 2 * n_var + l]));
-//    for (int n = 1; n <= 3; ++n) {
-//      real add{0};
-//      for (int m = 0; m < n; ++m) {
-//        add += tilde_op[(i_shared - m) * n_var * 3 + (n - 1) * n_var + l];
-//      }
-//      dql += 2 * central_1[n - 1] * add;
-//    }
+    real dql = 2 * (
+        central_1[0] * tilde_op[i_shared * n_var * 3 + l]
+        + central_1[1] * (tilde_op[i_shared * n_var * 3 + n_var + l] + tilde_op[(i_shared - 1) * n_var * 3 + n_var + l])
+        + central_1[2] * (tilde_op[i_shared * n_var * 3 + 2 * n_var + l] +
+                          tilde_op[(i_shared - 1) * n_var * 3 + 2 * n_var + l] +
+                          tilde_op[(i_shared - 2) * n_var * 3 + 2 * n_var + l]));
     fc[tid * n_var + l] = dql;
   }
   __syncthreads();
