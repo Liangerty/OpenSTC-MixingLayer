@@ -39,6 +39,9 @@ compute_inviscid_flux(const Block &block, cfd::DZone *zone, DParameter *param, i
     case 3: // Compute the term with WENO-Z-5
       compute_convective_term_weno<mix_model>(block, zone, param, n_var, parameter);
       break;
+    case 4:
+      compute_convective_term_ep<mix_model>(block, zone, param, n_var, parameter);
+      break;
     case 2: // Roe scheme
     default: // Roe scheme
       Roe_compute_inviscid_flux<mix_model>(block, zone, param, n_var, parameter);

@@ -72,4 +72,11 @@ positive_preserving_limiter(const real *f_1st, int n_var, int tid, real *fc, con
 __device__ real WENO5(const real *vp, const real *vm, real eps);
 __device__ real WENO7(const real *vp, const real *vm, real eps);
 
+template<MixtureModel mix_model>
+void compute_convective_term_ep(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
+                                const Parameter &parameter);
+
+template<MixtureModel mix_model>
+__global__ void
+compute_convective_term_ep_1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
 } // cfd

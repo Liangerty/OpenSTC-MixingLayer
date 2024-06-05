@@ -225,7 +225,7 @@ void cfd::Parameter::deduce_known_info() {
   }
 
   int inviscid_scheme{get_int("inviscid_scheme")};
-  if (inviscid_scheme == 51 || inviscid_scheme == 52) {
+  if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 6) {
     ngg = 3;
   } else if (inviscid_scheme == 71 || inviscid_scheme == 72) {
     ngg = 4;
@@ -251,6 +251,9 @@ void cfd::Parameter::deduce_known_info() {
   }
   if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 71 || inviscid_scheme == 72) {
     inviscid_type = 3;
+  }
+  if (inviscid_scheme == 6) {
+    inviscid_type = 4;
   }
 //  update_parameter("inviscid_tag", inviscid_tag);
   update_parameter("inviscid_type", inviscid_type);

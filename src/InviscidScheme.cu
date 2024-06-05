@@ -542,6 +542,234 @@ Roe_compute_inviscid_flux_1D(cfd::DZone *zone, int direction, int max_extent, DP
   }
 }
 
+template<MixtureModel mix_model>
+void compute_convective_term_ep(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
+                                const Parameter &parameter) {
+  // Implementation of the 6th-order EP scheme.
+  // PIROZZOLI S. Stabilized non-dissipative approximations of Euler equations in generalized curvilinear coordinates[J/OL].
+  // Journal of Computational Physics, 2011, 230(8): 2997-3014. DOI:10.1016/j.jcp.2011.01.001.
+
+  const int extent[3]{block.mx, block.my, block.mz};
+  const int ngg{block.ngg};
+
+  constexpr int block_dim = 64;
+  const int n_computation_per_block = block_dim + 2 * block.ngg - 1;
+  auto shared_mem = (block_dim * n_var // fc
+                     + n_computation_per_block * (3 + 1 + 1 + 1) // metric[3], jac, uk_jac, totalEnthalpy
+                     + (block_dim + ngg - 1) * 3 * n_var // tilde operations
+                    ) * sizeof(real);
+
+  for (int dir = 0; dir < 2; ++dir) {
+    int tpb[3]{1, 1, 1};
+    tpb[dir] = block_dim;
+    int bpg[3]{extent[0], extent[1], extent[2]};
+    bpg[dir] = (extent[dir] - 1) / (tpb[dir] - 1) + 1;
+
+    dim3 TPB(tpb[0], tpb[1], tpb[2]);
+    dim3 BPG(bpg[0], bpg[1], bpg[2]);
+    compute_convective_term_ep_1D<mix_model><<<BPG, TPB, shared_mem>>>(zone, dir, extent[dir], param);
+  }
+
+  if (extent[2] > 1) {
+    // 3D computation
+    // Number of threads in the 3rd direction cannot exceed 64
+    constexpr int tpb[3]{1, 1, 64};
+    int bpg[3]{extent[0], extent[1], (extent[2] - 1) / (tpb[2] - 1) + 1};
+
+    dim3 TPB(tpb[0], tpb[1], tpb[2]);
+    dim3 BPG(bpg[0], bpg[1], bpg[2]);
+    compute_convective_term_ep_1D<mix_model><<<BPG, TPB, shared_mem>>>(zone, 2, extent[2], param);
+  }
+}
+
+template<MixtureModel mix_model>
+__global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param) {
+  int labels[3]{0, 0, 0};
+  labels[direction] = 1;
+  const int tid = threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2];
+  const int block_dim = blockDim.x * blockDim.y * blockDim.z;
+  const auto ngg{zone->ngg};
+  const int n_point = block_dim + 2 * ngg - 1;
+
+  int idx[3];
+  idx[0] = (int) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = (int) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = (int) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
+  idx[direction] -= 1;
+  if (idx[direction] >= max_extent) return;
+
+  auto &pv = zone->bv;
+  const auto n_var{param->n_var};
+
+  extern __shared__ real s[];
+  real *metric = s;
+  real *jac = &metric[n_point * 3];
+  real *uk_jac = &jac[n_point];
+  real *totalEnthalpy = &uk_jac[n_point];
+  real *fc = &totalEnthalpy[n_point];
+  real *tilde_op = &fc[block_dim * n_var];
+  const int i_shared = tid - 1 + ngg;
+
+  // compute the contra-variant velocity
+  metric[i_shared * 3] = zone->metric(idx[0], idx[1], idx[2])(direction + 1, 1);
+  metric[i_shared * 3 + 1] = zone->metric(idx[0], idx[1], idx[2])(direction + 1, 2);
+  metric[i_shared * 3 + 2] = zone->metric(idx[0], idx[1], idx[2])(direction + 1, 3);
+  uk_jac[i_shared] = metric[i_shared * 3] * pv(idx[0], idx[1], idx[2], 1)
+                     + metric[i_shared * 3 + 1] * pv(idx[0], idx[1], idx[2], 2)
+                     + metric[i_shared * 3 + 2] * pv(idx[0], idx[1], idx[2], 3);
+  jac[i_shared] = zone->jac(idx[0], idx[1], idx[2]);
+  uk_jac[i_shared] *= jac[i_shared];
+  totalEnthalpy[i_shared] =
+      (zone->cv(idx[0], idx[1], idx[2], 4) + pv(idx[0], idx[1], idx[2], 4)) / pv(idx[0], idx[1], idx[2], 0);
+  // ghost cells
+  constexpr int max_additional_ghost_point_loaded = 3; // This is for 6th-order ep, with 3 ghost points on each side.
+  int ig_shared[max_additional_ghost_point_loaded];
+  int g_idx[max_additional_ghost_point_loaded][3];
+  int additional_loaded{0};
+  if (tid < ngg - 1) {
+    ig_shared[additional_loaded] = tid;
+    g_idx[additional_loaded][0] = idx[0] - (ngg - 1) * labels[0];
+    g_idx[additional_loaded][1] = idx[1] - (ngg - 1) * labels[1];
+    g_idx[additional_loaded][2] = idx[2] - (ngg - 1) * labels[2];
+    ++additional_loaded;
+  }
+  if (tid > block_dim - ngg - 1 || idx[direction] > max_extent - ngg - 1) {
+    int igShared = tid + 2 * ngg - 1;
+    int rGhIdx[3]{idx[0] + ngg * labels[0], idx[1] + ngg * labels[1], idx[2] + ngg * labels[2]};
+    metric[igShared * 3] = zone->metric(rGhIdx[0], rGhIdx[1], rGhIdx[2])(direction + 1, 1);
+    metric[igShared * 3 + 1] = zone->metric(rGhIdx[0], rGhIdx[1], rGhIdx[2])(direction + 1, 2);
+    metric[igShared * 3 + 2] = zone->metric(rGhIdx[0], rGhIdx[1], rGhIdx[2])(direction + 1, 3);
+    uk_jac[igShared] = metric[igShared * 3] * pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 1)
+                       + metric[igShared * 3 + 1] * pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 2)
+                       + metric[igShared * 3 + 2] * pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 3);
+    jac[igShared] = zone->jac(rGhIdx[0], rGhIdx[1], rGhIdx[2]);
+    uk_jac[igShared] *= jac[igShared];
+    totalEnthalpy[igShared] =
+        (zone->cv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 4) + pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 4)) /
+        pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 0);
+//    ig_shared[additional_loaded] = tid + 2 * ngg - 1;
+//    g_idx[additional_loaded][0] = idx[0] + ngg * labels[0];
+//    g_idx[additional_loaded][1] = idx[1] + ngg * labels[1];
+//    g_idx[additional_loaded][2] = idx[2] + ngg * labels[2];
+//    ++additional_loaded;
+  }
+  if (idx[direction] == max_extent - 1 && tid < ngg - 1) {
+    int n_more_left = ngg - 1 - tid - 1;
+    for (int m = 0; m < n_more_left; ++m) {
+      ig_shared[additional_loaded] = tid + m + 1;
+      g_idx[additional_loaded][0] = idx[0] - (ngg - 1 - m - 1) * labels[0];
+      g_idx[additional_loaded][1] = idx[1] - (ngg - 1 - m - 1) * labels[1];
+      g_idx[additional_loaded][2] = idx[2] - (ngg - 1 - m - 1) * labels[2];
+      ++additional_loaded;
+    }
+    int n_more_right = ngg - 1 - tid;
+    for (int m = 0; m < n_more_right; ++m) {
+      int igShared = i_shared + m + 1;
+      int rGhIdx[3]{idx[0] + (m + 1) * labels[0], idx[1] + (m + 1) * labels[1], idx[2] + (m + 1) * labels[2]};
+      metric[igShared * 3] = zone->metric(rGhIdx[0], rGhIdx[1], rGhIdx[2])(direction + 1, 1);
+      metric[igShared * 3 + 1] = zone->metric(rGhIdx[0], rGhIdx[1], rGhIdx[2])(direction + 1, 2);
+      metric[igShared * 3 + 2] = zone->metric(rGhIdx[0], rGhIdx[1], rGhIdx[2])(direction + 1, 3);
+      uk_jac[igShared] = metric[igShared * 3] * pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 1)
+                         + metric[igShared * 3 + 1] * pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 2)
+                         + metric[igShared * 3 + 2] * pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 3);
+      jac[igShared] = zone->jac(rGhIdx[0], rGhIdx[1], rGhIdx[2]);
+      uk_jac[igShared] *= jac[igShared];
+      totalEnthalpy[igShared] =
+          (zone->cv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 4) + pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 4)) /
+          pv(rGhIdx[0], rGhIdx[1], rGhIdx[2], 0);
+//      ig_shared[additional_loaded] = i_shared + m + 1;
+//      g_idx[additional_loaded][0] = idx[0] + (m + 1) * labels[0];
+//      g_idx[additional_loaded][1] = idx[1] + (m + 1) * labels[1];
+//      g_idx[additional_loaded][2] = idx[2] + (m + 1) * labels[2];
+//      ++additional_loaded;
+    }
+  }
+  for (int g = 0; g < additional_loaded; ++g) {
+    metric[ig_shared[g] * 3] = zone->metric(g_idx[g][0], g_idx[g][1], g_idx[g][2])(direction + 1, 1);
+    metric[ig_shared[g] * 3 + 1] = zone->metric(g_idx[g][0], g_idx[g][1], g_idx[g][2])(direction + 1, 2);
+    metric[ig_shared[g] * 3 + 2] = zone->metric(g_idx[g][0], g_idx[g][1], g_idx[g][2])(direction + 1, 3);
+    uk_jac[ig_shared[g]] = metric[ig_shared[g] * 3] * pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 1)
+                           + metric[ig_shared[g] * 3 + 1] * pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 2)
+                           + metric[ig_shared[g] * 3 + 2] * pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 3);
+    jac[ig_shared[g]] = zone->jac(g_idx[g][0], g_idx[g][1], g_idx[g][2]);
+    uk_jac[ig_shared[g]] *= jac[ig_shared[g]];
+    totalEnthalpy[ig_shared[g]] =
+        (zone->cv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 4) + pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 4)) /
+        pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 0);
+  }
+  __syncthreads();
+
+  for (int l = 1; l <= 3; ++l) {
+    int l_idx[3]{idx[0], idx[1], idx[2]};
+    l_idx[direction] += l;
+    const real weight = 0.125 * (uk_jac[i_shared] + uk_jac[i_shared + l]) *
+                        (pv(idx[0], idx[1], idx[2], 0) + pv(l_idx[0], l_idx[1], l_idx[2], 0));
+    const real pWeight = 0.25 * (pv(idx[0], idx[1], idx[2], 4) + pv(l_idx[0], l_idx[1], l_idx[2], 4));
+    tilde_op[i_shared * n_var * 3 + (l - 1) * n_var] = 2 * weight;
+    tilde_op[i_shared * n_var * 3 + (l - 1) * n_var + 1] =
+        weight * (pv(idx[0], idx[1], idx[2], 1) + pv(l_idx[0], l_idx[1], l_idx[2], 1)) +
+        pWeight * (metric[i_shared * 3] * jac[i_shared] + metric[(i_shared + l) * 3] * jac[i_shared + l]);
+    tilde_op[i_shared * n_var * 3 + (l - 1) * n_var + 2] =
+        weight * (pv(idx[0], idx[1], idx[2], 2) + pv(l_idx[0], l_idx[1], l_idx[2], 2)) +
+        pWeight * (metric[i_shared * 3 + 1] * jac[i_shared] + metric[(i_shared + l) * 3 + 1] * jac[i_shared + l]);
+    tilde_op[i_shared * n_var * 3 + (l - 1) * n_var + 3] =
+        weight * (pv(idx[0], idx[1], idx[2], 3) + pv(l_idx[0], l_idx[1], l_idx[2], 3)) +
+        pWeight * (metric[i_shared * 3 + 2] * jac[i_shared] + metric[(i_shared + l) * 3 + 2] * jac[i_shared + l]);
+    tilde_op[i_shared * n_var * 3 + (l - 1) * n_var + 4] =
+        weight * (totalEnthalpy[i_shared] + totalEnthalpy[i_shared + l]);
+  }
+  for (int g = 0; g < additional_loaded; ++g) {
+    for (int l = 1; l <= 3; ++l) {
+      int l_idx[3]{g_idx[g][0], g_idx[g][1], g_idx[g][2]};
+      l_idx[direction] += l;
+      const real weight = 0.125 * (uk_jac[ig_shared[g]] + uk_jac[ig_shared[g] + l]) *
+                          (pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 0) + pv(l_idx[0], l_idx[1], l_idx[2], 0));
+      const real pWeight = 0.25 * (pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 4) + pv(l_idx[0], l_idx[1], l_idx[2], 4));
+      tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var] = 2 * weight;
+      tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var + 1] =
+          weight * (pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 1) + pv(l_idx[0], l_idx[1], l_idx[2], 1)) +
+          pWeight *
+          (metric[ig_shared[g] * 3] * jac[ig_shared[g]] + metric[(ig_shared[g] + l) * 3] * jac[ig_shared[g] + l]);
+      tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var + 2] =
+          weight * (pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 2) + pv(l_idx[0], l_idx[1], l_idx[2], 2)) +
+          pWeight * (metric[ig_shared[g] * 3 + 1] * jac[ig_shared[g]] +
+                     metric[(ig_shared[g] + l) * 3 + 1] * jac[ig_shared[g] + l]);
+      tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var + 3] =
+          weight * (pv(g_idx[g][0], g_idx[g][1], g_idx[g][2], 3) + pv(l_idx[0], l_idx[1], l_idx[2], 3)) +
+          pWeight * (metric[ig_shared[g] * 3 + 2] * jac[ig_shared[g]] +
+                     metric[(ig_shared[g] + l) * 3 + 2] * jac[ig_shared[g] + l]);
+      tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var + 4] =
+          weight * (totalEnthalpy[ig_shared[g]] + totalEnthalpy[ig_shared[g] + l]);
+    }
+  }
+  __syncthreads();
+
+  constexpr real central_1[3]{0.75, -3.0 / 20, 1.0 / 60};
+  for (int l = 0; l < n_var; ++l) {
+    real dql = 2 * (central_1[0] * tilde_op[i_shared * n_var * 3 + l]
+                    + central_1[1] *
+                      (tilde_op[i_shared * n_var * 3 + n_var + l] + tilde_op[(i_shared - 1) * n_var * 3 + n_var + l])
+                    + central_1[2] * (tilde_op[i_shared * n_var * 3 + 2 * n_var + l] +
+                                      tilde_op[(i_shared - 1) * n_var * 3 + 2 * n_var + l] +
+                                      tilde_op[(i_shared - 2) * n_var * 3 + 2 * n_var + l]));
+//    for (int n = 1; n <= 3; ++n) {
+//      real add{0};
+//      for (int m = 0; m < n; ++m) {
+//        add += tilde_op[(i_shared - m) * n_var * 3 + (n - 1) * n_var + l];
+//      }
+//      dql += 2 * central_1[n - 1] * add;
+//    }
+    fc[tid * n_var + l] = dql;
+  }
+  __syncthreads();
+
+  if (tid > 0) {
+    for (int l = 0; l < n_var; ++l) {
+      zone->dq(idx[0], idx[1], idx[2], l) -= fc[tid * n_var + l] - fc[(tid - 1) * n_var + l];
+    }
+  }
+}
+
 // template instantiation
 template void
 compute_convective_term_pv<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
@@ -608,4 +836,24 @@ void Roe_compute_inviscid_flux<MixtureModel::MixtureFraction>(const Block &block
   printf("Roe_compute_inviscid_flux<MixtureModel::MixtureFraction> is not implemented yet.\n");
   MpiParallel::exit();
 }
+
+template void
+compute_convective_term_ep<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
+                                              const Parameter &parameter);
+
+template void
+compute_convective_term_ep<MixtureModel::Mixture>(const Block &block, cfd::DZone *zone, DParameter *param,
+                                                  int n_var, const Parameter &parameter);
+
+template void
+compute_convective_term_ep<MixtureModel::MixtureFraction>(const Block &block, cfd::DZone *zone, DParameter *param,
+                                                          int n_var, const Parameter &parameter);
+
+template void
+compute_convective_term_ep<MixtureModel::FR>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
+                                             const Parameter &parameter);
+
+template void
+compute_convective_term_ep<MixtureModel::FL>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
+                                             const Parameter &parameter);
 }
