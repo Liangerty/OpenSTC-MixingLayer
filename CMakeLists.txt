@@ -13,7 +13,6 @@ endif()
 
 add_compile_definitions(MAX_SPEC_NUMBER=9)
 add_compile_definitions(MAX_REAC_NUMBER=19)
-add_compile_definitions(GPU)
 
 project(OpenSTC-ML CUDA CXX)
 

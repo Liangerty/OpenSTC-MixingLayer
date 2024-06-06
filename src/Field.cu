@@ -520,11 +520,11 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   cudaMalloc(&h_ptr->boundary, mem_sz);
   cudaMemcpy(h_ptr->boundary, block.boundary.data(), mem_sz, cudaMemcpyHostToDevice);
   mem_sz = sizeof(InnerFace) * n_inner;
-  cudaMalloc(&h_ptr->innerface, mem_sz);
-  cudaMemcpy(h_ptr->innerface, block.inner_face.data(), mem_sz, cudaMemcpyHostToDevice);
+  cudaMalloc(&h_ptr->innerFace, mem_sz);
+  cudaMemcpy(h_ptr->innerFace, block.inner_face.data(), mem_sz, cudaMemcpyHostToDevice);
   mem_sz = sizeof(ParallelFace) * n_par;
-  cudaMalloc(&h_ptr->parface, mem_sz);
-  cudaMemcpy(h_ptr->parface, block.parallel_face.data(), mem_sz, cudaMemcpyHostToDevice);
+  cudaMalloc(&h_ptr->parFace, mem_sz);
+  cudaMemcpy(h_ptr->parFace, block.parallel_face.data(), mem_sz, cudaMemcpyHostToDevice);
 
   h_ptr->jac.allocate_memory(mx, my, mz, ngg);
   cudaMemcpy(h_ptr->jac.data(), block.jacobian.data(), sizeof(real) * h_ptr->jac.size(), cudaMemcpyHostToDevice);

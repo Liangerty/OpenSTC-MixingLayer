@@ -97,8 +97,12 @@ string monitor_file = input/monitor_points.txt
 array string monitor_var {
     density u   v  w  pressure temperature H2 O2 N2
 }
-// The slices are only for mixing layers, whose x coordinate is fixed for the same i.
+// The slices are only for mixing layers, whose x coordinate is fixed for the same i. (scaled by gridScale)
 int slice_frequency = 1000
 array real xSlice = {
    600
+}
+// We assume the z coordinate is fixed for the same k index. (scaled by gridScale)
+array real zSlice = {
+    0
 }

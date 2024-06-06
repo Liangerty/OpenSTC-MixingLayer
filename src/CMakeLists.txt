@@ -25,7 +25,7 @@ list(APPEND src_file
     ViscousScheme.cuh
     WallDistance.cuh WENO.cu
 
-    gxl_lib/Array.hpp
+    gxl_lib/Array.hpp gxl_lib/Array.cuh
     gxl_lib/MyString.cpp gxl_lib/MyAlgorithm.cpp gxl_lib/MyAlgorithm.h
     gxl_lib/Time.cpp gxl_lib/Time.h
     gxl_lib/MyAtomic.cuh

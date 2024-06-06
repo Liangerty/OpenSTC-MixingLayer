@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Define.h"
-#include "gxl_lib/Array.hpp"
+#include "gxl_lib/Array.cuh"
 #include "Parameter.h"
 #include "Mesh.h"
 #include "ChemData.h"
@@ -9,16 +9,14 @@
 namespace cfd {
 struct Inflow;
 
-#ifdef GPU
-
 struct DZone {
   DZone() = default;
 
-  int mx = 0, my = 0, mz = 0, ngg = 0; //, n_scal = 0, n_spec = 0, n_var = 5
+  int mx = 0, my = 0, mz = 0, ngg = 0;
   ggxl::Array3D<real> x, y, z;
   Boundary *boundary = nullptr;
-  InnerFace *innerface = nullptr;
-  ParallelFace *parface = nullptr;
+  InnerFace *innerFace = nullptr;
+  ParallelFace *parFace = nullptr;
   ggxl::Array3D<real> jac;
   ggxl::Array3D<gxl::Matrix<real, 3, 3, 1>> metric;
   ggxl::Array3D<real> wall_distance;
@@ -88,8 +86,6 @@ struct DZone {
   ggxl::VectorField3D<real> user_defined_statistical_data;
 };
 
-#endif
-
 struct DParameter;
 
 struct Field {
@@ -116,9 +112,7 @@ struct Field {
   ggxl::VectorField3DHost<real> firstOrderMoment, secondOrderMoment, userDefinedStatistics;
   ggxl::VectorField3DHost<real> mean_value, reynolds_stress_tensor_and_rms, user_defined_statistical_data;
 
-#ifdef GPU
   DZone *d_ptr = nullptr;
   DZone *h_ptr = nullptr;
-#endif
 };
 }

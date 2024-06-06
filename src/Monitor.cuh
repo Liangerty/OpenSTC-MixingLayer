@@ -2,7 +2,7 @@
 
 #include "Parameter.h"
 #include "ChemData.h"
-#include "gxl_lib/Array.hpp"
+#include "gxl_lib/Array.cuh"
 
 namespace cfd {
 
@@ -50,6 +50,9 @@ private:
   int n_iSlice{0};
   std::vector<int> iSlice, iSliceInBlock;
   std::vector<int> iSlice_js, iSlice_je, iSlice_ks, iSlice_ke;
+//  int n_kSlice{0};
+//  std::vector<int> kSlice, kSliceInBlock;
+//  std::vector<int> kSlice_is, kSlice_ie, kSlice_js, kSlice_je;
 
 private:
   // Utility functions

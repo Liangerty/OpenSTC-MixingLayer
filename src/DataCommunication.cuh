@@ -58,7 +58,7 @@ void data_communication(const Mesh &mesh, std::vector<Field> &field, const Param
 
 template<MixtureModel mix_model, class turb, bool with_cv>
 __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DParameter *param) {
-  const auto &f = zone->innerface[i_face];
+  const auto &f = zone->innerFace[i_face];
   uint n[3];
   n[0] = blockIdx.x * blockDim.x + threadIdx.x;
   n[1] = blockDim.y * blockIdx.y + threadIdx.y;
@@ -224,7 +224,7 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
 
 template<MixtureModel mix_model, class turb, bool with_cv>
 __global__ void assign_data_received(DZone *zone, int i_face, const real *data, DParameter *param) {
-  const auto &f = zone->parface[i_face];
+  const auto &f = zone->parFace[i_face];
   int n[3];
   n[0] = blockIdx.x * blockDim.x + threadIdx.x;
   n[1] = blockDim.y * blockIdx.y + threadIdx.y;

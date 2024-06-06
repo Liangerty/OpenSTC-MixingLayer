@@ -226,11 +226,135 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
         MPI_File_write_at(fp, offset, b.y.data(), 1, ty, &status);
         offset += mem_sz;
         MPI_File_write_at(fp, offset, b.z.data(), 1, ty, &status);
-        offset += mem_sz;
+        // offset += mem_sz;
         MPI_File_close(&fp);
       }
     }
   }
+//  auto zSlice = parameter.get_real_array("zSlice");
+  // Here, we assume the points with the same k index have the same z coordinate.
+  // Besides, we also assume that the blocking is only in x direction.
+  // Thus, the zSlice would be contained in multiple processes.
+//  if ((!zSlice.empty()) && mesh.dimension == 3) {
+//    const std::filesystem::path out_dir_slice("output/slice");
+//    if (!exists(out_dir_slice)) {
+//      create_directories(out_dir_slice);
+//    }
+//    const real gridScale{parameter.get_real("gridScale")};
+//    auto distance_smallest = new real[n_proc];
+//    for (auto zThis: zSlice) {
+//      int kThis{0}, bThis{0};
+//      real dist{1e+6};
+//      real zz = zThis * parameter.get_real("gridScale");
+//      for (int b = 0; b < n_block; ++b) {
+//        auto &z = mesh[b].z;
+//        for (int k = 0; k < mesh[b].mz; ++k) {
+//          if (abs(zz - z(0, 0, k)) < dist) {
+//            dist = abs(zz - z(0, 0, k));
+//            kThis = k;
+//            bThis = b;
+//          }
+//        }
+//      }
+//      // We have found the nearest block and i index to the slice in current process.
+//      // Next, we need to communicate among all processes to find the nearest.
+//      MPI_Barrier(MPI_COMM_WORLD);
+//      MPI_Allgather(&dist, 1, MPI_DOUBLE, distance_smallest, 1, MPI_DOUBLE, MPI_COMM_WORLD);
+//      bool this_smallest{true};
+//      for (int p = 0; p < n_proc; ++p) {
+//        if (p == myid)
+//          continue;
+//        if (distance_smallest[p] < dist) {
+//          this_smallest = false;
+//          break;
+//        }
+//      }
+//      if (this_smallest) {
+//        kSlice.push_back(kThis);
+//        kSliceInBlock.push_back(bThis);
+//        ++n_kSlice;
+//        printf("Process %d monitors block %d, kSlice %d with x = %f.\n", myid, bThis, kThis, zz);
+//      }
+//    }
+//    delete[] distance_smallest;
+//
+//    // If the slice is found, we need to monitor the slice.
+//    if (n_iSlice > 0) {
+//      auto core_range{parameter.get_real_range("coreRegion")};
+//      Range<real> core_region{core_range.xs * gridScale, core_range.xe * gridScale,
+//                              core_range.ys * gridScale, core_range.ye * gridScale,
+//                              core_range.zs * gridScale, core_range.ze * gridScale};
+//      int MX{1}, MY{1};
+//      for (int s = 0; s < n_iSlice; ++s) {
+//        // We need to find the region excluding the buffer layers.
+//        int k = kSlice[s];
+//        const auto &b = mesh[iSliceInBlock[s]];
+//        MX = std::max(b.mx, MX);
+//        MY = std::max(b.mz, MY);
+//
+//        int is = 0, ie = b.mx - 1, js = 0, je = b.my - 1;
+//        // Here, we assume the x increases with the i index.
+//        for (int i = 0; i < b.mx; ++i) {
+//          if (b.x(i, 0, k) > core_region.xs) {
+//            is = i;
+//            break;
+//          }
+//        }
+//        for (int i = 0; i < b.mx; ++i) {
+//          if (b.x(i, 0, k) > core_region.xe) {
+//            ie = i - 1;
+//            break;
+//          }
+//        }
+//        // We also assume the y increases with the j index.
+//        for (int j = 0; j < b.my; ++j) {
+//          if (b.y(0, j, k) > core_region.ys) {
+//            js = j;
+//            break;
+//          }
+//        }
+//        for (int j = 0; j < b.my; ++j) {
+//          if (b.y(0, j, k) > core_region.ye) {
+//            je = j - 1;
+//            break;
+//          }
+//        }
+//        kSlice_is.push_back(is);
+//        kSlice_ie.push_back(ie);
+//        kSlice_js.push_back(js);
+//        kSlice_je.push_back(je);
+//        // Here, we should first output the slices' coordinates.
+//        MPI_File fp;
+//        char file_name[1024];
+//        sprintf(file_name, "%s/zSlice_%f_coordinates.bin", out_dir_slice.string().c_str(),
+//                b.z(0, 0, kSlice[s]) / parameter.get_real("gridScale"));
+//        MPI_File_open(MPI_COMM_SELF, file_name, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
+//        MPI_Status status;
+//        MPI_Offset offset{0};
+//        const auto nx{ie - is + 1}, ny{je - js + 1};
+//        int nnv = parameter.get_int("n_var") + 1;
+//        MPI_File_write_at(fp, offset, &nnv, 1, MPI_INT, &status);
+//        offset += 4;
+//        MPI_File_write_at(fp, offset, &nx, 1, MPI_INT, &status);
+//        offset += 4;
+//        MPI_File_write_at(fp, offset, &ny, 1, MPI_INT, &status);
+//        offset += 4;
+//
+//        MPI_Datatype ty;
+//        int l_size[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
+//        int small_size[3]{nx, ny, 1};
+//        const auto mem_sz = nx * ny * 8;
+//        int start_idx[3]{b.ngg + kSlice_is[s], b.ngg + kSlice_js[s], b.ngg + kSlice[s]};
+//        MPI_Type_create_subarray(3, l_size, small_size, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+//        MPI_Type_commit(&ty);
+//        MPI_File_write_at(fp, offset, b.x.data(), 1, ty, &status);
+//        offset += mem_sz;
+//        MPI_File_write_at(fp, offset, b.y.data(), 1, ty, &status);
+//        // offset += mem_sz;
+//        MPI_File_close(&fp);
+//      }
+//    }
+//  }
 }
 
 std::vector<std::string> Monitor::setup_labels_to_monitor(const Parameter &parameter, const Species &species) {
@@ -410,6 +534,10 @@ void Monitor::output_slices(const Parameter &parameter, std::vector<cfd::Field> 
     }
     MPI_File_close(&fp);
   }
+
+//  if (n_kSlice <= 0) {
+//    return;
+//  }
   ++slice_counter;
 }
 

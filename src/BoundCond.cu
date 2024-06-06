@@ -6,7 +6,6 @@
 // This file should not include "algorithm", which will result in an error for gcc.
 // This persuades me to write a new function "exists" in MyAlgorithm.h and MyAlgorithm.cpp.
 
-#ifdef GPU
 namespace cfd {
 
 template<typename BCType>
@@ -1462,4 +1461,3 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
   }
 }
 }
-#endif
