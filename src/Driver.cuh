@@ -38,7 +38,6 @@ struct Driver<MixtureModel::FL, turb> {
   Driver(Parameter &parameter, Mesh &mesh_);
 
   void initialize_computation();
-//  void simulate();
 
   int myid = 0;
   gxl::Time time;

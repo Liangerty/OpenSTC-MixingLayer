@@ -146,18 +146,18 @@ cfd::wall_friction_heatFlux_3d(cfd::DZone *zone, ggxl::VectorField2D<real> *cfQw
   // const real rhow=pv(i,j-1,k,0);
   // const real dy=zone->y(i,j,k)-zone->y(i,j-1,k);
   real u, v, w;
-  real T1, T0;
+//  real T1, T0;
   real rhow;
   const real dy = zone->y(i, j, k) - zone->y(i, j - 1, k);
   if (!stat_on) {
     auto &pv = zone->bv;
     u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
-    T1 = pv(i, j, k, 5), T0 = pv(i, j - 1, k, 5);
+//    T1 = pv(i, j, k, 5), T0 = pv(i, j - 1, k, 5);
     rhow = pv(i, j - 1, k, 0);
   } else {
     auto &pv = zone->mean_value;
     u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
-    T1 = pv(i, j, k, 5), T0 = pv(i, j - 1, k, 5);
+//    T1 = pv(i, j, k, 5), T0 = pv(i, j - 1, k, 5);
     rhow = pv(i, j - 1, k, 0);
   }
   // const real xi_x = metric(1, 1), xi_y = metric(1, 2), xi_z = metric(1, 3);
