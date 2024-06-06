@@ -23,7 +23,7 @@ __global__ void update_physical_time(DParameter *param, real t) {
 }
 
 template<MixtureModel mix_model, class turb>
-void RK3_bv(Driver<mix_model, turb> &driver) {
+void RK3(Driver<mix_model, turb> &driver) {
   if (driver.myid == 0) {
     printf("Unsteady flow simulation with 3rd order Runge-Kutta scheme for time advancing.\n");
   }
@@ -146,7 +146,7 @@ void RK3_bv(Driver<mix_model, turb> &driver) {
         update_cv_and_bv_rk<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param, dt, rk);
 
         // limit unphysical values computed by the program
-        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param, b);
+        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
         // Apply boundary conditions
         // Attention: "driver" is a template class, when a template class calls a member function of another template,

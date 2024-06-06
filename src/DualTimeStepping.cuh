@@ -152,7 +152,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
         // update basic and conservative variables
         update_cv_and_bv<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
-        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param, b);
+        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
         // Apply boundary conditions
         // Attention: "driver" is a template class, when a template class calls a member function of another template,

@@ -18,7 +18,6 @@ compute_temperature_and_pressure(int i, int j, int k, const DParameter *param, D
 template<MixtureModel mixture_model>
 __device__ void compute_total_energy(int i, int j, int k, cfd::DZone *zone, const DParameter *param) {
   auto &bv = zone->bv;
-  auto &sv = zone->sv;
 
   const real V2 = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3);
   real total_energy = 0.5 * V2;
@@ -28,7 +27,7 @@ __device__ void compute_total_energy(int i, int j, int k, cfd::DZone *zone, cons
     // Add species enthalpy together up to kinetic energy to get total enthalpy
     for (auto l = 0; l < param->n_spec; l++) {
       // h = \Sum_{i=1}^{n_spec} h_i * Y_i
-      total_energy += enthalpy[l] * sv(i, j, k, l);
+      total_energy += enthalpy[l] * zone->sv(i, j, k, l);
     }
     total_energy *= bv(i, j, k, 0); // \rho * h
     total_energy -= bv(i, j, k, 4); // (\rho e =\rho h - p)

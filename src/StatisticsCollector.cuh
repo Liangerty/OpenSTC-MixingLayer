@@ -354,8 +354,8 @@ void StatisticsCollector::prepare_for_statistical_data_plot(const Species &speci
 template<MixtureModel mix_model, class turb>
 int32_t StatisticsCollector::acquire_variable_names(std::vector<std::string> &var_name, const Species &species) {
   auto nv = (int) (var_name.size()); // x,y,z + rho,u,v,w,p,T,Mach
-  const auto nv_old = nv;
   if constexpr (mix_model != MixtureModel::Air) {
+    const auto nv_old = nv;
     nv += parameter.get_int("n_spec"); // Y_k
     var_name.resize(nv);
     auto &names = species.spec_list;

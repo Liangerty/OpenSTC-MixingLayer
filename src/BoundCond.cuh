@@ -43,7 +43,7 @@ struct DBoundCond {
   void apply_boundary_conditions(const Mesh &mesh, std::vector<Field> &field, DParameter *param) const;
 
   // There may be time-dependent BCs, which need to be updated at each time step.
-  // E.g. the turbulent library method, we need to update the profile and fluctuation.
+  // E.g., the turbulent library method, we need to update the profile and fluctuation.
   // E.g., the NSCBC
   // Therefore, this function may be extended in the future to be called "time-dependent bc update".
   //  void
@@ -563,17 +563,17 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
   const real u_face{nx * u_b + ny * v_b + nz * w_b};
 
   // Interpolate the scalar values from internal nodes, which are used to compute gamma, after which, acoustic speed.
-  const int n_scalar = param->n_scalar, n_spec = param->n_spec;
+  const int n_scalar = param->n_scalar;
   auto &sv = zone->sv;
   real gamma_b{gamma_air}, mw{mw_air};
-  real sv_b[MAX_SPEC_NUMBER + 2], cp[MAX_SPEC_NUMBER];
+  real sv_b[MAX_SPEC_NUMBER + 2];
   if constexpr (mix_model != MixtureModel::Air) {
     for (int l = 0; l < n_scalar; ++l) {
       sv_b[l] = sv(i, j, k, l);
     }
     gamma_b = zone->gamma(i, j, k);
     real mw_inv{0};
-    for (int l = 0; l < n_spec; ++l) {
+    for (int l = 0; l < param->n_spec; ++l) {
       mw_inv += sv_b[l] / param->mw[l];
     }
     mw = 1.0 / mw_inv;
@@ -716,9 +716,10 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
         density = pow(c_b * c_b / (gamma * s_b), 1 / (gamma - 1));
         pressure = density * c_b * c_b / gamma;
         temperature = pressure * mw / (density * R_u);
+        real cp[MAX_SPEC_NUMBER];
         compute_cp(temperature, cp, param);
         real cp_tot{0};
-        for (int l = 0; l < n_spec; ++l) {
+        for (int l = 0; l < param->n_spec; ++l) {
           cp_tot += cp[l] * sv_b[l];
         }
         gamma = cp_tot / (cp_tot - R_u / mw);
@@ -780,7 +781,6 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
-  const int n_spec = param->n_spec;
 
   real t_wall{bv(i, j, k, 5)};
 
@@ -815,7 +815,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     // Mixture
     const auto mwk = param->mw;
     mw = 0;
-    for (int l = 0; l < n_spec; ++l) {
+    for (int l = 0; l < param->n_spec; ++l) {
       sv(i, j, k, l) = sv(idx[0], idx[1], idx[2], l);
       mw += sv(i, j, k, l) / mwk[l];
     }
@@ -834,29 +834,6 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
 
   if (if_fluctuation == 1) {
     // Pirozzoli & Li fluctuations
-    if (i == 0 && j == 0 && k == 0) {
-      for (int ll = 0; ll < 11; ++ll) {
-        printf("Zl[%d]=%f\n", ll, wall->Zl[ll]);
-      }
-      for (int ll = 0; ll < 6; ++ll) {
-        printf("Tm[%d]=%f\n", ll, wall->Tm[ll]);
-      }
-    }
-    auto index{0};
-    switch (b.face) {
-      case 1:
-        index = (k + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
-        break;
-      case 2:
-        index = (j + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
-        break;
-      case 0:
-      default:
-        index = (k + ngg) * (zone->my + 2 * ngg) + (j + ngg);
-        break;
-    }
-    auto &rng_state = rng_states_d_ptr[index];
-
 
   } else if (if_fluctuation == 3) {
     real A0 = wall->fluctuation_intensity;
@@ -881,7 +858,6 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     zone->vel(i, j, k) = bv(i, j, k, 2);
   }
 
-
   // turbulent boundary condition
   if constexpr (TurbMethod<turb>::label == TurbMethodLabel::SST) {
     // SST
@@ -892,6 +868,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
       mu_wall = Sutherland(t_wall);
     }
     const real dy = zone->wall_distance(idx[0], idx[1], idx[2]);
+    const int n_spec = param->n_spec;
     sv(i, j, k, n_spec) = 0;
     if (dy > 1e-25) {
       sv(i, j, k, n_spec + 1) = 60 * mu_wall / (rho_wall * sst::beta_1 * dy * dy);
@@ -951,6 +928,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     // turbulent boundary condition
     if constexpr (TurbMethod<turb>::label == TurbMethodLabel::SST) {
       // SST
+      const int n_spec = param->n_spec;
       sv(i_gh[0], i_gh[1], i_gh[2], n_spec) = 0;
       sv(i_gh[0], i_gh[1], i_gh[2], n_spec + 1) = sv(i, j, k, n_spec + 1);
       zone->mut(i_gh[0], i_gh[1], i_gh[2]) = 0;

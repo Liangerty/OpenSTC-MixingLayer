@@ -52,8 +52,8 @@ __global__ void
 compute_convective_term_pv_1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const int tid = threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2];
-  const int block_dim = blockDim.x * blockDim.y * blockDim.z;
+  const int tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const int block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
   const int n_point = block_dim + 2 * ngg - 1;
 
@@ -214,8 +214,7 @@ reconstruction(real *pv, real *pv_l, real *pv_r, const int idx_shared, DParamete
 }
 
 template<MixtureModel mix_model>
-void compute_convective_term_aweno(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                   const Parameter &parameter) {
+void compute_convective_term_aweno(const Block &block, cfd::DZone *zone, DParameter *param, int n_var) {
   // The implementation of AWENO is based on Fig.9 of (Ye, C-C, Zhang, P-J-Y, Wan, Z-H, and Sun, D-J (2022)
   // An alternative formulation of targeted ENO scheme for hyperbolic conservation laws. Computers & Fluids, 238, 105368.
   // doi:10.1016/j.compfluid.2022.105368.)
@@ -530,8 +529,7 @@ Roe_compute_inviscid_flux_1D(cfd::DZone *zone, int direction, int max_extent, DP
   }
   __syncthreads();
 
-  riemannSolver_Roe<mix_model>(zone, pv, tid, param, fc, metric, jac, entropy_fix_delta,
-                               direction);
+  riemannSolver_Roe<mix_model>(zone, pv, tid, param, fc, metric, jac, entropy_fix_delta);
   __syncthreads();
 
 
@@ -543,8 +541,7 @@ Roe_compute_inviscid_flux_1D(cfd::DZone *zone, int direction, int max_extent, DP
 }
 
 template<MixtureModel mix_model>
-void compute_convective_term_ep(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                const Parameter &parameter) {
+void compute_convective_term_ep(const Block &block, cfd::DZone *zone, DParameter *param, int n_var) {
   // Implementation of the 6th-order EP scheme.
   // PIROZZOLI S. Stabilized non-dissipative approximations of Euler equations in generalized curvilinear coordinates[J/OL].
   // Journal of Computational Physics, 2011, 230(8): 2997-3014. DOI:10.1016/j.jcp.2011.01.001.
@@ -586,8 +583,8 @@ template<MixtureModel mix_model>
 __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const int tid = threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2];
-  const int block_dim = blockDim.x * blockDim.y * blockDim.z;
+  const int tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const int block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
   const int n_point = block_dim + 2 * ngg - 1;
 
@@ -690,6 +687,7 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
   __syncthreads();
 
   const auto &sv = zone->sv;
+  const int n_scalar{param->n_scalar};
   for (int l = 1; l <= 3; ++l) {
     int l_idx[3]{idx[0], idx[1], idx[2]};
     l_idx[direction] += l;
@@ -708,7 +706,7 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
         pWeight * (metric[i_shared * 3 + 2] * jac[i_shared] + metric[(i_shared + l) * 3 + 2] * jac[i_shared + l]);
     tilde_op[i_shared * n_var * 3 + (l - 1) * n_var + 4] =
         weight * (totalEnthalpy[i_shared] + totalEnthalpy[i_shared + l]);
-    for (int k = 0; l < param->n_scalar_transported; ++k) {
+    for (int k = 0; k < n_scalar; ++k) {
       tilde_op[i_shared * n_var * 3 + (l - 1) * n_var + 5 + k] =
           weight * (sv(idx[0], idx[1], idx[2], k) + sv(l_idx[0], l_idx[1], l_idx[2], k));
     }
@@ -735,7 +733,7 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
                      metric[(ig_shared[g] + l) * 3 + 2] * jac[ig_shared[g] + l]);
       tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var + 4] =
           weight * (totalEnthalpy[ig_shared[g]] + totalEnthalpy[ig_shared[g] + l]);
-      for (int k = 0; k < param->n_scalar_transported; ++k) {
+      for (int k = 0; k < n_scalar; ++k) {
         tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var + 5 + k] =
             weight * (sv(g_idx[g][0], g_idx[g][1], g_idx[g][2], k) + sv(l_idx[0], l_idx[1], l_idx[2], k));
       }
@@ -784,24 +782,21 @@ compute_convective_term_pv<MixtureModel::FL>(const Block &block, cfd::DZone *zon
                                              const Parameter &parameter);
 
 template void
-compute_convective_term_aweno<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                                 const Parameter &parameter);
+compute_convective_term_aweno<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
 
 template void
 compute_convective_term_aweno<MixtureModel::Mixture>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                     int n_var, const Parameter &parameter);
+                                                     int n_var);
 
 template void
 compute_convective_term_aweno<MixtureModel::MixtureFraction>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                             int n_var, const Parameter &parameter);
+                                                             int n_var);
 
 template void
-compute_convective_term_aweno<MixtureModel::FR>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                                const Parameter &parameter);
+compute_convective_term_aweno<MixtureModel::FR>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
 
 template void
-compute_convective_term_aweno<MixtureModel::FL>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                                const Parameter &parameter);
+compute_convective_term_aweno<MixtureModel::FL>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
 
 template
 void Roe_compute_inviscid_flux<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param,
@@ -830,22 +825,26 @@ void Roe_compute_inviscid_flux<MixtureModel::MixtureFraction>(const Block &block
 }
 
 template void
-compute_convective_term_ep<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                              const Parameter &parameter);
+compute_convective_term_ep<MixtureModel::Air>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
 
 template void
-compute_convective_term_ep<MixtureModel::Mixture>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                  int n_var, const Parameter &parameter);
+compute_convective_term_ep<MixtureModel::Mixture>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
 
-template void
+template<>
+void
 compute_convective_term_ep<MixtureModel::MixtureFraction>(const Block &block, cfd::DZone *zone, DParameter *param,
-                                                          int n_var, const Parameter &parameter);
+                                                          int n_var) {
+  printf("compute_convective_term_ep<MixtureModel::MixtureFraction> is not implemented yet.\n");
+  MpiParallel::exit();
+}
 
 template void
-compute_convective_term_ep<MixtureModel::FR>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                             const Parameter &parameter);
+compute_convective_term_ep<MixtureModel::FR>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
 
-template void
-compute_convective_term_ep<MixtureModel::FL>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                             const Parameter &parameter);
+template<>
+void
+compute_convective_term_ep<MixtureModel::FL>(const Block &block, cfd::DZone *zone, DParameter *param, int n_var) {
+  printf("compute_convective_term_ep<MixtureModel::FL> is not implemented yet.\n");
+  MpiParallel::exit();
+}
 }

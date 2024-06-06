@@ -34,13 +34,13 @@ compute_inviscid_flux(const Block &block, cfd::DZone *zone, DParameter *param, i
       compute_convective_term_pv<mix_model>(block, zone, param, n_var, parameter);
       break;
     case 1: // Compute the term with AWENO methods. (WENO-Z-5 + LF/AUSM+/HLLC)
-      compute_convective_term_aweno<mix_model>(block, zone, param, n_var, parameter);
+      compute_convective_term_aweno<mix_model>(block, zone, param, n_var);
       break;
     case 3: // Compute the term with WENO-Z-5
       compute_convective_term_weno<mix_model>(block, zone, param, n_var, parameter);
       break;
     case 4:
-      compute_convective_term_ep<mix_model>(block, zone, param, n_var, parameter);
+      compute_convective_term_ep<mix_model>(block, zone, param, n_var);
       break;
     case 2: // Roe scheme
     default: // Roe scheme

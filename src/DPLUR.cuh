@@ -283,8 +283,8 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
       // This method does not have an implicit treatment, do something.
     }
   } else {
-    const auto i_turb_cv{param->i_turb_cv};
     if constexpr (TurbMethod<turb_method>::label == TurbMethodLabel::SST) {
+      const auto i_turb_cv{param->i_turb_cv};
       dqk(i, j, k, i_turb_cv) = dq0(i, j, k, i_turb_cv) + dt_local * dq_total[i_turb_cv] / diag;
       dqk(i, j, k, i_turb_cv + 1) = dq0(i, j, k, i_turb_cv + 1) + dt_local * dq_total[i_turb_cv + 1] / diag;
     }

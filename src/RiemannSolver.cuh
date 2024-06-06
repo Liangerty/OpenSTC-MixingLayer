@@ -21,12 +21,11 @@ riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, in
   const real ur = (k1 * pv_r[1] + k2 * pv_r[2] + k3 * pv_r[3]) / grad_k_div_jac;
 
   const real pl = pv_l[4], pr = pv_r[4], rho_l = pv_l[0], rho_r = pv_r[0];
-  const int n_spec = param->n_spec;
   real gam_l{gamma_air}, gam_r{gamma_air};
   const int n_var = param->n_var;
   auto n_reconstruct{n_var};
   if constexpr (mix_model == MixtureModel::FL) {
-    n_reconstruct += n_spec;
+    n_reconstruct += param->n_spec;
   }
   if constexpr (mix_model != MixtureModel::Air) {
     gam_l = pv_l[n_reconstruct + 1];
@@ -76,7 +75,7 @@ riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, in
         fci[l] = coeff * pv_l[l];
       } else {
         // Flamelet model
-        fci[l] = coeff * pv_l[l + n_spec];
+        fci[l] = coeff * pv_l[l + param->n_spec];
       }
     }
   } else {
@@ -90,7 +89,7 @@ riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, in
         fci[l] = coeff * pv_r[l];
       } else {
         // Flamelet model
-        fci[l] = coeff * pv_r[l + n_spec];
+        fci[l] = coeff * pv_r[l + param->n_spec];
       }
     }
   }
@@ -112,21 +111,20 @@ riemannSolver_hllc(const real *pv_l, const real *pv_r, DParameter *param, int ti
   const real u_tilde{pv_l[1] * rl_c + pv_r[1] * rr_c};
   const real v_tilde{pv_l[2] * rl_c + pv_r[2] * rr_c};
   const real w_tilde{pv_l[3] * rl_c + pv_r[3] * rr_c};
-  const real hl{(pv_l[n_reconstruct] + pv_l[4]) / pv_l[0]};
-  const real hr{(pv_r[n_reconstruct] + pv_r[4]) / pv_r[0]};
-  const real h_tilde{hl * rl_c + hr * rr_c};
-  const real ek_tilde{0.5 * (u_tilde * u_tilde + v_tilde * v_tilde + w_tilde * w_tilde)};
 
   real gamma{gamma_air};
-  real c_tilde{0};
+  real c_tilde;
   real svm[MAX_SPEC_NUMBER + 4];
   memset(svm, 0, sizeof(real) * (MAX_SPEC_NUMBER + 4));
   for (int l = 0; l < param->n_var - 5; ++l) {
     svm[l] = rl_c * pv_l[l + 5] + rr_c * pv_r[l + 5];
   }
-  real h_i[MAX_SPEC_NUMBER];
 
   if constexpr (mix_model == MixtureModel::Air) {
+    const real hl{(pv_l[n_reconstruct] + pv_l[4]) / pv_l[0]};
+    const real hr{(pv_r[n_reconstruct] + pv_r[4]) / pv_r[0]};
+    const real h_tilde{hl * rl_c + hr * rr_c};
+    const real ek_tilde{0.5 * (u_tilde * u_tilde + v_tilde * v_tilde + w_tilde * w_tilde)};
     c_tilde = std::sqrt((gamma - 1) * (h_tilde - ek_tilde));
   } else {
     real mw_inv{0};
@@ -138,7 +136,7 @@ riemannSolver_hllc(const real *pv_l, const real *pv_r, DParameter *param, int ti
     const real tr{pv_r[4] / pv_r[0]};
     const real t{(rl_c * tl + rr_c * tr) / (R_u * mw_inv)};
 
-    real cp_i[MAX_SPEC_NUMBER];
+    real cp_i[MAX_SPEC_NUMBER], h_i[MAX_SPEC_NUMBER];
     compute_enthalpy_and_cp(t, h_i, cp_i, param);
     real cv{0}, cp{0};
     for (int l = 0; l < param->n_spec; ++l) {
@@ -233,7 +231,7 @@ riemannSolver_hllc(const real *pv_l, const real *pv_r, DParameter *param, int ti
 template<MixtureModel mixtureModel>
 __device__ void
 compute_half_sum_left_right_flux(const real *pv_l, const real *pv_r, DParameter *param, const real *jac,
-                                 const real *metric, int i_shared, int direction, real *fc) {
+                                 const real *metric, int i_shared, real *fc) {
   real JacKx = jac[i_shared] * metric[i_shared * 3];
   real JacKy = jac[i_shared] * metric[i_shared * 3 + 1];
   real JacKz = jac[i_shared] * metric[i_shared * 3 + 2];
@@ -280,7 +278,7 @@ compute_half_sum_left_right_flux(const real *pv_l, const real *pv_r, DParameter 
 template<MixtureModel mix_model>
 __device__ void
 riemannSolver_Roe(DZone *zone, real *pv, int tid, DParameter *param, real *fc, real *metric, const real *jac,
-                  const real *entropy_fix_delta, int direction) {
+                  const real *entropy_fix_delta) {
   constexpr int n_reconstruction_max =
       7 + MAX_SPEC_NUMBER + 4; // rho,u,v,w,p,Y_{1...Ns},(k,omega,z,z_prime),E,gamma
   real pv_l[n_reconstruction_max], pv_r[n_reconstruction_max];
@@ -295,7 +293,7 @@ riemannSolver_Roe(DZone *zone, real *pv, int tid, DParameter *param, real *fc, r
 
   // Compute the left and right convective fluxes, which uses the reconstructed primitive variables, rather than the roe averaged ones.
   auto fci = &fc[tid * param->n_var];
-  compute_half_sum_left_right_flux<mix_model>(pv_l, pv_r, param, jac, metric, i_shared, direction, fci);
+  compute_half_sum_left_right_flux<mix_model>(pv_l, pv_r, param, jac, metric, i_shared, fci);
 
   // Compute the Roe averaged variables.
   const real dl = std::sqrt(pv_l[0]), dr = std::sqrt(pv_r[0]);

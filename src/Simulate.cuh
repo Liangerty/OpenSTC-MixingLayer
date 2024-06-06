@@ -23,7 +23,6 @@ void simulate(Driver<mix_model, turb> &driver) {
     // But we still store the cv array here. Because in methods such as RK, we need multiple stages to update the cv variables.
     // However, in high-order methods, such as the WENO method, we need to store the cv variables.
     // When this happens, the corresponding boundary conditions, data communications would all involve the update of cv.
-    const auto inviscid_tag{parameter.get_int("inviscid_scheme")};
     const auto temporal_tag{parameter.get_int("temporal_scheme")};
     // Inviscid methods which use only bv
     switch (temporal_tag) {
@@ -35,7 +34,7 @@ void simulate(Driver<mix_model, turb> &driver) {
         break;
       case 3:
       default:
-        RK3_bv<mix_model, turb>(driver);
+        RK3<mix_model, turb>(driver);
         break;
     }
   }

@@ -23,8 +23,7 @@ __device__ void
 reconstruction(real *pv, real *pv_l, real *pv_r, int idx_shared, DParameter *param);
 
 template<MixtureModel mix_model>
-void compute_convective_term_aweno(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                   const Parameter &parameter);
+void compute_convective_term_aweno(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
 
 template<MixtureModel mix_model>
 void compute_convective_term_weno(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
@@ -73,8 +72,7 @@ __device__ real WENO5(const real *vp, const real *vm, real eps);
 __device__ real WENO7(const real *vp, const real *vm, real eps);
 
 template<MixtureModel mix_model>
-void compute_convective_term_ep(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
-                                const Parameter &parameter);
+void compute_convective_term_ep(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
 
 template<MixtureModel mix_model>
 __global__ void

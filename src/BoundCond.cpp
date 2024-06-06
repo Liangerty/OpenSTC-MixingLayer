@@ -19,7 +19,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
   const int n_scalar = parameter.get_int("n_scalar");
   const int n_spec{spec.n_spec};
   real gamma{gamma_air};
-  real c{-1};
+  real c;
   if (inflow_type == 2) {
     // Mixing-layer problem.
     // The info should be treated differently from general cases.
@@ -105,7 +105,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     if (n_spec > 0) {
       // Assign the species mass fraction to the corresponding position.
       // Should be done after knowing the order of species.
-      for (auto [name, idx]: spec.spec_list) {
+      for (const auto& [name, idx]: spec.spec_list) {
         if (info.find(name) != info.cend()) {
           sv[idx] = std::get<real>(info.at(name));
         }
@@ -302,7 +302,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, const cfd::Species &spec, co
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.
     // Should be done after knowing the order of species.
-    for (auto [name, idx]: spec.spec_list) {
+    for (const auto& [name, idx]: spec.spec_list) {
       if (info.find(name) != info.cend()) {
         sv[idx] = std::get<real>(info.at(name));
       }
@@ -492,7 +492,7 @@ cfd::FarField::FarField(cfd::Species &spec, cfd::Parameter &parameter) {
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.
     // Should be done after knowing the order of species.
-    for (auto [name, idx]: spec.spec_list) {
+    for (const auto& [name, idx]: spec.spec_list) {
       if (info.find(name) != info.cend()) {
         sv[idx] = std::get<real>(info.at(name));
       }

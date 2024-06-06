@@ -45,7 +45,7 @@ real global_time_step(const Mesh &mesh, const Parameter &parameter, std::vector<
 __global__ void min_of_arr(real *arr, int size);
 
 template<MixtureModel mixture, class turb_method>
-__global__ void limit_flow(cfd::DZone *zone, cfd::DParameter *param, int blk_id);
+__global__ void limit_flow(cfd::DZone *zone, cfd::DParameter *param);
 }
 
 template<MixtureModel mixture, class turb_method>
@@ -101,7 +101,7 @@ __global__ void cfd::local_time_step(cfd::DZone *zone, cfd::DParameter *param) {
 }
 
 template<MixtureModel mixture, class turb_method>
-__global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param, int blk_id) {
+__global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
   const int j = blockDim.y * blockIdx.y + threadIdx.y;
@@ -167,10 +167,6 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param, int bl
           updated_var[3] += bv(i1, j1, k1, 3);
           updated_var[4] += bv(i1, j1, k1, 4);
 
-//          for (int l = 0; l < param->n_scalar; ++l) {
-//            updated_var[l + 5] += sv(i1, j1, k1, l);
-//          }
-
           ++kn;
         }
       }
@@ -179,7 +175,7 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param, int bl
     // Compute the average of the surrounding points
     if (kn > 0) {
       const real kn_inv{1.0 / kn};
-      for (int l = 0; l < n_flow_var/* + param->n_scalar*/; ++l) {
+      for (int l = 0; l < n_flow_var; ++l) {
         updated_var[l] *= kn_inv;
       }
     } else {
@@ -188,9 +184,6 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param, int bl
         updated_var[l] = max(var[l], ll[l]);
         updated_var[l] = min(updated_var[l], ul[l]);
       }
-//      for (int l = 0; l < param->n_scalar; ++l) {
-//        updated_var[l + 5] = param->limit_flow.sv_inf[l];
-//      }
     }
 
     // Assign averaged values for the bad point
@@ -201,9 +194,6 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param, int bl
     bv(i, j, k, 4) = updated_var[4];
     zone->vel(i, j, k) =
         std::sqrt(updated_var[1] * updated_var[1] + updated_var[2] * updated_var[2] + updated_var[3] * updated_var[3]);
-//    for (int l = 0; l < param->n_scalar; ++l) {
-//      sv(i, j, k, l) = updated_var[5 + l];
-//    }
     if constexpr (mixture == MixtureModel::Air) {
       bv(i, j, k, 5) = updated_var[4] * mw_air / (updated_var[0] * R_u);
     } else {
