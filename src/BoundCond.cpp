@@ -407,21 +407,50 @@ cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, int, real>
     parameter.update_parameter("if_compute_wall_distance", 1);
   }
   if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<int>(info.at("fluctuation_type"));
-  if (fluctuation_type == 3){
-    if (info.find("fluctuation_frequency") != info.end())
-      fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
-    if (info.find("fluctuation_intensity") != info.end())
-      fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
-    if (info.find("streamwise_wavelength") != info.end())
-      streamwise_wavelength = std::get<real>(info.at("streamwise_wavelength"));
-    if (info.find("spanwise_wavelength") != info.end())
-      spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
-    if (info.find("fluctuation_x0") != info.end())
-      fluctuation_x0 = std::get<real>(info.at("fluctuation_x0"));
-    if (info.find("fluctuation_x1") != info.end())
-      fluctuation_x1 = std::get<real>(info.at("fluctuation_x1"));
+  if (fluctuation_type != 0) {
+    // Last, read the fluctuation info.
+    if (fluctuation_type == 1) {
+      // Pirozzoli & Li fluctuations
+      if (parameter.has_int_array("need_rng")) {
+        auto need_rng = parameter.get_int_array("need_rng");
+        if (std::find(need_rng.begin(), need_rng.end(), label) == need_rng.end()) {
+          need_rng.push_back(label);
+          parameter.update_parameter("need_rng", need_rng);
+        }
+      } else {
+        parameter.update_parameter("need_rng", std::vector<int>{label});
+      }
+      if (info.find("fluctuation_intensity") != info.end())
+        fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
+      if (info.find("fluctuation_x0") != info.end())
+        fluctuation_x0 = std::get<real>(info.at("fluctuation_x0"));
+      if (info.find("fluctuation_x1") != info.end())
+        fluctuation_x1 = std::get<real>(info.at("fluctuation_x1"));
+      if (info.find("fluctuation_frequency") != info.end())
+        fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
+      Zl[0] = 0.2 / (1 - pow(0.8, 11));
+      for (int i = 1; i < 11; ++i) {
+        Zl[i] = 0.8 * Zl[i - 1];
+      }
+      Tm[0] = 0.2 / (1 - pow(0.8, 6));
+      for (int i = 1; i < 6; ++i) {
+        Tm[i] = 0.8 * Tm[i - 1];
+      }
+    } else if (fluctuation_type == 3) {
+      if (info.find("fluctuation_frequency") != info.end())
+        fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
+      if (info.find("fluctuation_intensity") != info.end())
+        fluctuation_intensity = std::get<real>(info.at("fluctuation_intensity"));
+      if (info.find("streamwise_wavelength") != info.end())
+        streamwise_wavelength = std::get<real>(info.at("streamwise_wavelength"));
+      if (info.find("spanwise_wavelength") != info.end())
+        spanwise_wavelength = std::get<real>(info.at("spanwise_wavelength"));
+      if (info.find("fluctuation_x0") != info.end())
+        fluctuation_x0 = std::get<real>(info.at("fluctuation_x0"));
+      if (info.find("fluctuation_x1") != info.end())
+        fluctuation_x1 = std::get<real>(info.at("fluctuation_x1"));
+    }
   }
-  
 }
 
 cfd::Symmetry::Symmetry(const std::string &inflow_name, cfd::Parameter &parameter) {

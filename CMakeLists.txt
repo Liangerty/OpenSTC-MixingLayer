@@ -17,7 +17,7 @@ add_compile_definitions(GPU)
 
 project(OpenSTC-ML CUDA CXX)
 
-set(CMAKE_CUDA_STANDARD 20)
+set(CMAKE_CUDA_STANDARD 17)
 
 add_subdirectory(src)
 

@@ -689,6 +689,7 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
   }
   __syncthreads();
 
+  const auto &sv = zone->sv;
   for (int l = 1; l <= 3; ++l) {
     int l_idx[3]{idx[0], idx[1], idx[2]};
     l_idx[direction] += l;
@@ -707,6 +708,10 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
         pWeight * (metric[i_shared * 3 + 2] * jac[i_shared] + metric[(i_shared + l) * 3 + 2] * jac[i_shared + l]);
     tilde_op[i_shared * n_var * 3 + (l - 1) * n_var + 4] =
         weight * (totalEnthalpy[i_shared] + totalEnthalpy[i_shared + l]);
+    for (int k = 0; l < param->n_scalar_transported; ++k) {
+      tilde_op[i_shared * n_var * 3 + (l - 1) * n_var + 5 + k] =
+          weight * (sv(idx[0], idx[1], idx[2], k) + sv(l_idx[0], l_idx[1], l_idx[2], k));
+    }
   }
   for (int g = 0; g < additional_loaded; ++g) {
     for (int l = 1; l <= 3; ++l) {
@@ -730,6 +735,10 @@ __global__ void compute_convective_term_ep_1D(cfd::DZone *zone, int direction, i
                      metric[(ig_shared[g] + l) * 3 + 2] * jac[ig_shared[g] + l]);
       tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var + 4] =
           weight * (totalEnthalpy[ig_shared[g]] + totalEnthalpy[ig_shared[g] + l]);
+      for (int k = 0; k < param->n_scalar_transported; ++k) {
+        tilde_op[ig_shared[g] * n_var * 3 + (l - 1) * n_var + 5 + k] =
+            weight * (sv(g_idx[g][0], g_idx[g][1], g_idx[g][2], k) + sv(l_idx[0], l_idx[1], l_idx[2], k));
+      }
     }
   }
   __syncthreads();

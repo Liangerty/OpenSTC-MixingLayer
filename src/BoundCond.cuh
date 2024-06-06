@@ -767,7 +767,7 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
 }
 
 template<MixtureModel mix_model, class turb, bool with_cv = false>
-__global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face) {
+__global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *rng_states_d_ptr) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
@@ -832,7 +832,33 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
   bv(i, j, k, 5) = t_wall;
   zone->vel(i, j, k) = 0;
 
-  if (if_fluctuation == 3) {
+  if (if_fluctuation == 1) {
+    // Pirozzoli & Li fluctuations
+    if (i == 0 && j == 0 && k == 0) {
+      for (int ll = 0; ll < 11; ++ll) {
+        printf("Zl[%d]=%f\n", ll, wall->Zl[ll]);
+      }
+      for (int ll = 0; ll < 6; ++ll) {
+        printf("Tm[%d]=%f\n", ll, wall->Tm[ll]);
+      }
+    }
+    auto index{0};
+    switch (b.face) {
+      case 1:
+        index = (k + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
+        break;
+      case 2:
+        index = (j + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
+        break;
+      case 0:
+      default:
+        index = (k + ngg) * (zone->my + 2 * ngg) + (j + ngg);
+        break;
+    }
+    auto &rng_state = rng_states_d_ptr[index];
+
+
+  } else if (if_fluctuation == 3) {
     real A0 = wall->fluctuation_intensity;
     real omega = 2.0 * pi * wall->fluctuation_frequency;
     real beta = 2.0 * pi / wall->spanwise_wavelength;
@@ -1255,7 +1281,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_wall<mix_model, turb, with_cv><<<BPG, TPB>>>(field.d_ptr, &wall[l], param, i_face);
+      apply_wall<mix_model, turb, with_cv><<<BPG, TPB>>>(field.d_ptr, &wall[l], param, i_face, rng_d_ptr);
     }
   }
 
