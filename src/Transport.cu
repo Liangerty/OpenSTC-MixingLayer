@@ -5,7 +5,7 @@
 
 __host__ __device__
 real cfd::Sutherland(real temperature) {
-  return 1.716e-5 * pow(temperature / 273, 1.5) * (273 + 111) / (temperature + 111);
+  return 1.7894e-5 * pow(temperature / 288.16, 1.5) * (288.16 + 110) / (temperature + 110);
 }
 
 real cfd::compute_viscosity(real temperature, real mw_total, real const *Y, const Species &spec) {

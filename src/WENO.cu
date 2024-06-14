@@ -210,7 +210,7 @@ __device__ void compute_flux(const real *Q, DParameter *param, const real *metri
   const real Uk{(Q[1] * metric[0] + Q[2] * metric[1] + Q[3] * metric[2]) / Q[0]};
   real pk{Q[n_var]};
   const real cGradK = Q[n_var + 1] * sqrt(metric[0] * metric[0] + metric[1] * metric[1] + metric[2] * metric[2]);
-  const real lambda0 = abs(Uk + cGradK);
+  const real lambda0 = abs(Uk) + cGradK;
 
   Fp[0] = 0.5 * jac * (Uk * Q[0] + lambda0 * Q[0]);
   Fp[1] = 0.5 * jac * (Uk * Q[1] + pk * metric[0] + lambda0 * Q[1]);
@@ -384,17 +384,16 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
       }
     }
 
-    for (int l = 0; l < 5; ++l) {
-      real coeff_alpha_s{0.5};
-      if (l == 1) {
-        coeff_alpha_s = -kx;
-      } else if (l == 2) {
-        coeff_alpha_s = -ky;
-      } else if (l == 3) {
-        coeff_alpha_s = -kz;
-      }
-
-      if (param->inviscid_scheme == 52) {
+    if (param->inviscid_scheme == 52){
+      for (int l = 0; l < 5; ++l){
+        real coeff_alpha_s{0.5};
+        if (l == 1) {
+          coeff_alpha_s = -kx;
+        } else if (l == 2) {
+          coeff_alpha_s = -ky;
+        } else if (l == 3) {
+          coeff_alpha_s = -kz;
+        }
         real vPlus[5], vMinus[5];
         memset(vPlus, 0, 5 * sizeof(real));
         memset(vMinus, 0, 5 * sizeof(real));
@@ -409,7 +408,25 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
           }
         }
         fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
-      } else if (param->inviscid_scheme == 72) {
+      }
+      for (int l = 0; l < n_spec; ++l) {
+        real vPlus[5], vMinus[5];
+        for (int m = 0; m < 5; ++m) {
+          vPlus[m] = -svm[l] * Fp[(i_shared - 2 + m) * n_var] + Fp[(i_shared - 2 + m) * n_var + 5 + l];
+          vMinus[m] = -svm[l] * Fm[(i_shared - 1 + m) * n_var] + Fm[(i_shared - 1 + m) * n_var + 5 + l];
+        }
+        fChar[5 + l] = WENO5(vPlus, vMinus, eps_scaled);
+      }
+    } else if (param->inviscid_scheme == 72){
+      for (int l = 0; l < 5; ++l){
+        real coeff_alpha_s{0.5};
+        if (l == 1) {
+          coeff_alpha_s = -kx;
+        } else if (l == 2) {
+          coeff_alpha_s = -ky;
+        } else if (l == 3) {
+          coeff_alpha_s = -kz;
+        }
         real vPlus[7], vMinus[7];
         memset(vPlus, 0, 7 * sizeof(real));
         memset(vMinus, 0, 7 * sizeof(real));
@@ -425,16 +442,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
         }
         fChar[l] = WENO7(vPlus, vMinus, eps_scaled);
       }
-    }
-    for (int l = 0; l < n_spec; ++l) {
-      if (param->inviscid_scheme == 52) {
-        real vPlus[5], vMinus[5];
-        for (int m = 0; m < 5; ++m) {
-          vPlus[m] = -svm[l] * Fp[(i_shared - 2 + m) * n_var] + Fp[(i_shared - 2 + m) * n_var + 5 + l];
-          vMinus[m] = -svm[l] * Fm[(i_shared - 1 + m) * n_var] + Fm[(i_shared - 1 + m) * n_var + 5 + l];
-        }
-        fChar[5 + l] = WENO5(vPlus, vMinus, eps_scaled);
-      } else if (param->inviscid_scheme == 72) {
+      for (int l = 0; l < n_spec; ++l) {
         real vPlus[7], vMinus[7];
         for (int m = 0; m < 7; ++m) {
           vPlus[m] = -svm[l] * Fp[(i_shared - 3 + m) * n_var] + Fp[(i_shared - 3 + m) * n_var + 5 + l];

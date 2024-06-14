@@ -133,7 +133,7 @@ identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::strin
       if (n_spec > 0) {
         // We expect to find some species info. If not found, old_data_info[0] will remain 0.
         const auto &spec_name = species.spec_list;
-        for (auto [spec, sp_label]: spec_name) {
+        for (const auto& [spec, sp_label]: spec_name) {
           if (n == gxl::to_upper(spec)) {
             l = 6 + sp_label + 3;
             break;
