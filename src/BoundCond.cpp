@@ -428,12 +428,12 @@ cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, int, real>
         fluctuation_x1 = std::get<real>(info.at("fluctuation_x1"));
       if (info.find("fluctuation_frequency") != info.end())
         fluctuation_frequency = std::get<real>(info.at("fluctuation_frequency"));
-      Zl[0] = 0.2 / (1 - pow(0.8, 11));
-      for (int i = 1; i < 11; ++i) {
+      Zl[0] = 0.2 / (1 - pow(0.8, 10));
+      for (int i = 1; i < 10; ++i) {
         Zl[i] = 0.8 * Zl[i - 1];
       }
-      Tm[0] = 0.2 / (1 - pow(0.8, 6));
-      for (int i = 1; i < 6; ++i) {
+      Tm[0] = 0.2 / (1 - pow(0.8, 5));
+      for (int i = 1; i < 5; ++i) {
         Tm[i] = 0.8 * Tm[i - 1];
       }
     } else if (fluctuation_type == 3) {

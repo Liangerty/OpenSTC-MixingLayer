@@ -101,8 +101,8 @@ struct Wall {
   real fluctuation_frequency = 0;
   real fluctuation_x0 = 0;
   real fluctuation_x1 = 0;
-  real Zl[11] = {0};
-  real Tm[6] = {0};
+  real Zl[10] = {0};
+  real Tm[5] = {0};
 };
 
 struct Outflow {

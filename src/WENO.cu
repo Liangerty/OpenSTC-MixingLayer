@@ -384,8 +384,8 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
       }
     }
 
-    if (param->inviscid_scheme == 52){
-      for (int l = 0; l < 5; ++l){
+    if (param->inviscid_scheme == 52) {
+      for (int l = 0; l < 5; ++l) {
         real coeff_alpha_s{0.5};
         if (l == 1) {
           coeff_alpha_s = -kx;
@@ -417,8 +417,8 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
         }
         fChar[5 + l] = WENO5(vPlus, vMinus, eps_scaled);
       }
-    } else if (param->inviscid_scheme == 72){
-      for (int l = 0; l < 5; ++l){
+    } else if (param->inviscid_scheme == 72) {
+      for (int l = 0; l < 5; ++l) {
         real coeff_alpha_s{0.5};
         if (l == 1) {
           coeff_alpha_s = -kx;
@@ -895,7 +895,8 @@ compute_weno_flux_cp(const real *cv, DParameter *param, int tid, const real *met
   }
   __syncthreads();
 
-  constexpr real eps{1e-40};
+//  const real eps_ref = 1e-8 * param->weno_eps_scale;
+  constexpr real eps{1e-20};
   const real jac1{jac[i_shared]}, jac2{jac[i_shared + 1]};
   const real eps_ref = eps * param->weno_eps_scale * 0.25 *
                        ((metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) *
@@ -1016,8 +1017,8 @@ __device__ real WENO5(const real *vp, const real *vm, real eps) {
                0.25 * (vp[1] - vp[3]) * (vp[1] - vp[3]);
   real beta2 = thirteen12th * (vp[0] + vp[2] - 2 * vp[1]) * (vp[0] + vp[2] - 2 * vp[1]) +
                0.25 * (vp[0] - 4 * vp[1] + 3 * vp[2]) * (vp[0] - 4 * vp[1] + 3 * vp[2]);
-  real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
   constexpr real three10th{0.3}, six10th{0.6}, one10th{0.1};
+  real tau5sqr{(beta0 - beta2) * (beta0 - beta2)};
   real a0{three10th + three10th * tau5sqr / ((eps + beta0) * (eps + beta0))};
   real a1{six10th + six10th * tau5sqr / ((eps + beta1) * (eps + beta1))};
   real a2{one10th + one10th * tau5sqr / ((eps + beta2) * (eps + beta2))};
@@ -1051,7 +1052,7 @@ __device__ real WENO7(const real *vp, const real *vm, real eps) {
   // 2nd order derivative
   real s20{-vp[0] + 4 * vp[1] - 5 * vp[2] + 2 * vp[3]};
   real s21{vp[2] - 2 * vp[3] + vp[4]};
-  real s22{vp[3] - 2 * vp[4] + vp[5]};
+  real s22{s21};
   real s23{2 * vp[3] - 5 * vp[4] + 4 * vp[5] - vp[6]};
   // 3rd order derivative
   real s30{-vp[0] + 3 * vp[1] - 3 * vp[2] + vp[3]};
@@ -1087,7 +1088,7 @@ __device__ real WENO7(const real *vp, const real *vm, real eps) {
 
   s20 = -vm[6] + 4 * vm[5] - 5 * vm[4] + 2 * vm[3];
   s21 = vm[4] - 2 * vm[3] + vm[2];
-  s22 = vm[3] - 2 * vm[2] + vm[1];
+  s22 = s21;
   s23 = 2 * vm[3] - 5 * vm[2] + 4 * vm[1] - vm[0];
 
   s30 = -vm[6] + 3 * vm[5] - 3 * vm[4] + vm[3];

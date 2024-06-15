@@ -137,32 +137,22 @@ cfd::wall_friction_heatFlux_3d(cfd::DZone *zone, ggxl::VectorField2D<real> *cfQw
   const int k = blockDim.z * blockIdx.z + threadIdx.z;
   if (i >= zone->mx || k >= zone->mz) return;
 
+  constexpr int j = 1;
+  auto &metric = zone->metric(i, 0, k);
+  const real d_wini = 1.0/ sqrt(metric(2,1)*metric(2,1)+metric(2,2)*metric(2,2)+metric(2,3)*metric(2,3));
 
-  const int j = 1;
-  auto &metric = zone->metric(i, j, k);
-
-  // const real u=pv(i,j,k,1),v=pv(i,j,k,2),w=pv(i,j,k,3);
-  // const real T1=pv(i,j,k,5),T0=pv(i,j-1,k,5);
-  // const real rhow=pv(i,j-1,k,0);
-  // const real dy=zone->y(i,j,k)-zone->y(i,j-1,k);
   real u, v, w;
-//  real T1, T0;
-  real rhow;
+  real rho_w;
   const real dy = zone->y(i, j, k) - zone->y(i, j - 1, k);
   if (!stat_on) {
     auto &pv = zone->bv;
     u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
-//    T1 = pv(i, j, k, 5), T0 = pv(i, j - 1, k, 5);
-    rhow = pv(i, j - 1, k, 0);
+    rho_w = pv(i, 0, k, 0);
   } else {
     auto &pv = zone->mean_value;
     u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
-//    T1 = pv(i, j, k, 5), T0 = pv(i, j - 1, k, 5);
-    rhow = pv(i, j - 1, k, 0);
+    rho_w = pv(i, 0, k, 0);
   }
-  // const real xi_x = metric(1, 1), xi_y = metric(1, 2), xi_z = metric(1, 3);
-  // const real eta_x = metric(2, 1), eta_y = metric(2, 2), eta_z = metric(2, 3);
-  // const real zeta_x = metric(3, 1), zeta_y = metric(3, 2), zeta_z = metric(3, 3);
   const real rho_ref = param->rho_ref, v_ref = param->v_ref;
   gxl::Matrix<real, 3, 3, 1> bdjin;
   real d1 = metric(2, 1);
@@ -193,17 +183,11 @@ cfd::wall_friction_heatFlux_3d(cfd::DZone *zone, ggxl::VectorField2D<real> *cfQw
   real vs = bdjin(3, 1) * u + bdjin(3, 2) * v + bdjin(3, 3) * w;
   real velocity_tau = sqrt(vt * vt + vs * vs);
 
-  real tau = velocity_tau / dy * zone->mul(i, j - 1, k);
+  real tau = velocity_tau / d_wini * zone->mul(i, 0, k);
   real cf = tau / (0.5 * (rho_ref * v_ref * v_ref));
-  real u_tau = sqrt(tau / rhow);
-  real y_plus = rhow * u_tau * dy / zone->mul(i, j - 1, k);
+  real u_tau = sqrt(tau / rho_w);
+  real y_plus = rho_w * u_tau * dy / zone->mul(i, 0, k);
 
-  //printf("i=%d,k=%d,u=%e,w=%e,mu=%e,cf=%e,y_plus=%e\n",i,k,u,w,zone->mul(i,j-1,k),sqrt(u*u+w*w)/dy*zone->mul(i,j-1,k)/(0.5*(rho_ref*v_ref*v_ref)),rhow*sqrt(sqrt(u*u+w*w)/dy*zone->mul(i,j-1,k)/rhow)*dy/zone->mul(i,j-1,k));
-  // (*cfQw)(i,k,0)=sqrt(u*u+w*w)/dy*zone->mul(i,j-1,k)/(0.5*(rho_ref*v_ref*v_ref));
-  // (*cfQw)(i,k,1)=rhow*sqrt(sqrt(u*u+w*w)/dy*zone->mul(i,j-1,k)/rhow)*dy/zone->mul(i,j-1,k);
   (*cfQw)(i, k, 0) = cf;
   (*cfQw)(i, k, 1) = y_plus;
-
-
-  // real Qw = (T1-T0)/dy;
 }

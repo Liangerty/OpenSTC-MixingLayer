@@ -834,10 +834,9 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
 
   if (if_fluctuation == 1) {
     // Pirozzoli & Li fluctuations
-    real phil[11] = {0.03, 0.47, 0.43, 0.73, 0.86, 0.36, 0.96, 0.47, 0.36, 0.61, 0.46};
-    real phim[6] = {0.31, 0.05, 0.03, 0.72, 0.93, 0.15};
+    real phil[10] = {0.03, 0.47, 0.43, 0.73, 0.86, 0.36, 0.96, 0.47, 0.36, 0.61};
+    real phim[5] = {0.31, 0.05, 0.03, 0.72, 0.93};
     real A0 = wall->fluctuation_intensity;
-    real omega = 2.0 * pi * wall->fluctuation_frequency;
     real x0 = wall->fluctuation_x0;
     real x1 = wall->fluctuation_x1;
     real t = param->physical_time;
@@ -848,12 +847,13 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     real fx = 4.0 * sin(theta) * (1.0 - cos(theta)) / sqrt(27.0);
 
     real gz = 0;
-    for (int l = 0; l < 11; ++l) {
-      gz += wall->Zl[l] * sin(2.0 * pi * l * (z / zmax + phil[l]));
+    for (int l = 0; l < 10; ++l) {
+      gz += wall->Zl[l] * sin(2.0 * pi * (l + 1) * (z / zmax + phil[l]));
     }
     real ht = 0;
-    for (int m = 0; m < 6; ++m) {
-      ht += wall->Tm[m] * sin(m * omega * t + 2.0 * pi * m * phim[m]);
+    for (int m = 0; m < 5; ++m) {
+      ht += wall->Tm[m] * sin(2.0 * pi * (m + 1) * (wall->fluctuation_frequency * t + phim[m]));
+//      ht += wall->Tm[m] * sin((m + 1) * omega * t + 2.0 * pi * (m + 1) * phim[m]);
     }
     if (x > x0 && x < x1) {
       bv(i, j, k, 2) = A0 * param->v_ref * fx * gz * ht;

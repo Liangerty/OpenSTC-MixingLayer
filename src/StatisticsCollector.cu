@@ -496,49 +496,67 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, int co
 
   real bv_add[6];
   memset(bv_add, 0, sizeof(real) * 6);
-  for (int l = 0; l < 6; ++l) {
-    for (int k = 0; k < extent[2]; ++k) {
-      bv_add[l] += firstOrderStat(i, j, k, l);
-    }
+  const real n_inv{1.0 / counter};
+  for (int k = 0; k < extent[2]; ++k) {
+    bv_add[0] += firstOrderStat(i, j, k, 0) * n_inv;
+    bv_add[1] += firstOrderStat(i, j, k, 1) / firstOrderStat(i, j, k, 0);
+    bv_add[2] += firstOrderStat(i, j, k, 2) / firstOrderStat(i, j, k, 0);
+    bv_add[3] += firstOrderStat(i, j, k, 3) / firstOrderStat(i, j, k, 0);
+    bv_add[4] += firstOrderStat(i, j, k, 4) * n_inv;
+    bv_add[5] += firstOrderStat(i, j, k, 5) / firstOrderStat(i, j, k, 0);
   }
-  mean(i, j, 0, 0) = bv_add[0] / extent[2] / counter;
-  const auto den = 1.0 / (mean(i, j, 0, 0) * counter * extent[2]);
-  mean(i, j, 0, 1) = bv_add[1] * den;
-  mean(i, j, 0, 2) = bv_add[2] * den;
-  mean(i, j, 0, 3) = bv_add[3] * den;
-  mean(i, j, 0, 4) = bv_add[4] / counter / extent[2];
-  mean(i, j, 0, 5) = bv_add[5] * den;
+  const real oneDivNz{1.0 / extent[2]};
+  mean(i, j, 0, 0) = bv_add[0] * oneDivNz;
+  mean(i, j, 0, 1) = bv_add[1] * oneDivNz;
+  mean(i, j, 0, 2) = bv_add[2] * oneDivNz;
+  mean(i, j, 0, 3) = bv_add[3] * oneDivNz;
+  mean(i, j, 0, 4) = bv_add[4] * oneDivNz;
+  mean(i, j, 0, 5) = bv_add[5] * oneDivNz;
   for (int l = 0; l < param->n_scalar; ++l) {
     real addUp{0};
     for (int k = 0; k < extent[2]; ++k) {
-      addUp += firstOrderStat(i, j, k, l + 6);
+      addUp += firstOrderStat(i, j, k, l + 6) / firstOrderStat(i, j, k, 0);
     }
-    mean(i, j, 0, l + 6) = addUp * den;
+    mean(i, j, 0, l + 6) = addUp * oneDivNz;
   }
 
   auto &rey_tensor = zone->reynolds_stress_tensor;
   auto &vel2ndMoment = zone->velocity2ndMoment;
   real rey_tensor_add[6];
   memset(rey_tensor_add, 0, sizeof(real) * 6);
+  int count_useful[3]{0, 0, 0};
   for (int k = 0; k < extent[2]; ++k) {
-    const auto sumRho{firstOrderStat(i, j, k, 0)};
-    const auto sumRho2{sumRho * sumRho};
-    rey_tensor_add[0] += max(
-        vel2ndMoment(i, j, k, 0) / sumRho - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 1) / sumRho2, 0.0);
-    rey_tensor_add[1] += max(
-        vel2ndMoment(i, j, k, 1) / sumRho - firstOrderStat(i, j, k, 2) * firstOrderStat(i, j, k, 2) / sumRho2, 0.0);
-    rey_tensor_add[2] += max(
-        vel2ndMoment(i, j, k, 2) / sumRho - firstOrderStat(i, j, k, 3) * firstOrderStat(i, j, k, 3) / sumRho2, 0.0);
+    const auto sumRhoInv{1.0 / firstOrderStat(i, j, k, 0)};
+    const auto sumRho2Inv{sumRhoInv * sumRhoInv};
+    auto temp =
+        vel2ndMoment(i, j, k, 0) * sumRhoInv - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 1) * sumRho2Inv;
+    if (temp > 0) {
+      rey_tensor_add[0] += temp;
+      count_useful[0]++;
+    }
+    temp = vel2ndMoment(i, j, k, 1) * sumRhoInv - firstOrderStat(i, j, k, 2) * firstOrderStat(i, j, k, 2) * sumRho2Inv;
+    if (temp > 0) {
+      rey_tensor_add[1] += temp;
+      count_useful[1]++;
+    }
+    temp = vel2ndMoment(i, j, k, 2) * sumRhoInv - firstOrderStat(i, j, k, 3) * firstOrderStat(i, j, k, 3) * sumRho2Inv;
+    if (temp > 0) {
+      rey_tensor_add[2] += temp;
+      count_useful[2]++;
+    }
     rey_tensor_add[3] +=
-        vel2ndMoment(i, j, k, 3) / sumRho - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 2) / sumRho2;
+        vel2ndMoment(i, j, k, 3) * sumRhoInv - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 2) * sumRho2Inv;
     rey_tensor_add[4] +=
-        vel2ndMoment(i, j, k, 4) / sumRho - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 3) / sumRho2;
+        vel2ndMoment(i, j, k, 4) * sumRhoInv - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 3) * sumRho2Inv;
     rey_tensor_add[5] +=
-        vel2ndMoment(i, j, k, 5) / sumRho - firstOrderStat(i, j, k, 2) * firstOrderStat(i, j, k, 3) / sumRho2;
+        vel2ndMoment(i, j, k, 5) * sumRhoInv - firstOrderStat(i, j, k, 2) * firstOrderStat(i, j, k, 3) * sumRho2Inv;
   }
-  for (int l = 0; l < 6; ++l) {
-    rey_tensor(i, j, 0, l) = rey_tensor_add[l] / extent[2];
-  }
+  rey_tensor(i, j, 0, 0) = count_useful[0] > 0 ? rey_tensor_add[0] / count_useful[0] : 0;
+  rey_tensor(i, j, 0, 1) = count_useful[1] > 0 ? rey_tensor_add[1] / count_useful[1] : 0;
+  rey_tensor(i, j, 0, 2) = count_useful[2] > 0 ? rey_tensor_add[2] / count_useful[2] : 0;
+  rey_tensor(i, j, 0, 3) = rey_tensor_add[3] * oneDivNz;
+  rey_tensor(i, j, 0, 4) = rey_tensor_add[4] * oneDivNz;
+  rey_tensor(i, j, 0, 5) = rey_tensor_add[5] * oneDivNz;
 }
 
 } // cfd

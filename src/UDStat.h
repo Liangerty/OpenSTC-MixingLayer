@@ -1,6 +1,7 @@
 #pragma once
 
-#define USER_DEFINE_STATISTICS ThermRMS,turbulent_dissipation_rate,H2_variance_and_dissipation_rate
+#define USER_DEFINE_STATISTICS ThermRMS,turbulent_dissipation_rate
+//,H2_variance_and_dissipation_rate
 
 #include <array>
 #include <string_view>
