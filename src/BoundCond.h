@@ -39,7 +39,7 @@ struct Inflow {
   // This set is used for inflow_type = 0 (constant inflow).
   // When inflow_type = 2, this set is used as the upper part.
   real mach = -1;
-  real pressure = 101325;
+  real pressure = -1;
   real temperature = -1;
   real velocity = 0;
   real density = -1;

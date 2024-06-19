@@ -86,8 +86,10 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
   } else {
     // In default, the mach number, pressure and temperature should be given.
     // If other combinations are given, then implement it later.
-    // Currently, 2 combinations are achieved. One is to give (mach, pressure,
-    // temperature) The other is to give (density, velocity, pressure)
+    // Currently, 3 combinations are achieved.
+    // 1. (mach, pressure, temperature)
+    // 2. (density, velocity, pressure)
+    // 3. (mach, temperature, reynolds)
     if (info.find("mach") != info.end()) mach = std::get<real>(info.at("mach"));
     if (info.find("pressure") != info.end()) pressure = std::get<real>(info.at("pressure"));
     if (info.find("temperature") != info.end()) temperature = std::get<real>(info.at("temperature"));
@@ -96,6 +98,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     if (info.find("u") != info.end()) u = std::get<real>(info.at("u"));
     if (info.find("v") != info.end()) v = std::get<real>(info.at("v"));
     if (info.find("w") != info.end()) w = std::get<real>(info.at("w"));
+    if (info.find("reynolds") != info.end()) reynolds_number = std::get<real>(info.at("reynolds"));
 
     sv = new real[n_scalar];
     for (int i = 0; i < n_scalar; ++i) {
@@ -105,7 +108,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     if (n_spec > 0) {
       // Assign the species mass fraction to the corresponding position.
       // Should be done after knowing the order of species.
-      for (const auto& [name, idx]: spec.spec_list) {
+      for (const auto &[name, idx]: spec.spec_list) {
         if (info.find(name) != info.cend()) {
           sv[idx] = std::get<real>(info.at(name));
         }
@@ -149,10 +152,23 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     v *= velocity;
     w *= velocity;
     if (density < 0) {
-      // The density is not given, compute it from equation of state
-      density = pressure * mw / (R_u * temperature);
+      // The density is not given
+      if (pressure < 0) {
+        // Then, the reynolds number should be given
+        if (reynolds_number < 0) {
+          printf("The reynolds number is not given, while the pressure, temperature are also not included.\n");
+          printf("Please check the inflow condition!\n");
+          MpiParallel::exit();
+        }
+        density = viscosity * reynolds_number / velocity;
+        pressure = density * temperature * R_u / mw;
+      } else {
+        // compute it from the equation of state
+        density = pressure * mw / (R_u * temperature);
+      }
     }
-    reynolds_number = density * velocity / viscosity;
+    if (reynolds_number < 0)
+      reynolds_number = density * velocity / viscosity;
 
     if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
       // RANS or DES simulation
@@ -302,7 +318,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, const cfd::Species &spec, co
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.
     // Should be done after knowing the order of species.
-    for (const auto& [name, idx]: spec.spec_list) {
+    for (const auto &[name, idx]: spec.spec_list) {
       if (info.find(name) != info.cend()) {
         sv[idx] = std::get<real>(info.at(name));
       }
@@ -492,7 +508,7 @@ cfd::FarField::FarField(cfd::Species &spec, cfd::Parameter &parameter) {
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.
     // Should be done after knowing the order of species.
-    for (const auto& [name, idx]: spec.spec_list) {
+    for (const auto &[name, idx]: spec.spec_list) {
       if (info.find(name) != info.cend()) {
         sv[idx] = std::get<real>(info.at(name));
       }
