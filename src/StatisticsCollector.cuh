@@ -391,7 +391,7 @@ void StatisticsCollector::collect_data(DParameter *param) {
   }
 
   for (int b = 0; b < mesh.n_block; ++b) {
-    const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    const auto mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
     dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
     collect_statistics<<<bpg, tpb>>>(field[b].d_ptr, param);
   }

@@ -70,7 +70,7 @@ void StatisticsCollector::export_statistical_data(DParameter *param, bool perfor
   }
   for (int b = 0; b < mesh.n_block; ++b) {
     auto &zone = field[b].h_ptr;
-    const int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    const int mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
     const auto size = (long long) (mx * my * mz * sizeof(real));
 
     cudaMemcpy(field[b].firstOrderMoment.data(), zone->firstOrderMoment.data(),
@@ -82,9 +82,9 @@ void StatisticsCollector::export_statistical_data(DParameter *param, bool perfor
 
 
     MPI_Datatype ty;
-    int lsize[3]{mx, my, mz};
+    int lSize[3]{mx, my, mz};
     int start_idx[3]{0, 0, 0};
-    MPI_Type_create_subarray(3, lsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+    MPI_Type_create_subarray(3, lSize, lSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
 
     // First, 1st order statistics
@@ -139,7 +139,7 @@ void StatisticsCollector::compute_offset_for_export_data() {
     n_block += mesh.nblk[p];
   }
   for (int b = 0; b < n_block; ++b) {
-    MPI_Offset sz = mesh.mx_blk[b] * mesh.my_blk[b] * mesh.mz_blk[b] * 8;
+    MPI_Offset sz = (mesh.mx_blk[b] + 2) * (mesh.my_blk[b] + 2) * (mesh.mz_blk[b] + 2) * 8;
     offset_unit[0] += sz * (6 + parameter.get_int("n_scalar")) + 4 * 3;
     offset_unit[1] += sz * 6 + 4 * 3;
     offset_unit[2] += sz + 4 * 3;
@@ -166,7 +166,7 @@ void StatisticsCollector::read_previous_statistical_data() {
     offset1 += 4;
     MPI_File_read_at(fp1, offset1, &mz, 1, MPI_INT32_T, &status);
     offset1 += 4;
-    if (mx != mesh[b].mx || my != mesh[b].my || mz != mesh[b].mz) {
+    if (mx != mesh[b].mx + 2 || my != mesh[b].my + 2 || mz != mesh[b].mz + 2) {
       printf(
           "The mesh size in the statistical data file 1st-order_statistics.bin is not consistent with the current mesh size.\n");
       exit(1);
@@ -188,7 +188,7 @@ void StatisticsCollector::read_previous_statistical_data() {
     offset2 += 4;
     MPI_File_read_at(fp2, offset2, &mz, 1, MPI_INT32_T, &status);
     offset2 += 4;
-    if (mx != mesh[b].mx || my != mesh[b].my || mz != mesh[b].mz) {
+    if (mx != mesh[b].mx + 2 || my != mesh[b].my + 2 || mz != mesh[b].mz + 2) {
       printf(
           "The mesh size in the statistical data file 2nd-order_velocity_statistics.bin is not consistent with the current mesh size.\n");
       exit(1);
@@ -216,7 +216,7 @@ void StatisticsCollector::read_previous_statistical_data() {
         offset_ud += 4;
         MPI_File_read_at(fp_ud, offset_ud, &mz, 1, MPI_INT32_T, &status);
         offset_ud += 4;
-        if (mx != mesh[b].mx || my != mesh[b].my || mz != mesh[b].mz) {
+        if (mx != mesh[b].mx + 2 || my != mesh[b].my + 2 || mz != mesh[b].mz + 2) {
           printf("The mesh size in the statistical data file %s is not consistent with the current mesh size.\n",
                  file_name.c_str());
           exit(1);
@@ -270,6 +270,8 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
       compute_statistical_data<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
       compute_user_defined_statistical_data<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
                                                                                   counter_ud_device);
+      compute_UD_stat_data_2<SECOND_ORDER_UDSTAT><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
+          counter_ud_device);
       auto sz = mx * my * mz * sizeof(real);
       cudaDeviceSynchronize();
       cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value.data(), sz * (6 + n_scalar),
@@ -385,10 +387,10 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
 
 __global__ void collect_statistics(DZone *zone, DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
-  if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
+  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - 1;
+  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - 1;
+  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - 1;
+  if (i >= extent[0] + 1 || j >= extent[1] + 1 || k >= extent[2] + 1) return;
 
   const auto &bv = zone->bv;
 
