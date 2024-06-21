@@ -8,11 +8,13 @@
 #include <string_view>
 #include "Define.h"
 #include "Field.h"
+#include "DParameter.cuh"
 
 namespace cfd {
 struct ThermRMS {
   static constexpr int n_collect = 4;
   static constexpr std::array<std::string_view, n_collect> namelistCollect{"rho2", "p2", "T2", "T"};
+  static constexpr int n_vol_stat_when_span_ave = 3;
   static constexpr int n_stat = 3;
   static constexpr std::array<std::string_view, n_stat> namelistStat{"rho<sub>rms</sub>", "p<sub>rms</sub>",
                                                                      "T<sub>rms</sub>"};
@@ -22,25 +24,21 @@ struct ThermRMS {
 
   __device__ static void
   compute(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int k,
-          int counter, int stat_idx, int collected_idx);
+          int counter, int vol_stat_idx, int collected_idx);
 
   __device__ static void
-  compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
-                           int mz, int counter, int stat_idx, int collected_idx);
+  compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int mz,
+                           int counter, int span_stat_idx, int collected_idx, int vol_stat_idx);
 
 };
 
 struct turbulent_dissipation_rate {
-//  static constexpr int n_collect = 16;
-//  static constexpr std::array<std::string_view, n_collect> namelistCollect{"u_x", "u_y", "u_z", "v_x", "v_y", "v_z",
-//                                                                           "w_x", "w_y", "w_z",
-//                                                                           "sigma11", "sigma12", "sigma13", "sigma22",
-//                                                                           "sigma23", "sigma33", "sigmaIjUi_xj"};
   static constexpr int n_collect = 10;
   static constexpr std::array<std::string_view, n_collect> namelistCollect{"u", "v", "w", "sigma11", "sigma12",
                                                                            "sigma13", "sigma22", "sigma23", "sigma33",
                                                                            "sigmaIjUi_xj"};
 
+  static constexpr int n_vol_stat_when_span_ave = 1;
   static constexpr int n_stat = 4;
   static constexpr std::array<std::string_view, n_stat> namelistStat{"<<greek>e</greek>><sub>F</sub>",
                                                                      "<greek>h</greek>", "t<sub><greek>h</greek></sub>",
@@ -51,11 +49,11 @@ struct turbulent_dissipation_rate {
 
   __device__ static void
   compute(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int k,
-          int counter, int stat_idx, int collected_idx);
+          int counter, int vol_stat_idx, int coll_idx);
 
   __device__ static void
   compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
-                           int mz, int counter, int stat_idx, int collected_idx);
+                           int mz, int counter, int span_stat_idx, int collected_idx, int vol_stat_idx);
 };
 
 struct H2AirMixingLayer {
@@ -64,13 +62,14 @@ struct H2AirMixingLayer {
       namelistCollect{"rhoH2H2"/*0*/, "rDGradH2GradH2"/*1*/, "rDH2x"/*2*/, "rDH2y"/*3*/, "rDH2z"/*4*/, "rDH2"/*5*/,
                       "rhoUH2"/*6*/, "rhoVH2"/*7*/, "rhoWH2"/*8*/, "rhoUH2H2"/*9*/, "rhoVH2H2"/*10*/,
                       "rhoWH2H2"/*11*/, "Sc_H2"/*12*/,
-                      "rhoO2O2"/*13*/, "rDGradO2GradO2"/*14*/, "rDO2x"/*15*/, "rDO2y"/*16*/, "rDO2z"/*17*/, "rDO2"/*18*/,
-                      "rhoUO2"/*19*/, "rhoVO2"/*20*/, "rhoWO2"/*21*/, "rhoUO2O2"/*22*/, "rhoVO2O2"/*23*/,
+                      "rhoO2O2"/*13*/, "rDGradO2GradO2"/*14*/, "rDO2x"/*15*/, "rDO2y"/*16*/, "rDO2z"/*17*/,
+                      "rDO2"/*18*/, "rhoUO2"/*19*/, "rhoVO2"/*20*/, "rhoWO2"/*21*/, "rhoUO2O2"/*22*/, "rhoVO2O2"/*23*/,
                       "rhoWO2O2"/*24*/, "Sc_O2"/*25*/,
-                      "rhoN2N2"/*26*/, "rDGradN2GradN2"/*27*/, "rDN2x"/*28*/, "rDN2y"/*29*/, "rDN2z"/*30*/, "rDN2"/*31*/,
-                      "rhoUN2"/*32*/, "rhoVN2"/*33*/, "rhoWN2"/*34*/, "rhoUN2N2"/*35*/, "rhoVN2N2"/*36*/,
+                      "rhoN2N2"/*26*/, "rDGradN2GradN2"/*27*/, "rDN2x"/*28*/, "rDN2y"/*29*/, "rDN2z"/*30*/,
+                      "rDN2"/*31*/, "rhoUN2"/*32*/, "rhoVN2"/*33*/, "rhoWN2"/*34*/, "rhoUN2N2"/*35*/, "rhoVN2N2"/*36*/,
                       "rhoWN2N2"/*37*/, "Sc_N2"/*38*/,
   };
+  static constexpr int n_vol_stat_when_span_ave = 8 + 22 * 3;
   static constexpr int n_stat = 8 + 22 * 3;
   static constexpr std::array<std::string_view, n_stat>
       namelistStat{"divV"/*0*/, "nut11"/*1*/, "nut22"/*2*/, "nut33"/*3*/, "nut12"/*4*/, "nut13"/*5*/, "nut23"/*6*/,
@@ -110,7 +109,7 @@ struct H2AirMixingLayer {
 
   __device__ static void
   compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
-                           int mz, int counter, int stat_idx, int collected_idx);
+                           int mz, int counter, int span_stat_idx, int collected_idx, int vol_stat_idx);
 
   __device__ static void
   compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int k,
@@ -147,6 +146,7 @@ namespace cfd {
 template<typename... stats>
 struct UDStat {
   constexpr static int n_collect = (0 + ... + stats::n_collect);
+  constexpr static int n_vol_stat_when_span_ave = (0 + ... + stats::n_vol_stat_when_span_ave);
   constexpr static int n_stat = (0 + ... + stats::n_stat);
 
   constexpr static std::array<std::string_view, n_stat> namelistStat() {
@@ -195,18 +195,6 @@ collect_user_defined_statistics(cfd::DZone *zone, cfd::DParameter *param, int i,
 }
 
 template<typename... stats>
-__device__ void
-compute_user_defined_statistical_data(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud,
-                                      int i, int j, int k, int counter) {
-  auto l = 0, collect_idx = 0;
-  ([&]() {
-    stats::compute(zone, param, counter_ud, i, j, k, counter, l, collect_idx);
-    l += stats::n_stat;
-    collect_idx += stats::n_collect;
-  }(), ...);
-}
-
-template<typename... stats>
 __global__ void
 compute_user_defined_statistical_data(DZone *zone, DParameter *param, int counter, const int *counter_ud) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
@@ -218,7 +206,11 @@ compute_user_defined_statistical_data(DZone *zone, DParameter *param, int counte
   auto l = 0, collect_idx = 0;
   ([&]() {
     stats::compute(zone, param, counter_ud, i, j, k, counter, l, collect_idx);
-    l += stats::n_stat;
+    if (param->perform_spanwise_average) {
+      l += stats::n_vol_stat_when_span_ave;
+    } else {
+      l += stats::n_stat;
+    }
     collect_idx += stats::n_collect;
   }(), ...);
 }
@@ -227,26 +219,10 @@ template<typename... stats>
 __device__ void
 compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
                                                             const int *counter_ud, int i, int j, int mz, int counter) {
-  auto l = 0, collect_idx = 0;
+  auto l = 0, collect_idx = 0, vol_stat_idx = 0;
   ([&]() {
-    stats::compute_spanwise_average(zone, param, counter_ud, i, j, mz, counter, l, collect_idx);
-    l += stats::n_stat;
-    collect_idx += stats::n_collect;
-  }(), ...);
-}
-
-template<typename... stats>
-__global__ void
-compute_user_defined_statistical_data_with_spanwise_average(cfd::DZone *zone, cfd::DParameter *param,
-                                                            const int *counter_ud, int counter) {
-  const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  if (i >= extent[0] || j >= extent[1]) return;
-
-  auto l = 0, collect_idx = 0;
-  ([&]() {
-    stats::compute_spanwise_average(zone, param, counter_ud, i, j, zone->mz, counter, l, collect_idx);
+    stats::compute_spanwise_average(zone, param, counter_ud, i, j, mz, counter, l, collect_idx, vol_stat_idx);
+    vol_stat_idx += stats::n_vol_stat_when_span_ave;
     l += stats::n_stat;
     collect_idx += stats::n_collect;
   }(), ...);

@@ -245,33 +245,26 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
 
   cudaMemcpy(counter_ud_device, counter_ud.data(), sizeof(int) * UserDefineStat::n_collect, cudaMemcpyHostToDevice);
   const int n_scalar{parameter.get_int("n_scalar")};
-  if (perform_spanwise_average) {
-    for (int b = 0; b < mesh.n_block; ++b) {
-      const auto mx{mesh[b].mx}, my{mesh[b].my};
-      dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, 1};
+  for (int b = 0; b < mesh.n_block; ++b) {
+    const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
+    compute_statistical_data<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
+    compute_user_defined_statistical_data<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
+                                                                                counter_ud_device);
+    compute_UD_stat_data_2<SECOND_ORDER_UDSTAT><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
+                                                              counter_ud_device);
+    if (perform_spanwise_average) {
       compute_statistical_data_spanwise_average<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
-      compute_user_defined_statistical_data_with_spanwise_average<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr,
-                                                                                                        param,
-                                                                                                        counter_ud_device,
-                                                                                                        counter);
       auto sz = mx * my * sizeof(real);
       cudaDeviceSynchronize();
-      cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value.data(), sz * (6 + n_scalar),
+      cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value_span_ave.data(), sz * (6 + n_scalar),
                  cudaMemcpyDeviceToHost);
-      cudaMemcpy(field[b].reynolds_stress_tensor_and_rms.data(), field[b].h_ptr->reynolds_stress_tensor.data(), sz * 6,
+      cudaMemcpy(field[b].reynolds_stress_tensor_and_rms.data(), field[b].h_ptr->reynolds_stress_tensor_span_ave.data(),
+                 sz * 6, cudaMemcpyDeviceToHost);
+      cudaMemcpy(field[b].user_defined_statistical_data.data(),
+                 field[b].h_ptr->user_defined_statistical_data_span_ave.data(), sz * UserDefineStat::n_stat,
                  cudaMemcpyDeviceToHost);
-      cudaMemcpy(field[b].user_defined_statistical_data.data(), field[b].h_ptr->user_defined_statistical_data.data(),
-                 sz * UserDefineStat::n_stat, cudaMemcpyDeviceToHost);
-    }
-  } else {
-    for (int b = 0; b < mesh.n_block; ++b) {
-      const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
-      dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
-      compute_statistical_data<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
-      compute_user_defined_statistical_data<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
-                                                                                  counter_ud_device);
-      compute_UD_stat_data_2<SECOND_ORDER_UDSTAT><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
-          counter_ud_device);
+    } else {
       auto sz = mx * my * mz * sizeof(real);
       cudaDeviceSynchronize();
       cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value.data(), sz * (6 + n_scalar),
@@ -478,9 +471,9 @@ __global__ void compute_statistical_data(DZone *zone, DParameter *param, int cou
 
   auto &rey_tensor = zone->reynolds_stress_tensor;
   auto &vel2ndMoment = zone->velocity2ndMoment;
-  rey_tensor(i, j, k, 0) = max(vel2ndMoment(i, j, k, 0) * den - mean(i, j, k, 1) * mean(i, j, k, 1), 0.0);
-  rey_tensor(i, j, k, 1) = max(vel2ndMoment(i, j, k, 1) * den - mean(i, j, k, 2) * mean(i, j, k, 2), 0.0);
-  rey_tensor(i, j, k, 2) = max(vel2ndMoment(i, j, k, 2) * den - mean(i, j, k, 3) * mean(i, j, k, 3), 0.0);
+  rey_tensor(i, j, k, 0) = vel2ndMoment(i, j, k, 0) * den - mean(i, j, k, 1) * mean(i, j, k, 1);
+  rey_tensor(i, j, k, 1) = vel2ndMoment(i, j, k, 1) * den - mean(i, j, k, 2) * mean(i, j, k, 2);
+  rey_tensor(i, j, k, 2) = vel2ndMoment(i, j, k, 2) * den - mean(i, j, k, 3) * mean(i, j, k, 3);
   rey_tensor(i, j, k, 3) = vel2ndMoment(i, j, k, 3) * den - mean(i, j, k, 1) * mean(i, j, k, 2);
   rey_tensor(i, j, k, 4) = vel2ndMoment(i, j, k, 4) * den - mean(i, j, k, 1) * mean(i, j, k, 3);
   rey_tensor(i, j, k, 5) = vel2ndMoment(i, j, k, 5) * den - mean(i, j, k, 2) * mean(i, j, k, 3);
@@ -494,32 +487,31 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, int co
   if (i >= extent[0] || j >= extent[1]) return;
 
   auto &mean = zone->mean_value;
-  auto &firstOrderStat = zone->firstOrderMoment;
+  auto &mean_span_ave = zone->mean_value_span_ave;
 
   real bv_add[6];
   memset(bv_add, 0, sizeof(real) * 6);
-  const real n_inv{1.0 / counter};
   for (int k = 0; k < extent[2]; ++k) {
-    bv_add[0] += firstOrderStat(i, j, k, 0) * n_inv;
-    bv_add[1] += firstOrderStat(i, j, k, 1) / firstOrderStat(i, j, k, 0);
-    bv_add[2] += firstOrderStat(i, j, k, 2) / firstOrderStat(i, j, k, 0);
-    bv_add[3] += firstOrderStat(i, j, k, 3) / firstOrderStat(i, j, k, 0);
-    bv_add[4] += firstOrderStat(i, j, k, 4) * n_inv;
-    bv_add[5] += firstOrderStat(i, j, k, 5) / firstOrderStat(i, j, k, 0);
+    bv_add[0] += mean(i, j, k, 0);
+    bv_add[1] += mean(i, j, k, 1);
+    bv_add[2] += mean(i, j, k, 2);
+    bv_add[3] += mean(i, j, k, 3);
+    bv_add[4] += mean(i, j, k, 4);
+    bv_add[5] += mean(i, j, k, 5);
   }
   const real oneDivNz{1.0 / extent[2]};
-  mean(i, j, 0, 0) = bv_add[0] * oneDivNz;
-  mean(i, j, 0, 1) = bv_add[1] * oneDivNz;
-  mean(i, j, 0, 2) = bv_add[2] * oneDivNz;
-  mean(i, j, 0, 3) = bv_add[3] * oneDivNz;
-  mean(i, j, 0, 4) = bv_add[4] * oneDivNz;
-  mean(i, j, 0, 5) = bv_add[5] * oneDivNz;
+  mean_span_ave(i, j, 0, 0) = bv_add[0] * oneDivNz;
+  mean_span_ave(i, j, 0, 1) = bv_add[1] * oneDivNz;
+  mean_span_ave(i, j, 0, 2) = bv_add[2] * oneDivNz;
+  mean_span_ave(i, j, 0, 3) = bv_add[3] * oneDivNz;
+  mean_span_ave(i, j, 0, 4) = bv_add[4] * oneDivNz;
+  mean_span_ave(i, j, 0, 5) = bv_add[5] * oneDivNz;
   for (int l = 0; l < param->n_scalar; ++l) {
     real addUp{0};
     for (int k = 0; k < extent[2]; ++k) {
-      addUp += firstOrderStat(i, j, k, l + 6) / firstOrderStat(i, j, k, 0);
+      addUp += mean(i, j, k, l + 6);
     }
-    mean(i, j, 0, l + 6) = addUp * oneDivNz;
+    mean_span_ave(i, j, 0, l + 6) = addUp * oneDivNz;
   }
 
   auto &rey_tensor = zone->reynolds_stress_tensor;
@@ -528,30 +520,24 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, int co
   memset(rey_tensor_add, 0, sizeof(real) * 6);
   int count_useful[3]{0, 0, 0};
   for (int k = 0; k < extent[2]; ++k) {
-    const auto sumRhoInv{1.0 / firstOrderStat(i, j, k, 0)};
-    const auto sumRho2Inv{sumRhoInv * sumRhoInv};
-    auto temp =
-        vel2ndMoment(i, j, k, 0) * sumRhoInv - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 1) * sumRho2Inv;
+    auto temp = rey_tensor(i, j, k, 0);
     if (temp > 0) {
       rey_tensor_add[0] += temp;
       count_useful[0]++;
     }
-    temp = vel2ndMoment(i, j, k, 1) * sumRhoInv - firstOrderStat(i, j, k, 2) * firstOrderStat(i, j, k, 2) * sumRho2Inv;
+    temp = rey_tensor(i, j, k, 1);
     if (temp > 0) {
       rey_tensor_add[1] += temp;
       count_useful[1]++;
     }
-    temp = vel2ndMoment(i, j, k, 2) * sumRhoInv - firstOrderStat(i, j, k, 3) * firstOrderStat(i, j, k, 3) * sumRho2Inv;
+    temp = rey_tensor(i, j, k, 2);
     if (temp > 0) {
       rey_tensor_add[2] += temp;
       count_useful[2]++;
     }
-    rey_tensor_add[3] +=
-        vel2ndMoment(i, j, k, 3) * sumRhoInv - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 2) * sumRho2Inv;
-    rey_tensor_add[4] +=
-        vel2ndMoment(i, j, k, 4) * sumRhoInv - firstOrderStat(i, j, k, 1) * firstOrderStat(i, j, k, 3) * sumRho2Inv;
-    rey_tensor_add[5] +=
-        vel2ndMoment(i, j, k, 5) * sumRhoInv - firstOrderStat(i, j, k, 2) * firstOrderStat(i, j, k, 3) * sumRho2Inv;
+    rey_tensor_add[3] += rey_tensor(i, j, k, 3);
+    rey_tensor_add[4] += rey_tensor(i, j, k, 4);
+    rey_tensor_add[5] += rey_tensor(i, j, k, 5);
   }
   rey_tensor(i, j, 0, 0) = count_useful[0] > 0 ? rey_tensor_add[0] / count_useful[0] : 0;
   rey_tensor(i, j, 0, 1) = count_useful[1] > 0 ? rey_tensor_add[1] / count_useful[1] : 0;
@@ -559,6 +545,9 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, int co
   rey_tensor(i, j, 0, 3) = rey_tensor_add[3] * oneDivNz;
   rey_tensor(i, j, 0, 4) = rey_tensor_add[4] * oneDivNz;
   rey_tensor(i, j, 0, 5) = rey_tensor_add[5] * oneDivNz;
+
+  compute_user_defined_statistical_data_with_spanwise_average<USER_DEFINE_STATISTICS>(zone, param, counter_ud, i, j,
+                                                                                      extent[2], counter);
 }
 
 } // cfd

@@ -16,41 +16,35 @@ ThermRMS::collect(cfd::DZone *zone, cfd::DParameter *param, int i, int j, int k,
 
 __device__ void
 ThermRMS::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
-                                   int mz, int counter, int stat_idx, int collected_idx) {
+                                   int mz, int counter, int span_stat_idx, int collected_idx,
+                                   int vol_stat_idx) {
   auto &stat = zone->user_defined_statistical_data;
-  auto &collect = zone->userCollectForStat;
-  auto &firstOrderMoment = zone->firstOrderMoment;
+  auto &stat_span_ave = zone->user_defined_statistical_data_span_ave;
 
-  const real counter_inv{1.0 / counter};
   real add_rho{0}, add_p{0}, add_T{0};
   for (int k = 0; k < mz; ++k) {
-    const real density = firstOrderMoment(i, j, k, 0) * counter_inv;
-    add_rho += sqrt(max(collect(i, j, k, collected_idx) / counter_ud[collected_idx] - density * density, 0.0));
-    add_p += sqrt(max(collect(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
-                      firstOrderMoment(i, j, k, 4) * firstOrderMoment(i, j, k, 4) * counter_inv * counter_inv, 0.0));
-    const real T_mean = collect(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3];
-    const real TT_mean = collect(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2];
-    const real T_favre = firstOrderMoment(i, j, k, 5) / firstOrderMoment(i, j, k, 0);
-    add_T += sqrt(max(TT_mean - 2 * T_mean * T_favre + T_favre * T_favre, 0.0));
+    add_rho += stat(i, j, k, vol_stat_idx);
+    add_p += stat(i, j, k, vol_stat_idx + 1);
+    add_T += stat(i, j, k, vol_stat_idx + 2);
   }
-  stat(i, j, 0, stat_idx) = add_rho / mz;
-  stat(i, j, 0, stat_idx + 1) = add_p / mz;
-  stat(i, j, 0, stat_idx + 2) = add_T / mz;
+  stat_span_ave(i, j, 0, span_stat_idx) = add_rho / mz;
+  stat_span_ave(i, j, 0, span_stat_idx + 1) = add_p / mz;
+  stat_span_ave(i, j, 0, span_stat_idx + 2) = add_T / mz;
 }
 
 __device__ void
 ThermRMS::compute(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int k, int counter,
-                  int stat_idx, int collected_idx) {
+                  int vol_stat_idx, int collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
   auto &collect = zone->userCollectForStat;
   auto &mean = zone->mean_value;
-  stat(i, j, k, stat_idx) = sqrt(
+  stat(i, j, k, vol_stat_idx) = sqrt(
       max(collect(i, j, k, collected_idx) / counter_ud[collected_idx] - mean(i, j, k, 0) * mean(i, j, k, 0), 0.0));
-  stat(i, j, k, stat_idx + 1) = sqrt(
+  stat(i, j, k, vol_stat_idx + 1) = sqrt(
       max(collect(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] - mean(i, j, k, 4) * mean(i, j, k, 4),
           0.0));
   const real T_mean = collect(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3];
-  stat(i, j, k, stat_idx + 2) = sqrt(
+  stat(i, j, k, vol_stat_idx + 2) = sqrt(
       max(collect(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] - 2 * T_mean * mean(i, j, k, 5) +
           mean(i, j, k, 5) * mean(i, j, k, 5), 0.0));
 }
@@ -95,15 +89,6 @@ turbulent_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, in
   const real w_z = 0.5 * (xi_z * (bv(i + 1, j, k, 3) - bv(i - 1, j, k, 3)) +
                           eta_z * (bv(i, j + 1, k, 3) - bv(i, j - 1, k, 3)) +
                           zeta_z * (bv(i, j, k + 1, 3) - bv(i, j, k - 1, 3)));
-//  collect(i, j, k, collect_idx) += u_x;
-//  collect(i, j, k, collect_idx + 1) += u_y;
-//  collect(i, j, k, collect_idx + 2) += u_z;
-//  collect(i, j, k, collect_idx + 3) += v_x;
-//  collect(i, j, k, collect_idx + 4) += v_y;
-//  collect(i, j, k, collect_idx + 5) += v_z;
-//  collect(i, j, k, collect_idx + 6) += w_x;
-//  collect(i, j, k, collect_idx + 7) += w_y;
-//  collect(i, j, k, collect_idx + 8) += w_z;
 
   const real mu = zone->mul(i, j, k);
   const real sigma11 = mu * (4.0 * u_x - 2 * v_y - 2 * w_z) / 3.0;
@@ -112,16 +97,6 @@ turbulent_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, in
   const real sigma22 = mu * (4.0 * v_y - 2 * u_x - 2 * w_z) / 3.0;
   const real sigma23 = mu * (v_z + w_y);
   const real sigma33 = mu * (4.0 * w_z - 2 * u_x - 2 * v_y) / 3.0;
-//  collect(i, j, k, collect_idx + 9) += sigma11;
-//  collect(i, j, k, collect_idx + 10) += sigma12;
-//  collect(i, j, k, collect_idx + 11) += sigma13;
-//  collect(i, j, k, collect_idx + 12) += sigma22;
-//  collect(i, j, k, collect_idx + 13) += sigma23;
-//  collect(i, j, k, collect_idx + 14) += sigma33;
-//
-//  collect(i, j, k, collect_idx + 15) += sigma11 * u_x + sigma12 * u_y + sigma13 * u_z
-//                                       + sigma12 * v_x + sigma22 * v_y + sigma23 * v_z
-//                                       + sigma13 * w_x + sigma23 * w_y + sigma33 * w_z;
 
   collect(i, j, k, collect_idx + 3) += sigma11;
   collect(i, j, k, collect_idx + 4) += sigma12;
@@ -137,7 +112,7 @@ turbulent_dissipation_rate::collect(cfd::DZone *zone, cfd::DParameter *param, in
 
 __device__ void
 turbulent_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
-                                    int k, int counter, int stat_idx, int collected_idx) {
+                                    int k, int counter, int vol_stat_idx, int coll_idx) {
   auto &stat = zone->user_defined_statistical_data;
   auto &collect = zone->userCollectForStat;
   auto &mean = zone->mean_value;
@@ -147,337 +122,107 @@ turbulent_dissipation_rate::compute(cfd::DZone *zone, cfd::DParameter *param, co
   const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
   const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
 
-  auto mx{zone->mx}, my{zone->my}, mz{zone->mz};
   real rhoEps{0};
-  if (mz == 1) {
-    // 2D case
-    if (i > 0 && i < mx - 1 && j > 0 && j < my - 1) {
-      const real u_x = 0.5 * (xi_x * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_x * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real u_y = 0.5 * (xi_y * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_y * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real u_z = 0.5 * (xi_z * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_z * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real v_x =
-          0.5 * (xi_x * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_x * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real v_y =
-          0.5 * (xi_y * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_y * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real v_z =
-          0.5 * (xi_z * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_z * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real w_x =
-          0.5 * (xi_x * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_x * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      const real w_y =
-          0.5 * (xi_y * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_y * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      const real w_z =
-          0.5 * (xi_z * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_z * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      rhoEps = collect(i, j, k, collected_idx + 9) / counter_ud[collected_idx + 9] -
-               collect(i, j, k, collected_idx + 3) * u_x / counter_ud[collected_idx + 3]
-               - collect(i, j, k, collected_idx + 4) * u_y / counter_ud[collected_idx + 4] -
-               collect(i, j, k, collected_idx + 5) * u_z / counter_ud[collected_idx + 5]
-               - collect(i, j, k, collected_idx + 4) * v_x / counter_ud[collected_idx + 4] -
-               collect(i, j, k, collected_idx + 6) * v_y / counter_ud[collected_idx + 6]
-               - collect(i, j, k, collected_idx + 7) * v_z / counter_ud[collected_idx + 7] -
-               collect(i, j, k, collected_idx + 5) * w_x / counter_ud[collected_idx + 5]
-               - collect(i, j, k, collected_idx + 7) * w_y / counter_ud[collected_idx + 7] -
-               collect(i, j, k, collected_idx + 8) * w_z / counter_ud[collected_idx + 8];
-    }
+  const real u_x = 0.5 * (xi_x * (collect(i + 1, j, k, coll_idx) - collect(i - 1, j, k, coll_idx)) +
+                          eta_x * (collect(i, j + 1, k, coll_idx) - collect(i, j - 1, k, coll_idx)) +
+                          zeta_x * (collect(i, j, k + 1, coll_idx) - collect(i, j, k - 1, coll_idx))) /
+                   counter_ud[coll_idx];
+  const real u_y = 0.5 * (xi_y * (collect(i + 1, j, k, coll_idx) - collect(i - 1, j, k, coll_idx)) +
+                          eta_y * (collect(i, j + 1, k, coll_idx) - collect(i, j - 1, k, coll_idx)) +
+                          zeta_y * (collect(i, j, k + 1, coll_idx) - collect(i, j, k - 1, coll_idx))) /
+                   counter_ud[coll_idx];
+  const real u_z = 0.5 * (xi_z * (collect(i + 1, j, k, coll_idx) - collect(i - 1, j, k, coll_idx)) +
+                          eta_z * (collect(i, j + 1, k, coll_idx) - collect(i, j - 1, k, coll_idx)) +
+                          zeta_z * (collect(i, j, k + 1, coll_idx) - collect(i, j, k - 1, coll_idx))) /
+                   counter_ud[coll_idx];
+  const real v_x = 0.5 * (xi_x * (collect(i + 1, j, k, coll_idx + 1) - collect(i - 1, j, k, coll_idx + 1)) +
+                          eta_x * (collect(i, j + 1, k, coll_idx + 1) - collect(i, j - 1, k, coll_idx + 1)) +
+                          zeta_x *
+                          (collect(i, j, k + 1, coll_idx + 1) - collect(i, j, k - 1, coll_idx + 1))) /
+                   counter_ud[coll_idx + 1];
+  const real v_y =
+      0.5 * (xi_y * (collect(i + 1, j, k, coll_idx + 1) - collect(i - 1, j, k, coll_idx + 1)) +
+             eta_y * (collect(i, j + 1, k, coll_idx + 1) - collect(i, j - 1, k, coll_idx + 1)) +
+             zeta_y * (collect(i, j, k + 1, coll_idx + 1) - collect(i, j, k - 1, coll_idx + 1))) /
+      counter_ud[coll_idx + 1];
+  const real v_z =
+      0.5 * (xi_z * (collect(i + 1, j, k, coll_idx + 1) - collect(i - 1, j, k, coll_idx + 1)) +
+             eta_z * (collect(i, j + 1, k, coll_idx + 1) - collect(i, j - 1, k, coll_idx + 1)) +
+             zeta_z * (collect(i, j, k + 1, coll_idx + 1) - collect(i, j, k - 1, coll_idx + 1))) /
+      counter_ud[coll_idx + 1];
+  const real w_x =
+      0.5 * (xi_x * (collect(i + 1, j, k, coll_idx + 2) - collect(i - 1, j, k, coll_idx + 2)) +
+             eta_x * (collect(i, j + 1, k, coll_idx + 2) - collect(i, j - 1, k, coll_idx + 2)) +
+             zeta_x * (collect(i, j, k + 1, coll_idx + 2) - collect(i, j, k - 1, coll_idx + 2))) /
+      counter_ud[coll_idx + 2];
+  const real w_y =
+      0.5 * (xi_y * (collect(i + 1, j, k, coll_idx + 2) - collect(i - 1, j, k, coll_idx + 2)) +
+             eta_y * (collect(i, j + 1, k, coll_idx + 2) - collect(i, j - 1, k, coll_idx + 2)) +
+             zeta_y * (collect(i, j, k + 1, coll_idx + 2) - collect(i, j, k - 1, coll_idx + 2))) /
+      counter_ud[coll_idx + 2];
+  const real w_z =
+      0.5 * (xi_z * (collect(i + 1, j, k, coll_idx + 2) - collect(i - 1, j, k, coll_idx + 2)) +
+             eta_z * (collect(i, j + 1, k, coll_idx + 2) - collect(i, j - 1, k, coll_idx + 2)) +
+             zeta_z * (collect(i, j, k + 1, coll_idx + 2) - collect(i, j, k - 1, coll_idx + 2))) /
+      counter_ud[coll_idx + 2];
+  rhoEps = collect(i, j, k, coll_idx + 9) / counter_ud[coll_idx + 9] -
+           collect(i, j, k, coll_idx + 3) * u_x / counter_ud[coll_idx + 3]
+           - collect(i, j, k, coll_idx + 4) * u_y / counter_ud[coll_idx + 4] -
+           collect(i, j, k, coll_idx + 5) * u_z / counter_ud[coll_idx + 5]
+           - collect(i, j, k, coll_idx + 4) * v_x / counter_ud[coll_idx + 4] -
+           collect(i, j, k, coll_idx + 6) * v_y / counter_ud[coll_idx + 6]
+           - collect(i, j, k, coll_idx + 7) * v_z / counter_ud[coll_idx + 7] -
+           collect(i, j, k, coll_idx + 5) * w_x / counter_ud[coll_idx + 5]
+           - collect(i, j, k, coll_idx + 7) * w_y / counter_ud[coll_idx + 7] -
+           collect(i, j, k, coll_idx + 8) * w_z / counter_ud[coll_idx + 8];
+
+  if (param->perform_spanwise_average) {
+    stat(i, j, k, vol_stat_idx) = rhoEps;
   } else {
-    // 3D case
-    if (i > 0 && i < mx - 1 && j > 0 && j < my - 1 && k > 0 && k < mz - 1) {
-      const real u_x = 0.5 * (xi_x * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_x * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx)) +
-                              zeta_x * (collect(i, j, k + 1, collected_idx) - collect(i, j, k - 1, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real u_y = 0.5 * (xi_y * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_y * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx)) +
-                              zeta_y * (collect(i, j, k + 1, collected_idx) - collect(i, j, k - 1, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real u_z = 0.5 * (xi_z * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_z * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx)) +
-                              zeta_z * (collect(i, j, k + 1, collected_idx) - collect(i, j, k - 1, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real v_x =
-          0.5 * (xi_x * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_x * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_x *
-                 (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real v_y =
-          0.5 * (xi_y * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_y * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_y *
-                 (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real v_z =
-          0.5 * (xi_z * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_z * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_z *
-                 (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real w_x =
-          0.5 * (xi_x * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_x * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_x *
-                 (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      const real w_y =
-          0.5 * (xi_y * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_y * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_y *
-                 (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      const real w_z =
-          0.5 * (xi_z * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_z * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_z *
-                 (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      rhoEps = collect(i, j, k, collected_idx + 9) / counter_ud[collected_idx + 9] -
-               collect(i, j, k, collected_idx + 3) * u_x / counter_ud[collected_idx + 3]
-               - collect(i, j, k, collected_idx + 4) * u_y / counter_ud[collected_idx + 4] -
-               collect(i, j, k, collected_idx + 5) * u_z / counter_ud[collected_idx + 5]
-               - collect(i, j, k, collected_idx + 4) * v_x / counter_ud[collected_idx + 4] -
-               collect(i, j, k, collected_idx + 6) * v_y / counter_ud[collected_idx + 6]
-               - collect(i, j, k, collected_idx + 7) * v_z / counter_ud[collected_idx + 7] -
-               collect(i, j, k, collected_idx + 5) * w_x / counter_ud[collected_idx + 5]
-               - collect(i, j, k, collected_idx + 7) * w_y / counter_ud[collected_idx + 7] -
-               collect(i, j, k, collected_idx + 8) * w_z / counter_ud[collected_idx + 8];
-    }
-  }
-
-
-//  auto rhoEps = collect(i, j, k, collected_idx + 15) / counter_ud[collected_idx + 15]
-//                - collect(i, j, k, collected_idx + 9) * collect(i, j, k, collected_idx) /
-//                  (counter_ud[collected_idx] * counter_ud[collected_idx + 9])
-//                - collect(i, j, k, collected_idx + 10) * collect(i, j, k, collected_idx + 1) /
-//                  (counter_ud[collected_idx + 1] * counter_ud[collected_idx + 10])
-//                - collect(i, j, k, collected_idx + 11) * collect(i, j, k, collected_idx + 2) /
-//                  (counter_ud[collected_idx + 2] * counter_ud[collected_idx + 11])
-//                - collect(i, j, k, collected_idx + 10) * collect(i, j, k, collected_idx + 3) /
-//                  (counter_ud[collected_idx + 3] * counter_ud[collected_idx + 10])
-//                - collect(i, j, k, collected_idx + 12) * collect(i, j, k, collected_idx + 4) /
-//                  (counter_ud[collected_idx + 4] * counter_ud[collected_idx + 12])
-//                - collect(i, j, k, collected_idx + 13) * collect(i, j, k, collected_idx + 5) /
-//                  (counter_ud[collected_idx + 5] * counter_ud[collected_idx + 13])
-//                - collect(i, j, k, collected_idx + 11) * collect(i, j, k, collected_idx + 6) /
-//                  (counter_ud[collected_idx + 6] * counter_ud[collected_idx + 11])
-//                - collect(i, j, k, collected_idx + 13) * collect(i, j, k, collected_idx + 7) /
-//                  (counter_ud[collected_idx + 7] * counter_ud[collected_idx + 13])
-//                - collect(i, j, k, collected_idx + 14) * collect(i, j, k, collected_idx + 8) /
-//                  (counter_ud[collected_idx + 8] * counter_ud[collected_idx + 14]);
-  // In case of accumulated numerical error, the turbulent dissipation rate is limited to be positive.
-  stat(i, j, k, stat_idx) = max(rhoEps / mean(i, j, k, 0), 1e-30);
-  real nu{0};
-  if (param->n_spec > 0) {
-    real Y[MAX_SPEC_NUMBER], mw{0};
-    for (int l = 0; l < param->n_spec; ++l) {
-      Y[l] = mean(i, j, k, l + 6);
-      mw += mean(i, j, k, l + 6) / param->mw[l];
-    }
-    mw = 1.0 / mw;
-    nu = compute_viscosity(mean(i, j, k, 5), mw, Y, param) / mean(i, j, k, 0);
-  } else {
-    nu = Sutherland(mean(i, j, k, 5)) / mean(i, j, k, 0);
-  }
-  // The Kolmogorov scale \eta = (nu^3 / epsilon)^(1/4)
-  stat(i, j, k, stat_idx + 1) = pow(nu * nu * nu / stat(i, j, k, stat_idx), 0.25);
-  // The Kolmogorov time scale t_eta = \sqrt{nu / epsilon}
-  stat(i, j, k, stat_idx + 2) = sqrt(nu / stat(i, j, k, stat_idx));
-  auto &rey_tensor = zone->reynolds_stress_tensor;
-  real tke = 0.5 * (rey_tensor(i, j, k, 0) + rey_tensor(i, j, k, 1) + rey_tensor(i, j, k, 2));
-  // The turbulent time scale t_turb = tke / epsilon.
-  stat(i, j, k, stat_idx + 3) = tke / stat(i, j, k, stat_idx);
-}
-
-__device__ void
-turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud,
-                                                     int i, int j, int mz, int counter, int stat_idx,
-                                                     int collected_idx) {
-  auto &stat = zone->user_defined_statistical_data;
-  auto &collect = zone->userCollectForStat;
-  auto &firstOrderMoment = zone->firstOrderMoment;
-
-  const real counter_inv{1.0 / counter};
-  real add{0};
-  auto mx{zone->mx}, my{zone->my};
-  if (mz == 1) {
-    // 2D case
-    const real density = firstOrderMoment(i, j, 0, 0) * counter_inv;
-    const auto &m = zone->metric(i, j, 0);
-    const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
-    const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
-    const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
-    const real u_x = 0.5 * (xi_x * (collect(i + 1, j, 0, collected_idx) - collect(i - 1, j, 0, collected_idx)) +
-                            eta_x * (collect(i, j + 1, 0, collected_idx) - collect(i, j - 1, 0, collected_idx))) /
-                     counter_ud[collected_idx];
-    const real u_y = 0.5 * (xi_y * (collect(i + 1, j, 0, collected_idx) - collect(i - 1, j, 0, collected_idx)) +
-                            eta_y * (collect(i, j + 1, 0, collected_idx) - collect(i, j - 1, 0, collected_idx))) /
-                     counter_ud[collected_idx];
-    const real u_z = 0.5 * (xi_z * (collect(i + 1, j, 0, collected_idx) - collect(i - 1, j, 0, collected_idx)) +
-                            eta_z * (collect(i, j + 1, 0, collected_idx) - collect(i, j - 1, 0, collected_idx))) /
-                     counter_ud[collected_idx];
-    const real v_x = 0.5 * (xi_x * (collect(i + 1, j, 0, collected_idx + 1) - collect(i - 1, j, 0, collected_idx + 1)) +
-                            eta_x *
-                            (collect(i, j + 1, 0, collected_idx + 1) - collect(i, j - 1, 0, collected_idx + 1))) /
-                     counter_ud[collected_idx + 1];
-    const real v_y = 0.5 * (xi_y * (collect(i + 1, j, 0, collected_idx + 1) - collect(i - 1, j, 0, collected_idx + 1)) +
-                            eta_y *
-                            (collect(i, j + 1, 0, collected_idx + 1) - collect(i, j - 1, 0, collected_idx + 1))) /
-                     counter_ud[collected_idx + 1];
-    const real v_z = 0.5 * (xi_z * (collect(i + 1, j, 0, collected_idx + 1) - collect(i - 1, j, 0, collected_idx + 1)) +
-                            eta_z *
-                            (collect(i, j + 1, 0, collected_idx + 1) - collect(i, j - 1, 0, collected_idx + 1))) /
-                     counter_ud[collected_idx + 1];
-    const real w_x = 0.5 * (xi_x * (collect(i + 1, j, 0, collected_idx + 2) - collect(i - 1, j, 0, collected_idx + 2)) +
-                            eta_x *
-                            (collect(i, j + 1, 0, collected_idx + 2) - collect(i, j - 1, 0, collected_idx + 2))) /
-                     counter_ud[collected_idx + 2];
-    const real w_y = 0.5 * (xi_y * (collect(i + 1, j, 0, collected_idx + 2) - collect(i - 1, j, 0, collected_idx + 2)) +
-                            eta_y *
-                            (collect(i, j + 1, 0, collected_idx + 2) - collect(i, j - 1, 0, collected_idx + 2))) /
-                     counter_ud[collected_idx + 2];
-    const real w_z = 0.5 * (xi_z * (collect(i + 1, j, 0, collected_idx + 2) - collect(i - 1, j, 0, collected_idx + 2)) +
-                            eta_z *
-                            (collect(i, j + 1, 0, collected_idx + 2) - collect(i, j - 1, 0, collected_idx + 2))) /
-                     counter_ud[collected_idx + 2];
-    real rhoEps = collect(i, j, 0, collected_idx + 9) / counter_ud[collected_idx + 9] -
-                  collect(i, j, 0, collected_idx + 3) * u_x / counter_ud[collected_idx + 3]
-                  - collect(i, j, 0, collected_idx + 4) * u_y / counter_ud[collected_idx + 4] -
-                  collect(i, j, 0, collected_idx + 5) * u_z / counter_ud[collected_idx + 5]
-                  - collect(i, j, 0, collected_idx + 4) * v_x / counter_ud[collected_idx + 4] -
-                  collect(i, j, 0, collected_idx + 6) * v_y / counter_ud[collected_idx + 6]
-                  - collect(i, j, 0, collected_idx + 7) * v_z / counter_ud[collected_idx + 7] -
-                  collect(i, j, 0, collected_idx + 5) * w_x / counter_ud[collected_idx + 5]
-                  - collect(i, j, 0, collected_idx + 7) * w_y / counter_ud[collected_idx + 7] -
-                  collect(i, j, 0, collected_idx + 8) * w_z / counter_ud[collected_idx + 8];
-    stat(i, j, 0, stat_idx) = max(rhoEps / density, 1e-30);
-    auto &mean = zone->mean_value;
+    // In case of accumulated numerical error, the turbulent dissipation rate is limited to be positive.
+    stat(i, j, k, vol_stat_idx) = max(rhoEps / mean(i, j, k, 0), 1e-30);
     real nu{0};
     if (param->n_spec > 0) {
       real Y[MAX_SPEC_NUMBER], mw{0};
       for (int l = 0; l < param->n_spec; ++l) {
-        Y[l] = mean(i, j, 0, l + 6);
-        mw += mean(i, j, 0, l + 6) / param->mw[l];
+        Y[l] = mean(i, j, k, l + 6);
+        mw += mean(i, j, k, l + 6) / param->mw[l];
       }
       mw = 1.0 / mw;
-      nu = compute_viscosity(mean(i, j, 0, 5), mw, Y, param) / mean(i, j, 0, 0);
+      nu = compute_viscosity(mean(i, j, k, 5), mw, Y, param) / mean(i, j, k, 0);
     } else {
-      nu = Sutherland(mean(i, j, 0, 5)) / mean(i, j, 0, 0);
+      nu = Sutherland(mean(i, j, k, 5)) / mean(i, j, k, 0);
     }
     // The Kolmogorov scale \eta = (nu^3 / epsilon)^(1/4)
-    stat(i, j, 0, stat_idx + 1) = pow(nu * nu * nu / stat(i, j, 0, stat_idx), 0.25);
+    stat(i, j, k, vol_stat_idx + 1) = pow(nu * nu * nu / stat(i, j, k, vol_stat_idx), 0.25);
     // The Kolmogorov time scale t_eta = \sqrt{nu / epsilon}
-    stat(i, j, 0, stat_idx + 2) = sqrt(nu / stat(i, j, 0, stat_idx));
+    stat(i, j, k, vol_stat_idx + 2) = sqrt(nu / stat(i, j, k, vol_stat_idx));
     auto &rey_tensor = zone->reynolds_stress_tensor;
-    real tke = 0.5 * (rey_tensor(i, j, 0, 0) + rey_tensor(i, j, 0, 1) + rey_tensor(i, j, 0, 2));
+    real tke = 0.5 * (rey_tensor(i, j, k, 0) + rey_tensor(i, j, k, 1) + rey_tensor(i, j, k, 2));
     // The turbulent time scale t_turb = tke / epsilon.
-    stat(i, j, 0, stat_idx + 3) = tke / stat(i, j, 0, stat_idx);
-    return;
+    stat(i, j, k, vol_stat_idx + 3) = tke / stat(i, j, k, vol_stat_idx);
   }
-  int useful_counter{0};
+}
+
+__device__ void
+turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud,
+                                                     int i, int j, int mz, int counter, int span_stat_idx,
+                                                     int collected_idx, int vol_stat_idx) {
+  auto &stat = zone->user_defined_statistical_data;
+  auto &stat_span_ave = zone->user_defined_statistical_data_span_ave;
+
+  real add{0};
+  int num{0};
   for (int k = 0; k < mz; ++k) {
-    const real density = firstOrderMoment(i, j, k, 0) * counter_inv;
-    real rhoEps{0};
-    if (i > 0 && i < mx - 1 && j > 0 && j < my - 1 && k > 0 && k < mz - 1) {
-      const auto &m = zone->metric(i, j, k);
-      const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
-      const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
-      const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
-      const real u_x = 0.5 * (xi_x * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_x * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx)) +
-                              zeta_x * (collect(i, j, k + 1, collected_idx) - collect(i, j, k - 1, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real u_y = 0.5 * (xi_y * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_y * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx)) +
-                              zeta_y * (collect(i, j, k + 1, collected_idx) - collect(i, j, k - 1, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real u_z = 0.5 * (xi_z * (collect(i + 1, j, k, collected_idx) - collect(i - 1, j, k, collected_idx)) +
-                              eta_z * (collect(i, j + 1, k, collected_idx) - collect(i, j - 1, k, collected_idx)) +
-                              zeta_z * (collect(i, j, k + 1, collected_idx) - collect(i, j, k - 1, collected_idx))) /
-                       counter_ud[collected_idx];
-      const real v_x =
-          0.5 * (xi_x * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_x * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_x * (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real v_y =
-          0.5 * (xi_y * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_y * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_y * (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real v_z =
-          0.5 * (xi_z * (collect(i + 1, j, k, collected_idx + 1) - collect(i - 1, j, k, collected_idx + 1)) +
-                 eta_z * (collect(i, j + 1, k, collected_idx + 1) - collect(i, j - 1, k, collected_idx + 1)) +
-                 zeta_z * (collect(i, j, k + 1, collected_idx + 1) - collect(i, j, k - 1, collected_idx + 1))) /
-          counter_ud[collected_idx + 1];
-      const real w_x =
-          0.5 * (xi_x * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_x * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_x * (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      const real w_y =
-          0.5 * (xi_y * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_y * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_y * (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      const real w_z =
-          0.5 * (xi_z * (collect(i + 1, j, k, collected_idx + 2) - collect(i - 1, j, k, collected_idx + 2)) +
-                 eta_z * (collect(i, j + 1, k, collected_idx + 2) - collect(i, j - 1, k, collected_idx + 2)) +
-                 zeta_z * (collect(i, j, k + 1, collected_idx + 2) - collect(i, j, k - 1, collected_idx + 2))) /
-          counter_ud[collected_idx + 2];
-      rhoEps = collect(i, j, k, collected_idx + 9) / counter_ud[collected_idx + 9] -
-               collect(i, j, k, collected_idx + 3) * u_x / counter_ud[collected_idx + 3]
-               - collect(i, j, k, collected_idx + 4) * u_y / counter_ud[collected_idx + 4] -
-               collect(i, j, k, collected_idx + 5) * u_z / counter_ud[collected_idx + 5]
-               - collect(i, j, k, collected_idx + 4) * v_x / counter_ud[collected_idx + 4] -
-               collect(i, j, k, collected_idx + 6) * v_y / counter_ud[collected_idx + 6]
-               - collect(i, j, k, collected_idx + 7) * v_z / counter_ud[collected_idx + 7] -
-               collect(i, j, k, collected_idx + 5) * w_x / counter_ud[collected_idx + 5]
-               - collect(i, j, k, collected_idx + 7) * w_y / counter_ud[collected_idx + 7] -
-               collect(i, j, k, collected_idx + 8) * w_z / counter_ud[collected_idx + 8];
-    }
-//    auto rhoEps = collect(i, j, k, collected_idx + 15) / counter_ud[collected_idx + 15]
-//                  - collect(i, j, k, collected_idx + 9) * collect(i, j, k, collected_idx) /
-//                    (counter_ud[collected_idx] * counter_ud[collected_idx + 9])
-//                  - collect(i, j, k, collected_idx + 10) * collect(i, j, k, collected_idx + 1) /
-//                    (counter_ud[collected_idx + 1] * counter_ud[collected_idx + 10])
-//                  - collect(i, j, k, collected_idx + 11) * collect(i, j, k, collected_idx + 2) /
-//                    (counter_ud[collected_idx + 2] * counter_ud[collected_idx + 11])
-//                  - collect(i, j, k, collected_idx + 10) * collect(i, j, k, collected_idx + 3) /
-//                    (counter_ud[collected_idx + 3] * counter_ud[collected_idx + 10])
-//                  - collect(i, j, k, collected_idx + 12) * collect(i, j, k, collected_idx + 4) /
-//                    (counter_ud[collected_idx + 4] * counter_ud[collected_idx + 12])
-//                  - collect(i, j, k, collected_idx + 13) * collect(i, j, k, collected_idx + 5) /
-//                    (counter_ud[collected_idx + 5] * counter_ud[collected_idx + 13])
-//                  - collect(i, j, k, collected_idx + 11) * collect(i, j, k, collected_idx + 6) /
-//                    (counter_ud[collected_idx + 6] * counter_ud[collected_idx + 11])
-//                  - collect(i, j, k, collected_idx + 13) * collect(i, j, k, collected_idx + 7) /
-//                    (counter_ud[collected_idx + 7] * counter_ud[collected_idx + 13])
-//                  - collect(i, j, k, collected_idx + 14) * collect(i, j, k, collected_idx + 8) /
-//                    (counter_ud[collected_idx + 8] * counter_ud[collected_idx + 14]);
-    if (auto Eps = rhoEps / density;Eps > 1e-30) {
-      add += Eps;
-      ++useful_counter;
+    if (real rhoEps = stat(i, j, k, vol_stat_idx); rhoEps > 1e-30) {
+      add += rhoEps;
+      ++num;
     }
   }
-  stat(i, j, 0, stat_idx) = max(add / useful_counter, 1e-30);
+  stat_span_ave(i, j, 0, span_stat_idx) = num > 0 ? add / num : 1e-30;
+  auto rhoEpsInv = 1.0 / stat_span_ave(i, j, 0, span_stat_idx);
   real nu;
-  auto &mean = zone->mean_value;
+  auto &mean = zone->mean_value_span_ave;
   if (param->n_spec > 0) {
     real Y[MAX_SPEC_NUMBER], mw{0};
     for (int l = 0; l < param->n_spec; ++l) {
@@ -489,12 +234,11 @@ turbulent_dissipation_rate::compute_spanwise_average(cfd::DZone *zone, cfd::DPar
   } else {
     nu = Sutherland(mean(i, j, 0, 5)) / mean(i, j, 0, 0);
   }
-  stat(i, j, 0, stat_idx + 1) = pow(nu * nu * nu / stat(i, j, 0, stat_idx), 0.25);
-  stat(i, j, 0, stat_idx + 2) = min(sqrt(nu / stat(i, j, 0, stat_idx)), 1.0);
-  auto &rey_tensor = zone->reynolds_stress_tensor;
-  stat(i, j, 0, stat_idx + 3) =
-      min(0.5 * (rey_tensor(i, j, 0, 0) + rey_tensor(i, j, 0, 1) + rey_tensor(i, j, 0, 2)) / stat(i, j, 0, stat_idx),
-          1.0);
+  stat_span_ave(i, j, 0, span_stat_idx + 1) = pow(nu * nu * nu * rhoEpsInv, 0.25);
+  stat_span_ave(i, j, 0, span_stat_idx + 2) = min(sqrt(nu * rhoEpsInv), 1.0);
+  auto &rey_tensor = zone->reynolds_stress_tensor_span_ave;
+  stat_span_ave(i, j, 0, span_stat_idx + 3) = min(
+      0.5 * (rey_tensor(i, j, 0, 0) + rey_tensor(i, j, 0, 1) + rey_tensor(i, j, 0, 2)) * rhoEpsInv, 1.0);
 }
 
 __device__ void
@@ -572,7 +316,6 @@ H2AirMixingLayer::collect(cfd::DZone *zone, cfd::DParameter *param, int i, int j
   collect(i, j, k, collect_idx + 16) += rhoD * zz;
   collect(i, j, k, collect_idx + 17) += rhoD;
 
-  auto &bv = zone->bv;
   auto rho = zone->bv(i, j, k, 0), u = zone->bv(i, j, k, 1), v = zone->bv(i, j, k, 2), w = zone->bv(i, j, k, 3);
   // flux of H2
   real h2 = sv(i, j, k, 0);
@@ -663,18 +406,17 @@ H2AirMixingLayer::compute(cfd::DZone *zone, cfd::DParameter *param, const int *c
   real S12 = uy + vx;
   real S13 = uz + wx;
   real S23 = vz + wy;
-  stat(i, j, k, 1 + stat_idx) = S11 > 1e-25 ? -Tau11 / S11 : 0;
-  stat(i, j, k, 2 + stat_idx) = S22 > 1e-25 ? -Tau22 / S22 : 0;
-  stat(i, j, k, 3 + stat_idx) = S33 > 1e-25 ? -Tau33 / S33 : 0;
-  stat(i, j, k, 4 + stat_idx) = S12 > 1e-25 ? -Tau12 / S12 : 0;
-  stat(i, j, k, 5 + stat_idx) = S13 > 1e-25 ? -Tau13 / S13 : 0;
-  stat(i, j, k, 6 + stat_idx) = S23 > 1e-25 ? -Tau23 / S23 : 0;
+  stat(i, j, k, 1 + stat_idx) = abs(S11) > 1e-25 ? -Tau11 / S11 : 0;
+  stat(i, j, k, 2 + stat_idx) = abs(S22) > 1e-25 ? -Tau22 / S22 : 0;
+  stat(i, j, k, 3 + stat_idx) = abs(S33) > 1e-25 ? -Tau33 / S33 : 0;
+  stat(i, j, k, 4 + stat_idx) = abs(S12) > 1e-25 ? -Tau12 / S12 : 0;
+  stat(i, j, k, 5 + stat_idx) = abs(S13) > 1e-25 ? -Tau13 / S13 : 0;
+  stat(i, j, k, 6 + stat_idx) = abs(S23) > 1e-25 ? -Tau23 / S23 : 0;
   real SiiSii = S11 * S11 + S22 * S22 + S33 * S33 + 2 * S12 * S12 + 2 * S13 * S13 + 2 * S23 * S23;
   real nut =
       SiiSii > 1e-25 ? -(Tau11 * S11 + Tau22 * S22 + Tau33 * S33 + Tau12 * S12 + Tau13 * S13 + Tau23 * S23) / SiiSii
                      : 0;
   stat(i, j, k, 7 + stat_idx) = nut;
-
 
   const real rho_inv = 1.0 / mean(i, j, k, 0);
   // H2
@@ -1023,245 +765,112 @@ H2AirMixingLayer::compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, co
 
 __device__ void
 H2AirMixingLayer::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i,
-                                           int j, int mz, int counter, int stat_idx, int collected_idx) {
-  if (mz == 1) {
-    compute(zone, param, counter_ud, i, j, 0, counter, stat_idx, collected_idx);
-    return;
-  }
+                                           int j, int mz, int counter, int span_stat_idx, int collected_idx,
+                                           int vol_stat_idx) {
   auto &stat = zone->user_defined_statistical_data;
-  auto &collected_moments = zone->userCollectForStat;
-  auto &firstOrderMoment = zone->firstOrderMoment;
-  auto &vel2ndMoment = zone->velocity2ndMoment;
+  auto &stat_span_ave = zone->user_defined_statistical_data_span_ave;
 
-  const real counter_inv = 1.0 / counter;
-  int useful[6]{0, 0, 0, 0, 0, 0};
-  real add[6]{0, 0, 0, 0, 0, 0};
-  int useful_nut[7]{0, 0, 0, 0, 0, 0, 0};
-  real nut_add[7]{0, 0, 0, 0, 0, 0, 0};
-  real divV_add{0};
-  for (int k = 0; k < mz; ++k) {
-    const real sum_density_inv = 1.0 / firstOrderMoment(i, j, k, 0);
-    const real rho_inv = counter / firstOrderMoment(i, j, k, 0);
-    const auto &m = zone->metric(i, j, k);
-    const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
-    const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
-    const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
-    // H2
-    real yk = firstOrderMoment(i, j, k, 6) * sum_density_inv;
-    // {H2''H2''}
-    if (real temp = collected_moments(i, j, k, collected_idx) / counter_ud[collected_idx] * rho_inv - yk * yk;
-        temp > 1e-30) {
-      add[0] += temp;
-      ++useful[0];
+  for (int l = 0; l < 8; ++l) {
+    // divV and nut's
+    real add{0};
+    int num{0};
+    for (int k = 0; k < mz; ++k) {
+      if (auto val = stat(i, j, k, vol_stat_idx + l);abs(val) > 1e-25) {
+        add += val;
+        ++num;
+      }
     }
-    real dz_xi = firstOrderMoment(i + 1, j, k, 6) / firstOrderMoment(i + 1, j, k, 0) -
-                 firstOrderMoment(i - 1, j, k, 6) / firstOrderMoment(i - 1, j, k, 0);
-    real dz_eta = firstOrderMoment(i, j + 1, k, 6) / firstOrderMoment(i, j + 1, k, 0) -
-                  firstOrderMoment(i, j - 1, k, 6) / firstOrderMoment(i, j - 1, k, 0);
-    real dz_zeta = firstOrderMoment(i, j, k + 1, 6) / firstOrderMoment(i, j, k + 1, 0) -
-                   firstOrderMoment(i, j, k - 1, 6) / firstOrderMoment(i, j, k - 1, 0);
-    real zx = 0.5 * (xi_x * dz_xi + eta_x * dz_eta + zeta_x * dz_zeta);
-    real zy = 0.5 * (xi_y * dz_xi + eta_y * dz_eta + zeta_y * dz_zeta);
-    real zz = 0.5 * (xi_z * dz_xi + eta_z * dz_eta + zeta_z * dz_zeta);
-    // chi=2/<rho>*[<rho*D*gradH2*gradH2>-2<rho*D*H2x>*{H2}_x-2<rho*D*H2y>*{H2}_y-2<rho*D*H2z>*{H2}_z+<rho*D>*grad{H2}*grad{H2}]
-    real chi = 2 * rho_inv * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
-                              2 * collected_moments(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] * zx -
-                              2 * collected_moments(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3] * zy -
-                              2 * collected_moments(i, j, k, collected_idx + 4) / counter_ud[collected_idx + 4] * zz +
-                              collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
-                              (zx * zx + zy * zy + zz * zz));
-    if (chi > 1e-30) {
-      add[1] += chi;
-      ++useful[1];
-    }
-
-    // O2
-    yk = firstOrderMoment(i, j, k, 7) * sum_density_inv;
-    // {O2''O2''}
-    if (real temp =
-          collected_moments(i, j, k, collected_idx + 6) / counter_ud[collected_idx + 6] * rho_inv - yk * yk;
-        temp > 1e-30) {
-      add[2] += temp;
-      ++useful[2];
-    }
-    dz_xi = firstOrderMoment(i + 1, j, k, 7) / firstOrderMoment(i + 1, j, k, 0) -
-            firstOrderMoment(i - 1, j, k, 7) / firstOrderMoment(i - 1, j, k, 0);
-    dz_eta = firstOrderMoment(i, j + 1, k, 7) / firstOrderMoment(i, j + 1, k, 0) -
-             firstOrderMoment(i, j - 1, k, 7) / firstOrderMoment(i, j - 1, k, 0);
-    dz_zeta = firstOrderMoment(i, j, k + 1, 7) / firstOrderMoment(i, j, k + 1, 0) -
-              firstOrderMoment(i, j, k - 1, 7) / firstOrderMoment(i, j, k - 1, 0);
-    zx = 0.5 * (xi_x * dz_xi + eta_x * dz_eta + zeta_x * dz_zeta);
-    zy = 0.5 * (xi_y * dz_xi + eta_y * dz_eta + zeta_y * dz_zeta);
-    zz = 0.5 * (xi_z * dz_xi + eta_z * dz_eta + zeta_z * dz_zeta);
-    // chi=2/<rho>*[<rho*D*gradO2*gradO2>-2<rho*D*O2x>*{O2}_x-2<rho*D*O2y>*{O2}_y-2<rho*D*O2z>*{O2}_z+<rho*D>*grad{O2}*grad{O2}]
-    chi = 2 * rho_inv * (collected_moments(i, j, k, collected_idx + 7) / counter_ud[collected_idx + 7] -
-                         2 * collected_moments(i, j, k, collected_idx + 8) / counter_ud[collected_idx + 8] * zx -
-                         2 * collected_moments(i, j, k, collected_idx + 9) / counter_ud[collected_idx + 9] * zy -
-                         2 * collected_moments(i, j, k, collected_idx + 10) / counter_ud[collected_idx + 10] * zz +
-                         collected_moments(i, j, k, collected_idx + 11) / counter_ud[collected_idx + 11] *
-                         (zx * zx + zy * zy + zz * zz));
-    if (chi > 1e-30) {
-      add[3] += chi;
-      ++useful[3];
-    }
-
-    // N2
-    yk = firstOrderMoment(i, j, k, 8) * sum_density_inv;
-    // {N2''N2''}
-    if (real temp =
-          collected_moments(i, j, k, collected_idx + 12) / counter_ud[collected_idx + 12] * rho_inv - yk * yk;
-        temp > 1e-30) {
-      add[4] += temp;
-      ++useful[4];
-    }
-    dz_xi = firstOrderMoment(i + 1, j, k, 8) / firstOrderMoment(i + 1, j, k, 0) -
-            firstOrderMoment(i - 1, j, k, 8) / firstOrderMoment(i - 1, j, k, 0);
-    dz_eta = firstOrderMoment(i, j + 1, k, 8) / firstOrderMoment(i, j + 1, k, 0) -
-             firstOrderMoment(i, j - 1, k, 8) / firstOrderMoment(i, j - 1, k, 0);
-    dz_zeta = firstOrderMoment(i, j, k + 1, 8) / firstOrderMoment(i, j, k + 1, 0) -
-              firstOrderMoment(i, j, k - 1, 8) / firstOrderMoment(i, j, k - 1, 8);
-    zx = 0.5 * (xi_x * dz_xi + eta_x * dz_eta + zeta_x * dz_zeta);
-    zy = 0.5 * (xi_y * dz_xi + eta_y * dz_eta + zeta_y * dz_zeta);
-    zz = 0.5 * (xi_z * dz_xi + eta_z * dz_eta + zeta_z * dz_zeta);
-    // chi=2/<rho>*[<rho*D*gradN2*gradN2>-2<rho*D*N2x>*{N2}_x-2<rho*D*N2y>*{N2}_y-2<rho*D*N2z>*{N2}_z+<rho*D>*grad{N2}*grad{N2}]
-    chi = 2 * rho_inv * (collected_moments(i, j, k, collected_idx + 13) / counter_ud[collected_idx + 13] -
-                         2 * collected_moments(i, j, k, collected_idx + 14) / counter_ud[collected_idx + 14] * zx -
-                         2 * collected_moments(i, j, k, collected_idx + 15) / counter_ud[collected_idx + 15] * zy -
-                         2 * collected_moments(i, j, k, collected_idx + 16) / counter_ud[collected_idx + 16] * zz +
-                         collected_moments(i, j, k, collected_idx + 17) / counter_ud[collected_idx + 17] *
-                         (zx * zx + zy * zy + zz * zz));
-    if (chi > 1e-30) {
-      add[5] += chi;
-      ++useful[5];
-    }
-
-    // nut
-    const auto sumRho2Inv{sum_density_inv * sum_density_inv};
-    real uu = vel2ndMoment(i, j, k, 0) * sum_density_inv -
-              firstOrderMoment(i, j, k, 1) * firstOrderMoment(i, j, k, 1) * sumRho2Inv;
-    real vv = vel2ndMoment(i, j, k, 1) * sum_density_inv -
-              firstOrderMoment(i, j, k, 2) * firstOrderMoment(i, j, k, 2) * sumRho2Inv;
-    real ww = vel2ndMoment(i, j, k, 2) * sum_density_inv -
-              firstOrderMoment(i, j, k, 3) * firstOrderMoment(i, j, k, 3) * sumRho2Inv;
-    real Tau12 = vel2ndMoment(i, j, k, 3) * sum_density_inv -
-                 firstOrderMoment(i, j, k, 1) * firstOrderMoment(i, j, k, 2) * sumRho2Inv;
-    real Tau13 = vel2ndMoment(i, j, k, 4) * sum_density_inv -
-                 firstOrderMoment(i, j, k, 1) * firstOrderMoment(i, j, k, 3) * sumRho2Inv;
-    real Tau23 = vel2ndMoment(i, j, k, 5) * sum_density_inv -
-                 firstOrderMoment(i, j, k, 2) * firstOrderMoment(i, j, k, 3) * sumRho2Inv;
-    const real tke = 0.5 * (uu + vv + ww);
-    real Tau11 = uu - 2.0 / 3 * tke;
-    real Tau22 = vv - 2.0 / 3 * tke;
-    real Tau33 = ww - 2.0 / 3 * tke;
-    real ux = 0.5 * (xi_x * (firstOrderMoment(i + 1, j, k, 1) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 1) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_x * (firstOrderMoment(i, j + 1, k, 1) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 1) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_x * (firstOrderMoment(i, j, k + 1, 1) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 1) / firstOrderMoment(i, j, k - 1, 0)));
-    real uy = 0.5 * (xi_y * (firstOrderMoment(i + 1, j, k, 1) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 1) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_y * (firstOrderMoment(i, j + 1, k, 1) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 1) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_y * (firstOrderMoment(i, j, k + 1, 1) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 1) / firstOrderMoment(i, j, k - 1, 0)));
-    real uz = 0.5 * (xi_z * (firstOrderMoment(i + 1, j, k, 1) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 1) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_z * (firstOrderMoment(i, j + 1, k, 1) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 1) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_z * (firstOrderMoment(i, j, k + 1, 1) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 1) / firstOrderMoment(i, j, k - 1, 0)));
-    real vx = 0.5 * (xi_x * (firstOrderMoment(i + 1, j, k, 2) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 2) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_x * (firstOrderMoment(i, j + 1, k, 2) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 2) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_x * (firstOrderMoment(i, j, k + 1, 2) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 2) / firstOrderMoment(i, j, k - 1, 0)));
-    real vy = 0.5 * (xi_y * (firstOrderMoment(i + 1, j, k, 2) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 2) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_y * (firstOrderMoment(i, j + 1, k, 2) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 2) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_y * (firstOrderMoment(i, j, k + 1, 2) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 2) / firstOrderMoment(i, j, k - 1, 0)));
-    real vz = 0.5 * (xi_z * (firstOrderMoment(i + 1, j, k, 2) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 2) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_z * (firstOrderMoment(i, j + 1, k, 2) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 2) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_z * (firstOrderMoment(i, j, k + 1, 2) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 2) / firstOrderMoment(i, j, k - 1, 0)));
-    real wx = 0.5 * (xi_x * (firstOrderMoment(i + 1, j, k, 3) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 3) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_x * (firstOrderMoment(i, j + 1, k, 3) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 3) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_x * (firstOrderMoment(i, j, k + 1, 3) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 3) / firstOrderMoment(i, j, k - 1, 0)));
-    real wy = 0.5 * (xi_y * (firstOrderMoment(i + 1, j, k, 3) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 3) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_y * (firstOrderMoment(i, j + 1, k, 3) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 3) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_y * (firstOrderMoment(i, j, k + 1, 3) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 3) / firstOrderMoment(i, j, k - 1, 0)));
-    real wz = 0.5 * (xi_z * (firstOrderMoment(i + 1, j, k, 3) / firstOrderMoment(i + 1, j, k, 0) -
-                             firstOrderMoment(i - 1, j, k, 3) / firstOrderMoment(i - 1, j, k, 0)) +
-                     eta_z * (firstOrderMoment(i, j + 1, k, 3) / firstOrderMoment(i, j + 1, k, 0) -
-                              firstOrderMoment(i, j - 1, k, 3) / firstOrderMoment(i, j - 1, k, 0)) +
-                     zeta_z * (firstOrderMoment(i, j, k + 1, 3) / firstOrderMoment(i, j, k + 1, 0) -
-                               firstOrderMoment(i, j, k - 1, 3) / firstOrderMoment(i, j, k - 1, 0)));
-    real divV = ux + vy + wz;
-    divV_add += divV;
-    real S11 = 2 * ux - 2.0 / 3 * divV;
-    real S22 = 2 * vy - 2.0 / 3 * divV;
-    real S33 = 2 * wz - 2.0 / 3 * divV;
-    real S12 = uy + vx;
-    real S13 = uz + wx;
-    real S23 = vz + wy;
-    real SiiSii = S11 * S11 + S22 * S22 + S33 * S33 + 2 * S12 * S12 + 2 * S13 * S13 + 2 * S23 * S23;
-    if (S11 > 1e-25) {
-      nut_add[0] += -Tau11 / S11;
-      ++useful_nut[0];
-    }
-    if (S22 > 1e-25) {
-      nut_add[1] += -Tau22 / S22;
-      ++useful_nut[1];
-    }
-    if (S33 > 1e-25) {
-      nut_add[2] += -Tau33 / S33;
-      ++useful_nut[2];
-    }
-    if (S12 > 1e-25) {
-      nut_add[3] += -Tau12 / S12;
-      ++useful_nut[3];
-    }
-    if (S13 > 1e-25) {
-      nut_add[4] += -Tau13 / S13;
-      ++useful_nut[4];
-    }
-    if (S23 > 1e-25) {
-      nut_add[5] += -Tau23 / S23;
-      ++useful_nut[5];
-    }
-    if (SiiSii > 1e-25) {
-      nut_add[6] += -(Tau11 * S11 + Tau22 * S22 + Tau33 * S33 + Tau12 * S12 + Tau13 * S13 + Tau23 * S23) / SiiSii;
-      ++useful_nut[6];
+    if (num > 0) {
+      stat_span_ave(i, j, 0, span_stat_idx + l) = add / num;
     }
   }
-  stat(i, j, 0, stat_idx) = useful[0] > 0 ? max(add[0] / useful[0], 1e-30) : 1e-30;
-  stat(i, j, 0, stat_idx + 1) = useful[1] > 0 ? max(add[1] / useful[1], 1e-30) : 1e-30;
-  stat(i, j, 0, stat_idx + 2) = min(stat(i, j, 0, stat_idx) / stat(i, j, 0, stat_idx + 1), 1.0);
-  stat(i, j, 0, stat_idx + 3) = useful[2] > 0 ? max(add[2] / useful[2], 1e-30) : 1e-30;
-  stat(i, j, 0, stat_idx + 4) = useful[3] > 0 ? max(add[3] / useful[3], 1e-30) : 1e-30;
-  stat(i, j, 0, stat_idx + 5) = min(stat(i, j, 0, stat_idx + 3) / stat(i, j, 0, stat_idx + 4), 1.0);
-  stat(i, j, 0, stat_idx + 6) = useful[4] > 0 ? max(add[4] / useful[4], 1e-30) : 1e-30;
-  stat(i, j, 0, stat_idx + 7) = useful[5] > 0 ? max(add[5] / useful[5], 1e-30) : 1e-30;
-  stat(i, j, 0, stat_idx + 8) = min(stat(i, j, 0, stat_idx + 6) / stat(i, j, 0, stat_idx + 7), 1.0);
-  stat(i, j, 0, stat_idx + 9) = divV_add / mz;
-  stat(i, j, 0, stat_idx + 10) = useful_nut[0] > 0 ? nut_add[0] / useful_nut[0] : 0;
-  stat(i, j, 0, stat_idx + 11) = useful_nut[1] > 0 ? nut_add[1] / useful_nut[1] : 0;
-  stat(i, j, 0, stat_idx + 12) = useful_nut[2] > 0 ? nut_add[2] / useful_nut[2] : 0;
-  stat(i, j, 0, stat_idx + 13) = useful_nut[3] > 0 ? nut_add[3] / useful_nut[3] : 0;
-  stat(i, j, 0, stat_idx + 14) = useful_nut[4] > 0 ? nut_add[4] / useful_nut[4] : 0;
-  stat(i, j, 0, stat_idx + 15) = useful_nut[5] > 0 ? nut_add[5] / useful_nut[5] : 0;
-  stat(i, j, 0, stat_idx + 16) = useful_nut[6] > 0 ? nut_add[6] / useful_nut[6] : 0;
+  for (int i_spec = 0; i_spec < 3; ++i_spec) {
+    int l = 8 + i_spec * 22;
+    // 1. {Z''Z''}, l=8, 30, 52
+    // 2. chi_z, l=9, 31, 53
+    real add{0};
+    int num{0};
+    for (int i_var=0;i_var<2;++i_var){
+      add=0;
+      num=0;
+      for (int k = 0; k < mz; ++k) {
+        if (auto val = stat(i, j, k, vol_stat_idx + l);val > 1e-30) {
+          add += val;
+          ++num;
+        }
+      }
+      if (num > 0) {
+        stat_span_ave(i, j, 0, span_stat_idx + l) = add / num;
+      }
+      ++l;
+    }
+    // t_z, l=10, 32, 54
+    add = 0;
+    num = 0;
+    for (int k = 0; k < mz; ++k) {
+      if (auto val = stat(i, j, k, vol_stat_idx + l);val < 1) {
+        add += val;
+        ++num;
+      }
+    }
+    if (num > 0) {
+      stat_span_ave(i, j, 0, span_stat_idx + l) = add / num;
+    }
+    ++l;
+    // {u''Z''}, {v''Z''}, {w''Z''}, l=11, 12, 13; 33, 34, 35; 55, 56, 57
+    for (int i_dir = 0; i_dir < 3; ++i_dir) {
+      add = 0;
+      for (int k = 0; k < mz; ++k) {
+        add += stat(i, j, k, vol_stat_idx + l);
+      }
+      stat_span_ave(i, j, 0, span_stat_idx + l) = add / mz;
+      ++l;
+    }
+    // 3 - Dt_Z-x,y,z: l=14, 15, 16; 36, 37, 38; 58, 59, 60
+    // 1 - Dt_Z: l=17, 39, 61
+    // 1 - Sc_Z_laminar: l=18, 40, 62
+    // 3 - Sct_Z-x,y,z: l=19, 20, 21; 41, 42, 43; 63, 64, 65
+    // 1 - Sct_Z: l=22, 44, 66
+    for (int i_dir = 0; i_dir < 9; ++i_dir) {
+      add = 0;
+      num = 0;
+      for (int k = 0; k < mz; ++k) {
+        if (auto val = stat(i, j, k, vol_stat_idx + l);abs(val) > 1e-25) {
+          add += val;
+          ++num;
+        }
+      }
+      if (num > 0) {
+        stat_span_ave(i, j, 0, span_stat_idx + l) = add / num;
+      }
+      ++l;
+    }
+    // Z''2 flux: l=23, 24, 25; 45, 46, 47; 67, 68, 69
+    for (int i_dir = 0; i_dir < 3; ++i_dir) {
+      add = 0;
+      for (int k = 0; k < mz; ++k) {
+        add += stat(i, j, k, vol_stat_idx + l);
+      }
+      stat_span_ave(i, j, 0, span_stat_idx + l) = add / mz;
+      ++l;
+    }
+    // 3 - Sct2_Z-x,y,z: l=26, 27, 28; 48, 49, 50; 70, 71, 72
+    // 1 - Sct2_Z: l=29, 51, 73
+    for (int i_dir = 0; i_dir < 4; ++i_dir) {
+      add = 0;
+      num = 0;
+      for (int k = 0; k < mz; ++k) {
+        if (auto val = stat(i, j, k, vol_stat_idx + l);abs(val) > 1e-25) {
+          add += val;
+          ++num;
+        }
+      }
+      if (num > 0) {
+        stat_span_ave(i, j, 0, span_stat_idx + l) = add / num;
+      }
+      ++l;
+    }
+  }
 }
 
 __device__ void

@@ -84,6 +84,11 @@ struct DZone {
   ggxl::VectorField3D<real> mean_value;
   ggxl::VectorField3D<real> reynolds_stress_tensor;
   ggxl::VectorField3D<real> user_defined_statistical_data;
+
+  // spanwise-averaged version
+  ggxl::VectorField3D<real> mean_value_span_ave;
+  ggxl::VectorField3D<real> reynolds_stress_tensor_span_ave;
+  ggxl::VectorField3D<real> user_defined_statistical_data_span_ave;
 };
 
 struct DParameter;

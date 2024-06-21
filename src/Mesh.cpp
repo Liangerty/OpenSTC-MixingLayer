@@ -608,6 +608,9 @@ cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg
   read_grid(myid, parameter);
   parameter.update_parameter("n_block", n_block);
   parameter.update_parameter("dimension", dimension);
+  if (dimension == 2) {
+    parameter.update_parameter("perform_spanwise_average", false);
+  }
   if (myid == 0) {
     fmt::print("Problem dimension: {}\nTotal grid number: {}\n", dimension, n_grid_total);
   }

@@ -36,6 +36,8 @@ struct DParameter {
   real entropy_fix_factor = 0; // The factor for entropy fix
   int viscous_scheme = 0; // The tag for viscous scheme. 0 - Inviscid, 2 - 2nd order central discretization
 
+  bool perform_spanwise_average = false; // If we want to perform spanwise average
+
   real dt = -1; // The global time step. If -1, we use the local time step.
   real physical_time = 0; // The physical time of the simulation
 

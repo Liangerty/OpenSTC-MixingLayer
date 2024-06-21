@@ -133,7 +133,7 @@ identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::strin
       if (n_spec > 0) {
         // We expect to find some species info. If not found, old_data_info[0] will remain 0.
         const auto &spec_name = species.spec_list;
-        for (const auto& [spec, sp_label]: spec_name) {
+        for (const auto &[spec, sp_label]: spec_name) {
           if (n == gxl::to_upper(spec)) {
             l = 6 + sp_label + 3;
             break;
@@ -620,10 +620,13 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   if (parameter.get_bool("if_collect_statistics")) {
     // If we need to collect the statistics, we need to allocate memory for the data.
     if (parameter.get_bool("perform_spanwise_average")) {
-      h_ptr->mean_value.allocate_memory(mx, my, 1, 6 + n_scalar, 0);
-      h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, 1, 6, 0);
-      h_ptr->user_defined_statistical_data.allocate_memory(mx, my, 1, UserDefineStat::n_stat, 0);
-    } else {
+      h_ptr->mean_value.allocate_memory(mx, my, mz, 6 + n_scalar, 0);
+      h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, mz, 6, 0);
+      h_ptr->user_defined_statistical_data.allocate_memory(mx, my, mz, UserDefineStat::n_vol_stat_when_span_ave, 0);
+      h_ptr->mean_value_span_ave.allocate_memory(mx, my, 1, 6 + n_scalar, 0);
+      h_ptr->reynolds_stress_tensor_span_ave.allocate_memory(mx, my, 1, 6, 0);
+      h_ptr->user_defined_statistical_data_span_ave.allocate_memory(mx, my, 1, UserDefineStat::n_stat, 0);
+    }else{
       h_ptr->mean_value.allocate_memory(mx, my, mz, 6 + n_scalar, 0);
       h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, mz, 6, 0);
       h_ptr->user_defined_statistical_data.allocate_memory(mx, my, mz, UserDefineStat::n_stat, 0);
