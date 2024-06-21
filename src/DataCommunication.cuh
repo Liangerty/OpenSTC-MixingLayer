@@ -93,8 +93,6 @@ __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DP
     const real vel{std::sqrt(zone->bv(idx[0], idx[1], idx[2], 1) * zone->bv(idx[0], idx[1], idx[2], 1) +
                              zone->bv(idx[0], idx[1], idx[2], 2) * zone->bv(idx[0], idx[1], idx[2], 2) +
                              zone->bv(idx[0], idx[1], idx[2], 3) * zone->bv(idx[0], idx[1], idx[2], 3))};
-    zone->vel(idx[0], idx[1], idx[2]) = vel;
-    tar_zone->vel(idx_tar[0], idx_tar[1], idx_tar[2]) = vel;
   } else {
     // Else, get the inner value for this block's ghost grid
 #pragma unroll
@@ -248,9 +246,6 @@ __global__ void assign_data_received(DZone *zone, int i_face, const real *data, 
   for (int l = 0; l < param->n_scalar; ++l) {
     sv(idx[0], idx[1], idx[2], l) = 0.5 * (sv(idx[0], idx[1], idx[2], l) + data[bias + 6 + l]);
   }
-  zone->vel(idx[0], idx[1], idx[2]) = std::sqrt(bv(idx[0], idx[1], idx[2], 1) * bv(idx[0], idx[1], idx[2], 1) +
-                                                bv(idx[0], idx[1], idx[2], 2) * bv(idx[0], idx[1], idx[2], 2) +
-                                                bv(idx[0], idx[1], idx[2], 3) * bv(idx[0], idx[1], idx[2], 3));
   if constexpr (with_cv) {
     compute_cv_from_bv_1_point<mix_model, turb>(zone, param, idx[0], idx[1], idx[2]);
   }

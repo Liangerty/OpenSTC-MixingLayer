@@ -64,7 +64,8 @@ __global__ void cfd::wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction,
   // dimensionless fiction coefficient, cf
   friction[i] = viscosity * du_normal_wall / dyn_pressure;
 
-  const double conductivity = zone->thermal_conductivity(i, 0, 0);
+  constexpr real cp{gamma_air * R_u / mw_air / (gamma_air - 1)};
+  const double conductivity = zone->mul(i, 0, 0) * cp / 0.72;
   // dimensional heat flux
   heat_flux[i] = conductivity * (pv(i, 1, 0, 5) - pv(i, 0, 0, 5)) * grad_eta;
 
@@ -139,7 +140,8 @@ cfd::wall_friction_heatFlux_3d(cfd::DZone *zone, ggxl::VectorField2D<real> *cfQw
 
   constexpr int j = 1;
   auto &metric = zone->metric(i, 0, k);
-  const real d_wini = 1.0/ sqrt(metric(2,1)*metric(2,1)+metric(2,2)*metric(2,2)+metric(2,3)*metric(2,3));
+  const real d_wini =
+      1.0 / sqrt(metric(2, 1) * metric(2, 1) + metric(2, 2) * metric(2, 2) + metric(2, 3) * metric(2, 3));
 
   real u, v, w;
   real rho_w;

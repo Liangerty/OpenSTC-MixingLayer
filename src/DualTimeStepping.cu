@@ -145,7 +145,8 @@ __global__ void cfd::compute_square_of_dbv_wrt_last_inner_iter(cfd::DZone *zone)
   auto &bv_last = zone->in_last_step;
 
   bv_last(i, j, k, 0) = (bv(i, j, k, 0) - bv_last(i, j, k, 0)) * (bv(i, j, k, 0) - bv_last(i, j, k, 0));
-  bv_last(i, j, k, 1) = (zone->vel(i, j, k) - bv_last(i, j, k, 1)) * (zone->vel(i, j, k) - bv_last(i, j, k, 1));
+  real vel = sqrt(bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3));
+  bv_last(i, j, k, 1) = (vel - bv_last(i, j, k, 1)) * (vel - bv_last(i, j, k, 1));
   bv_last(i, j, k, 2) = (bv(i, j, k, 4) - bv_last(i, j, k, 2)) * (bv(i, j, k, 4) - bv_last(i, j, k, 2));
   bv_last(i, j, k, 3) = (bv(i, j, k, 5) - bv_last(i, j, k, 3)) * (bv(i, j, k, 5) - bv_last(i, j, k, 3));
 }
@@ -158,7 +159,9 @@ __global__ void cfd::store_last_iter(cfd::DZone *zone) {
   if (i >= mx || j >= my || k >= mz) return;
 
   zone->in_last_step(i, j, k, 0) = zone->bv(i, j, k, 0);
-  zone->in_last_step(i, j, k, 1) = zone->vel(i, j, k);
+  zone->in_last_step(i, j, k, 1) = sqrt(
+      zone->bv(i, j, k, 1) * zone->bv(i, j, k, 1) + zone->bv(i, j, k, 2) * zone->bv(i, j, k, 2) +
+      zone->bv(i, j, k, 3) * zone->bv(i, j, k, 3));
   zone->in_last_step(i, j, k, 2) = zone->bv(i, j, k, 4);
   zone->in_last_step(i, j, k, 3) = zone->bv(i, j, k, 5);
 }

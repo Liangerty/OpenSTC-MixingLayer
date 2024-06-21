@@ -98,7 +98,7 @@ compute_jacobian_times_dq(const DParameter *param, DZone *zone, int i, int j, in
   const real u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
   const real U = xi_x * u + xi_y * v + xi_z * w;
   const real lmd1 = U + pm_spectral_radius;
-  const real e = 0.5 * zone->vel(i, j, k) * zone->vel(i, j, k);
+  const real e = 0.5 * (u * u + v * v + w * w);
   real gamma{gamma_air};
   real b3{0}, b4{0}, h{0};
   auto &dq = zone->dq;

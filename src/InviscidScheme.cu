@@ -435,13 +435,19 @@ __global__ void compute_entropy_fix_delta(cfd::DZone *zone, DParameter *param) {
   const real ky = sqrt(metric(2, 1) * metric(2, 1) + metric(2, 2) * metric(2, 2) + metric(2, 3) * metric(2, 3));
   const real kz = sqrt(metric(3, 1) * metric(3, 1) + metric(3, 2) * metric(3, 2) + metric(3, 3) * metric(3, 3));
 
+  real acoustic_speed{0};
+  if constexpr (mix_model != MixtureModel::Air) {
+    acoustic_speed = zone->acoustic_speed(i, j, k);
+  } else {
+    acoustic_speed = sqrt(gamma_air * bv(i, j, k, 4) / bv(i, j, k, 0));
+  }
   if (param->dim == 2) {
     zone->entropy_fix_delta(i, j, k) =
-        param->entropy_fix_factor * (U + V + zone->acoustic_speed(i, j, k) * 0.5 * (kx + ky));
+        param->entropy_fix_factor * (U + V + acoustic_speed * 0.5 * (kx + ky));
   } else {
     // 3D
     zone->entropy_fix_delta(i, j, k) =
-        param->entropy_fix_factor * (U + V + W + zone->acoustic_speed(i, j, k) * (kx + ky + kz) / 3.0);
+        param->entropy_fix_factor * (U + V + W + acoustic_speed * (kx + ky + kz) / 3.0);
   }
 }
 

@@ -71,8 +71,6 @@ void Driver<MixtureModel::FL, turb>::initialize_computation() {
   for (auto i = 0; i < mesh.n_block; ++i) {
     int mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
     dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
-    compute_velocity<<<bpg, tpb>>>(field[i].d_ptr);
-//    compute_cv_from_bv<MixtureModel::FL, turb_method><<<bpg, tpb>>>(field[i].d_ptr, param);
     if constexpr (TurbMethod<turb>::hasMut == true) {
       initialize_mut<MixtureModel::FL, turb><<<bpg, tpb >>>(field[i].d_ptr, param);
     }

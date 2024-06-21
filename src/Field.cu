@@ -535,17 +535,16 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   h_ptr->cv.allocate_memory(mx, my, mz, n_var, ngg);
   h_ptr->bv.allocate_memory(mx, my, mz, 6, ngg);
   h_ptr->bv_last.allocate_memory(mx, my, mz, 4, 0);
-  h_ptr->vel.allocate_memory(mx, my, mz, ngg);
-  h_ptr->acoustic_speed.allocate_memory(mx, my, mz, ngg);
   h_ptr->mach.allocate_memory(mx, my, mz, ngg);
   h_ptr->mul.allocate_memory(mx, my, mz, ngg);
-  h_ptr->thermal_conductivity.allocate_memory(mx, my, mz, ngg);
 
   const auto n_spec{parameter.get_int("n_spec")};
   const auto n_scalar = parameter.get_int("n_scalar");
   h_ptr->sv.allocate_memory(mx, my, mz, n_scalar, ngg);
   h_ptr->rho_D.allocate_memory(mx, my, mz, n_spec, ngg);
   if (n_spec > 0) {
+    h_ptr->acoustic_speed.allocate_memory(mx, my, mz, ngg);
+    h_ptr->thermal_conductivity.allocate_memory(mx, my, mz, ngg);
     h_ptr->gamma.allocate_memory(mx, my, mz, ngg);
     h_ptr->cp.allocate_memory(mx, my, mz, ngg);
     if (parameter.get_int("reaction") == 1) {
@@ -566,7 +565,6 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
     // RANS method or DES method
     h_ptr->mut.allocate_memory(mx, my, mz, ngg);
-    h_ptr->turb_therm_cond.allocate_memory(mx, my, mz, ngg);
     if (parameter.get_int("RANS_model") == 2) {
       // SST
       h_ptr->wall_distance.allocate_memory(mx, my, mz, ngg);
@@ -583,7 +581,7 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3 &&
         parameter.get_bool("fixed_time_step"))) {
     h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 0);
-    h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 0);
+//    h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 0);
     h_ptr->dt_local.allocate_memory(mx, my, mz, 0);
   }
   if (parameter.get_int("implicit_method") == 1) { // DPLUR
@@ -594,10 +592,9 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
       h_ptr->dq0.allocate_memory(mx, my, mz, n_var, 1);
       h_ptr->dqk.allocate_memory(mx, my, mz, n_var, 1);
       h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 1);
-      h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 1);
+//      h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 1);
     }
   }
-  h_ptr->unphysical.allocate_memory(mx, my, mz, 0);
   if (parameter.get_int("inviscid_scheme") == 2) {
     // Roe scheme
     h_ptr->entropy_fix_delta.allocate_memory(mx, my, mz, 1);

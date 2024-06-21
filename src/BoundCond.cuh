@@ -122,7 +122,6 @@ __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
   bv(i, j, k, 1) = u_t;
   bv(i, j, k, 2) = v_t;
   bv(i, j, k, 3) = w_t;
-  zone->vel(i, j, k) = std::sqrt(u_t * u_t + v_t * v_t + w_t * w_t);
   // The gradient of pressure, density, and scalars should also be zero.
   bv(i, j, k, 0) = bv(inner_idx[0], inner_idx[1], inner_idx[2], 0);
   bv(i, j, k, 4) = bv(inner_idx[0], inner_idx[1], inner_idx[2], 4);
@@ -144,8 +143,6 @@ __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
     bv(gi, gj, gk, 1) = u - 2 * u_k * k_x;
     bv(gi, gj, gk, 2) = v - 2 * u_k * k_y;
     bv(gi, gj, gk, 3) = w - 2 * u_k * k_z;
-    zone->vel(gi, gj, gk) = std::sqrt(bv(gi, gj, gk, 1) * bv(gi, gj, gk, 1) + bv(gi, gj, gk, 2) * bv(gi, gj, gk, 2) +
-                                      bv(gi, gj, gk, 3) * bv(gi, gj, gk, 3));
     bv(gi, gj, gk, 4) = bv(ii, ij, ik, 4);
     bv(gi, gj, gk, 5) = bv(ii, ij, ik, 5);
     for (int l = 0; l < param->n_scalar; ++l) {
@@ -313,7 +310,6 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(i, j, k) = mut;
     }
-    zone->vel(i, j, k) = vel;
     if constexpr (with_cv) {
       compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
     }
@@ -514,7 +510,6 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
   if constexpr (TurbMethod<turb>::hasMut) {
     zone->mut(i, j, k) = mut;
   }
-  zone->vel(i, j, k) = vel;
   if constexpr (with_cv) {
     compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
   }
@@ -603,7 +598,6 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(i, j, k) = farfield->mut;
     }
-    zone->vel(i, j, k) = std::sqrt(u * u + v * v + w * w);
     if constexpr (with_cv) {
       compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
     }
@@ -740,7 +734,6 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(i, j, k) = mut;
     }
-    zone->vel(i, j, k) = std::sqrt(u * u + v * v + w * w);
     if constexpr (with_cv) {
       compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
     }
@@ -830,7 +823,6 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
   bv(i, j, k, 3) = 0;
   bv(i, j, k, 4) = p;
   bv(i, j, k, 5) = t_wall;
-  zone->vel(i, j, k) = 0;
 
   if (if_fluctuation == 1) {
     // Pirozzoli & Li fluctuations
@@ -878,7 +870,6 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     bv(i, j, k, 2) =
         A0 * (15.1875 * xi3 * xi * xi - 35.4375 * xi3 * xi + 20.25 * xi3) * cos(beta * z) * sin(omega * t) / rho_wall *
         param->rho_ref * param->v_ref;
-    zone->vel(i, j, k) = bv(i, j, k, 2);
   }
 
   // turbulent boundary condition

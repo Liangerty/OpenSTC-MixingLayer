@@ -77,11 +77,10 @@ void Driver<mix_model, turb>::initialize_computation() {
 
 
   // First, compute the conservative variables from basic variables
-  for (auto i = 0; i < mesh.n_block; ++i) {
-    int mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
-    dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
-    compute_velocity<<<bpg, tpb>>>(field[i].d_ptr);
-    if constexpr (TurbMethod<turb>::hasMut == true) {
+  if constexpr (TurbMethod<turb>::hasMut == true) {
+    for (auto i = 0; i < mesh.n_block; ++i) {
+      int mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
+      dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
       initialize_mut<mix_model, turb><<<bpg, tpb>>>(field[i].d_ptr, param);
     }
   }
@@ -153,7 +152,7 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
         species.compute_cp(var_info[5], cp_i);
         real cp{0};
         mw = 0;
-        for (const auto& [name, i]: species.spec_list) {
+        for (const auto &[name, i]: species.spec_list) {
           if (var_info[6 + i] > 0)
             fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), var_info[6 + i]);
           mw += var_info[6 + i] / species.mw[i];
@@ -186,7 +185,7 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
         species.compute_cp(var_info[12 + ns], cp_i);
         real cp{0};
         mw = 0;
-        for (const auto& [name, i]: species.spec_list) {
+        for (const auto &[name, i]: species.spec_list) {
           if (var_info[13 + ns + i] > 0)
             fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), var_info[13 + ns + i]);
           mw += var_info[13 + ns + i] / species.mw[i];
@@ -210,7 +209,7 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
       fprintf(ref_state, "p_ref = %16.10e\n", parameter.get_real("p_inf"));
       fprintf(ref_state, "T_ref = %16.10e\n", parameter.get_real("T_inf"));
       auto &sv_ref = parameter.get_real_array("sv_inf");
-      for (const auto& [name, i]: species.spec_list) {
+      for (const auto &[name, i]: species.spec_list) {
         if (sv_ref[i] > 0)
           fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), sv_ref[i]);
       }

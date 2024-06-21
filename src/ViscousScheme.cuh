@@ -107,9 +107,16 @@ __device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DP
   const real t_x = t_xi * xi_x + t_eta * eta_x + t_zeta * zeta_x;
   const real t_y = t_xi * xi_y + t_eta * eta_y + t_zeta * zeta_y;
   const real t_z = t_xi * xi_z + t_eta * eta_z + t_zeta * zeta_z;
-  real conductivity = 0.5 * (zone->thermal_conductivity(i, j, k) + zone->thermal_conductivity(i + 1, j, k));
-  if constexpr (TurbMethod<turb_method>::hasMut) {
-    conductivity += 0.5 * (zone->turb_therm_cond(i, j, k) + zone->turb_therm_cond(i + 1, j, k));
+  real conductivity{0};
+  if constexpr (mix_model != MixtureModel::Air) {
+    conductivity = 0.5 * (zone->thermal_conductivity(i, j, k) + zone->thermal_conductivity(i + 1, j, k));
+    if constexpr (TurbMethod<turb_method>::hasMut) {
+      conductivity +=
+          0.5 * (zone->mut(i, j, k) * zone->cp(i, j, k) + zone->mut(i + 1, j, k) * zone->cp(i + 1, j, k)) / param->Prt;
+    }
+  } else {
+    constexpr real cp{gamma_air * R_u / mw_air / (gamma_air - 1)};
+    conductivity = (mul / param->Pr + mut / param->Prt) * cp;
   }
 
   fv[4] = um * fv[1] + vm * fv[2] + wm * fv[3] +
@@ -355,7 +362,7 @@ __device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, cfd:
                                   1.0);
     const real twoThirdrhoKm = -2.0 / 3 * 0.5 * (pv(i, j, k, 0) * zone->sv(i, j, k, param->n_spec) +
                                                  pv(i, j + 1, k, 0) * zone->sv(i, j + 1, k, param->n_spec))
-                                                * dy_div_delta;
+                               * dy_div_delta;
     tau_xx += twoThirdrhoKm;
     tau_yy += twoThirdrhoKm;
     tau_zz += twoThirdrhoKm;
@@ -376,9 +383,16 @@ __device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, cfd:
   const real t_x = t_xi * xi_x + t_eta * eta_x + t_zeta * zeta_x;
   const real t_y = t_xi * xi_y + t_eta * eta_y + t_zeta * zeta_y;
   const real t_z = t_xi * xi_z + t_eta * eta_z + t_zeta * zeta_z;
-  real conductivity = 0.5 * (zone->thermal_conductivity(i, j, k) + zone->thermal_conductivity(i, j + 1, k));
-  if constexpr (TurbMethod<turb_method>::hasMut) {
-    conductivity += 0.5 * (zone->turb_therm_cond(i, j, k) + zone->turb_therm_cond(i, j + 1, k));
+  real conductivity{0};
+  if constexpr (mix_model != MixtureModel::Air) {
+    conductivity = 0.5 * (zone->thermal_conductivity(i, j, k) + zone->thermal_conductivity(i, j + 1, k));
+    if constexpr (TurbMethod<turb_method>::hasMut) {
+      conductivity +=
+          0.5 * (zone->mut(i, j, k) * zone->cp(i, j, k) + zone->mut(i, j + 1, k) * zone->cp(i, j + 1, k)) / param->Prt;
+    }
+  } else {
+    constexpr real cp{gamma_air * R_u / mw_air / (gamma_air - 1)};
+    conductivity = (mul / param->Pr + mut / param->Prt) * cp;
   }
 
   gv[4] = um * gv[1] + vm * gv[2] + wm * gv[3] +
@@ -641,9 +655,16 @@ __device__ void compute_hv_2nd_order(const int *idx, DZone *zone, real *hv, cfd:
   const real t_x = t_xi * xi_x + t_eta * eta_x + t_zeta * zeta_x;
   const real t_y = t_xi * xi_y + t_eta * eta_y + t_zeta * zeta_y;
   const real t_z = t_xi * xi_z + t_eta * eta_z + t_zeta * zeta_z;
-  real conductivity = 0.5 * (zone->thermal_conductivity(i, j, k) + zone->thermal_conductivity(i, j, k + 1));
-  if constexpr (TurbMethod<turb_method>::hasMut) {
-    conductivity += 0.5 * (zone->turb_therm_cond(i, j, k) + zone->turb_therm_cond(i, j, k + 1));
+  real conductivity{0};
+  if constexpr (mix_model != MixtureModel::Air) {
+    conductivity = 0.5 * (zone->thermal_conductivity(i, j, k) + zone->thermal_conductivity(i, j, k + 1));
+    if constexpr (TurbMethod<turb_method>::hasMut) {
+      conductivity +=
+          0.5 * (zone->mut(i, j, k) * zone->cp(i, j, k) + zone->mut(i, j, k + 1) * zone->cp(i, j, k + 1)) / param->Prt;
+    }
+  } else {
+    constexpr real cp{gamma_air * R_u / mw_air / (gamma_air - 1)};
+    conductivity = (mul / param->Pr + mut / param->Prt) * cp;
   }
 
   hv[4] = um * hv[1] + vm * hv[2] + wm * hv[3] +

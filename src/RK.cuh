@@ -239,14 +239,13 @@ __global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt
   }
 
   auto &bv = zone->bv;
-  auto &velocity = zone->vel(i, j, k);
 
   bv(i, j, k, 0) = cv(i, j, k, 0);
   const real density_inv = 1.0 / cv(i, j, k, 0);
   bv(i, j, k, 1) = cv(i, j, k, 1) * density_inv;
   bv(i, j, k, 2) = cv(i, j, k, 2) * density_inv;
   bv(i, j, k, 3) = cv(i, j, k, 3) * density_inv;
-  velocity = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3); //V^2
+  auto V2 = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3); //V^2
 
   auto &sv = zone->sv;
   if constexpr (mix_model != MixtureModel::FL) {
@@ -270,9 +269,8 @@ __global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt
     compute_temperature_and_pressure(i, j, k, param, zone, cv(i, j, k, 4));
   } else {
     // Air
-    bv(i, j, k, 4) = (gamma_air - 1) * (cv(i, j, k, 4) - 0.5 * bv(i, j, k, 0) * velocity);
+    bv(i, j, k, 4) = (gamma_air - 1) * (cv(i, j, k, 4) - 0.5 * bv(i, j, k, 0) * V2);
     bv(i, j, k, 5) = bv(i, j, k, 4) * mw_air * density_inv / R_u;
   }
-  velocity = std::sqrt(velocity);
 }
 }

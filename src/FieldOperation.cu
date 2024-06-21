@@ -38,16 +38,3 @@ cfd::compute_temperature_and_pressure(int i, int j, int k, const DParameter *par
   bv(i, j, k, 5) = t;
   bv(i, j, k, 4) = bv(i, j, k, 0) * t * gas_const;
 }
-
-__global__ void cfd::compute_velocity(cfd::DZone *zone) {
-  const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
-  if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
-
-  const auto &bv = zone->bv;
-
-  zone->vel(i, j, k) = std::sqrt(
-      bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3));
-}

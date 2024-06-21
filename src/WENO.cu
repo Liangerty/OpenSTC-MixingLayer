@@ -82,7 +82,10 @@ compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent,
     cv[i_shared * n_reconstruct + l] = zone->cv(idx[0], idx[1], idx[2], l);
   }
   cv[i_shared * n_reconstruct + n_var] = zone->bv(idx[0], idx[1], idx[2], 4);
-  cv[i_shared * n_reconstruct + n_var + 1] = zone->acoustic_speed(idx[0], idx[1], idx[2]);
+  if constexpr (mix_model != MixtureModel::Air)
+    cv[i_shared * n_reconstruct + n_var + 1] = zone->acoustic_speed(idx[0], idx[1], idx[2]);
+  else
+    cv[i_shared * n_reconstruct + n_var + 1] = sqrt(gamma_air * R_u / mw_air * zone->bv(idx[0], idx[1], idx[2], 5));
   for (auto l = 1; l < 4; ++l) {
     metric[i_shared * 3 + l - 1] = zone->metric(idx[0], idx[1], idx[2])(direction + 1, l);
   }
@@ -101,7 +104,11 @@ compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent,
       cv[ig_shared[additional_loaded] * n_reconstruct + l] = zone->cv(g_idx[0], g_idx[1], g_idx[2], l);
     }
     cv[ig_shared[additional_loaded] * n_reconstruct + n_var] = zone->bv(g_idx[0], g_idx[1], g_idx[2], 4);
-    cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = zone->acoustic_speed(g_idx[0], g_idx[1], g_idx[2]);
+    if constexpr (mix_model != MixtureModel::Air)
+      cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = zone->acoustic_speed(g_idx[0], g_idx[1], g_idx[2]);
+    else
+      cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = sqrt(
+          gamma_air * R_u / mw_air * zone->bv(g_idx[0], g_idx[1], g_idx[2], 5));
     for (auto l = 1; l < 4; ++l) {
       metric[ig_shared[additional_loaded] * 3 + l - 1] = zone->metric(g_idx[0], g_idx[1], g_idx[2])(direction + 1, l);
     }
@@ -115,7 +122,11 @@ compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent,
       cv[ig_shared[additional_loaded] * n_reconstruct + l] = zone->cv(g_idx[0], g_idx[1], g_idx[2], l);
     }
     cv[ig_shared[additional_loaded] * n_reconstruct + n_var] = zone->bv(g_idx[0], g_idx[1], g_idx[2], 4);
-    cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = zone->acoustic_speed(g_idx[0], g_idx[1], g_idx[2]);
+    if constexpr (mix_model != MixtureModel::Air)
+      cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = zone->acoustic_speed(g_idx[0], g_idx[1], g_idx[2]);
+    else
+      cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = sqrt(
+          gamma_air * R_u / mw_air * zone->bv(g_idx[0], g_idx[1], g_idx[2], 5));
     for (auto l = 1; l < 4; ++l) {
       metric[ig_shared[additional_loaded] * 3 + l - 1] = zone->metric(g_idx[0], g_idx[1], g_idx[2])(direction + 1, l);
     }
@@ -133,7 +144,11 @@ compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent,
         cv[ig_shared[additional_loaded] * n_reconstruct + l] = zone->cv(g_idx[0], g_idx[1], g_idx[2], l);
       }
       cv[ig_shared[additional_loaded] * n_reconstruct + n_var] = zone->bv(g_idx[0], g_idx[1], g_idx[2], 4);
-      cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = zone->acoustic_speed(g_idx[0], g_idx[1], g_idx[2]);
+      if constexpr (mix_model != MixtureModel::Air)
+        cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = zone->acoustic_speed(g_idx[0], g_idx[1], g_idx[2]);
+      else
+        cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = sqrt(
+            gamma_air * R_u / mw_air * zone->bv(g_idx[0], g_idx[1], g_idx[2], 5));
       for (auto l = 1; l < 4; ++l) {
         metric[ig_shared[additional_loaded] * 3 + l - 1] = zone->metric(g_idx[0], g_idx[1], g_idx[2])(direction + 1, l);
       }
@@ -148,7 +163,11 @@ compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent,
         cv[ig_shared[additional_loaded] * n_reconstruct + l] = zone->cv(g_idx[0], g_idx[1], g_idx[2], l);
       }
       cv[ig_shared[additional_loaded] * n_reconstruct + n_var] = zone->bv(g_idx[0], g_idx[1], g_idx[2], 4);
-      cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = zone->acoustic_speed(g_idx[0], g_idx[1], g_idx[2]);
+      if constexpr (mix_model != MixtureModel::Air)
+        cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = zone->acoustic_speed(g_idx[0], g_idx[1], g_idx[2]);
+      else
+        cv[ig_shared[additional_loaded] * n_reconstruct + n_var + 1] = sqrt(
+            gamma_air * R_u / mw_air * zone->bv(g_idx[0], g_idx[1], g_idx[2], 5));
       for (auto l = 1; l < 4; ++l) {
         metric[ig_shared[additional_loaded] * 3 + l - 1] = zone->metric(g_idx[0], g_idx[1], g_idx[2])(direction + 1, l);
       }

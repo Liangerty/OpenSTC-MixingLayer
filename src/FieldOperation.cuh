@@ -36,7 +36,6 @@ __device__ void compute_total_energy(int i, int j, int k, cfd::DZone *zone, cons
     total_energy += bv(i, j, k, 4) / (gamma_air - 1);
   }
   zone->cv(i, j, k, 4) = total_energy;
-  zone->vel(i, j, k) = sqrt(V2);
 }
 
 template<MixtureModel mix_model, class turb_method>
@@ -77,8 +76,6 @@ __global__ void compute_cv_from_bv(DZone *zone, DParameter *param) {
   compute_total_energy<mix_model>(i, j, k, zone, param);
 }
 
-__global__ void compute_velocity(DZone *zone);
-
 template<MixtureModel mix_model, class turb_method>
 __device__ void compute_cv_from_bv_1_point(DZone *zone, const DParameter *param, int i, int j, int k) {
   const auto &bv = zone->bv;
@@ -117,6 +114,8 @@ __global__ void update_physical_properties(DZone *zone, DParameter *param) {
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   const real temperature{zone->bv(i, j, k, 5)};
+  auto V= sqrt(zone->bv(i, j, k, 1) * zone->bv(i, j, k, 1) + zone->bv(i, j, k, 2) * zone->bv(i, j, k, 2) +
+                zone->bv(i, j, k, 3) * zone->bv(i, j, k, 3));
   if constexpr (mix_model != MixtureModel::Air) {
     const int n_spec{param->n_spec};
     auto &yk = zone->sv;
@@ -133,15 +132,12 @@ __global__ void update_physical_properties(DZone *zone, DParameter *param) {
     zone->gamma(i, j, k) = cp_tot / cv;
     zone->acoustic_speed(i, j, k) = std::sqrt(zone->gamma(i, j, k) * R_u * temperature / mw);
     compute_transport_property(i, j, k, temperature, mw, cp, param, zone);
+    zone->mach(i, j, k) = V / zone->acoustic_speed(i, j, k);
   } else {
     constexpr real c_temp{gamma_air * R_u / mw_air};
-    constexpr real cp{gamma_air * R_u / mw_air / (gamma_air - 1)};
-    const real pr = param->Pr;
-    zone->acoustic_speed(i, j, k) = std::sqrt(c_temp * temperature);
     zone->mul(i, j, k) = Sutherland(temperature);
-    zone->thermal_conductivity(i, j, k) = zone->mul(i, j, k) * cp / pr;
+    zone->mach(i, j, k) = V / std::sqrt(c_temp * temperature);
   }
-  zone->mach(i, j, k) = zone->vel(i, j, k) / zone->acoustic_speed(i, j, k);
 }
 
 template<MixtureModel mix_model, class turb_method>
@@ -209,14 +205,12 @@ __global__ void update_cv_and_bv(cfd::DZone *zone, DParameter *param) {
   }
 
   auto &bv = zone->bv;
-  auto &velocity = zone->vel(i, j, k);
 
   bv(i, j, k, 0) = cv(i, j, k, 0);
   const real density_inv = 1.0 / cv(i, j, k, 0);
   bv(i, j, k, 1) = cv(i, j, k, 1) * density_inv;
   bv(i, j, k, 2) = cv(i, j, k, 2) * density_inv;
   bv(i, j, k, 3) = cv(i, j, k, 3) * density_inv;
-  velocity = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3); //V^2
 
   auto &sv = zone->sv;
   if constexpr (mix_model != MixtureModel::FL) {
@@ -240,10 +234,10 @@ __global__ void update_cv_and_bv(cfd::DZone *zone, DParameter *param) {
     compute_temperature_and_pressure(i, j, k, param, zone, cv(i, j, k, 4));
   } else {
     // Air
-    bv(i, j, k, 4) = (gamma_air - 1) * (cv(i, j, k, 4) - 0.5 * bv(i, j, k, 0) * velocity);
+    real V2 = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3); //V^2
+    bv(i, j, k, 4) = (gamma_air - 1) * (cv(i, j, k, 4) - 0.5 * bv(i, j, k, 0) * V2);
     bv(i, j, k, 5) = bv(i, j, k, 4) * mw_air * density_inv / R_u;
   }
-  velocity = std::sqrt(velocity);
 }
 
 template<MixtureModel mix_model, class turb_method>
@@ -308,8 +302,6 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param) {
     bv(i, j, k, 4) = (gamma_air - 1) * (total_energy - 0.5 * bv(i, j, k, 0) * V2);
     bv(i, j, k, 5) = bv(i, j, k, 4) * mw_air * density_inv / R_u;
   }
-
-  zone->vel(i, j, k) = std::sqrt(V2);
 }
 
 template<MixtureModel mix_model, class turb_method>
@@ -382,8 +374,6 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param, real dt) {
     bv(i, j, k, 4) = (gamma_air - 1) * (total_energy - 0.5 * bv(i, j, k, 0) * V2);
     bv(i, j, k, 5) = bv(i, j, k, 4) * mw_air * density_inv / R_u;
   }
-
-  zone->vel(i, j, k) = std::sqrt(V2);
 }
 
 template<bool with_cv = false>
