@@ -1093,9 +1093,6 @@ void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
         extent[i] += 2 * ngg + 2;
       }
       const int len = 3 * (ngg + 1) * extent[0] * extent[1] * extent[2];
-//      const int len = 3 * (ngg + 1) * (std::abs(face.range_start[0] - face.range_end[0]) + 1)
-//                          * (std::abs(face.range_end[1] - face.range_start[1]) + 1)
-//                          * (std::abs(face.range_end[2] - face.range_start[2]) + 1);
       temp_s[fc_num] = new real[len];
       temp_r[fc_num] = new real[len];
       ++fc_num;
@@ -1119,10 +1116,10 @@ void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
                                                                                   Fc.range_end[2]};
       min_[0] = Fc.range_start[Fc.loop_order[0]] - Fc.direction;
       max_[0] = Fc.range_end[Fc.loop_order[0]] - Fc.direction * (ngg + 1);
-      min_[1] = Fc.range_start[Fc.loop_order[1]] - Fc.loop_dir[Fc.loop_order[1]] * (ngg + 1);
-      max_[1] = Fc.range_end[Fc.loop_order[1]] + Fc.loop_dir[Fc.loop_order[1]] * (ngg + 1);
-      min_[2] = Fc.range_start[Fc.loop_order[2]] - Fc.loop_dir[Fc.loop_order[2]] * (ngg + 1);
-      max_[2] = Fc.range_end[Fc.loop_order[2]] + Fc.loop_dir[Fc.loop_order[2]] * (ngg + 1);
+      min_[1] = Fc.range_start[Fc.loop_order[1]] - Fc.loop_dir[1] * (ngg + 1);
+      max_[1] = Fc.range_end[Fc.loop_order[1]] + Fc.loop_dir[1] * (ngg + 1);
+      min_[2] = Fc.range_start[Fc.loop_order[2]] - Fc.loop_dir[2] * (ngg + 1);
+      max_[2] = Fc.range_end[Fc.loop_order[2]] + Fc.loop_dir[2] * (ngg + 1);
       const int di1 = -Fc.direction, dj1 = Fc.loop_dir[1];
       int dk1 = Fc.loop_dir[2];
       if (dimension == 2) {
