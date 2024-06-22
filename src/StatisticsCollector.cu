@@ -251,8 +251,7 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
     compute_statistical_data<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
     compute_user_defined_statistical_data<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
                                                                                 counter_ud_device);
-    compute_UD_stat_data_2<SECOND_ORDER_UDSTAT><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
-                                                              counter_ud_device);
+    compute_UD_stat_data_2<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
     if (perform_spanwise_average) {
       compute_statistical_data_spanwise_average<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
       auto sz = mx * my * sizeof(real);
@@ -515,7 +514,6 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, int co
   }
 
   auto &rey_tensor = zone->reynolds_stress_tensor;
-  auto &vel2ndMoment = zone->velocity2ndMoment;
   real rey_tensor_add[6];
   memset(rey_tensor_add, 0, sizeof(real) * 6);
   int count_useful[3]{0, 0, 0};
@@ -539,12 +537,13 @@ compute_statistical_data_spanwise_average(DZone *zone, DParameter *param, int co
     rey_tensor_add[4] += rey_tensor(i, j, k, 4);
     rey_tensor_add[5] += rey_tensor(i, j, k, 5);
   }
-  rey_tensor(i, j, 0, 0) = count_useful[0] > 0 ? rey_tensor_add[0] / count_useful[0] : 0;
-  rey_tensor(i, j, 0, 1) = count_useful[1] > 0 ? rey_tensor_add[1] / count_useful[1] : 0;
-  rey_tensor(i, j, 0, 2) = count_useful[2] > 0 ? rey_tensor_add[2] / count_useful[2] : 0;
-  rey_tensor(i, j, 0, 3) = rey_tensor_add[3] * oneDivNz;
-  rey_tensor(i, j, 0, 4) = rey_tensor_add[4] * oneDivNz;
-  rey_tensor(i, j, 0, 5) = rey_tensor_add[5] * oneDivNz;
+  auto &rey_tensor_span_ave = zone->reynolds_stress_tensor_span_ave;
+  rey_tensor_span_ave(i, j, 0, 0) = count_useful[0] > 0 ? rey_tensor_add[0] / count_useful[0] : 0;
+  rey_tensor_span_ave(i, j, 0, 1) = count_useful[1] > 0 ? rey_tensor_add[1] / count_useful[1] : 0;
+  rey_tensor_span_ave(i, j, 0, 2) = count_useful[2] > 0 ? rey_tensor_add[2] / count_useful[2] : 0;
+  rey_tensor_span_ave(i, j, 0, 3) = rey_tensor_add[3] * oneDivNz;
+  rey_tensor_span_ave(i, j, 0, 4) = rey_tensor_add[4] * oneDivNz;
+  rey_tensor_span_ave(i, j, 0, 5) = rey_tensor_add[5] * oneDivNz;
 
   compute_user_defined_statistical_data_with_spanwise_average<USER_DEFINE_STATISTICS>(zone, param, counter_ud, i, j,
                                                                                       extent[2], counter);

@@ -1,8 +1,6 @@
 #pragma once
 
 #define USER_DEFINE_STATISTICS ThermRMS,turbulent_dissipation_rate,H2AirMixingLayer
-//,H2_variance_and_dissipation_rate
-#define SECOND_ORDER_UDSTAT H2AirMixingLayer
 
 #include <array>
 #include <string_view>
@@ -30,6 +28,9 @@ struct ThermRMS {
   compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int mz,
                            int counter, int span_stat_idx, int collected_idx, int vol_stat_idx);
 
+  __device__ static void
+  compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int k,
+                    int counter, int stat_idx, int collected_idx){};
 };
 
 struct turbulent_dissipation_rate {
@@ -54,6 +55,10 @@ struct turbulent_dissipation_rate {
   __device__ static void
   compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
                            int mz, int counter, int span_stat_idx, int collected_idx, int vol_stat_idx);
+
+  __device__ static void
+  compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j, int k,
+                    int counter, int stat_idx, int collected_idx){};
 };
 
 struct H2AirMixingLayer {
@@ -240,7 +245,11 @@ compute_UD_stat_data_2(DZone *zone, DParameter *param, int counter, const int *c
   auto l = 0, collect_idx = 0;
   ([&]() {
     stats::compute_2nd_level(zone, param, counter_ud, i, j, k, counter, l, collect_idx);
-    l += stats::n_stat;
+    if (param->perform_spanwise_average) {
+      l += stats::n_vol_stat_when_span_ave;
+    } else {
+      l += stats::n_stat;
+    }
     collect_idx += stats::n_collect;
   }(), ...);
 }

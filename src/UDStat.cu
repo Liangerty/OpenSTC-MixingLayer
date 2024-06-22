@@ -273,7 +273,7 @@ H2AirMixingLayer::collect(cfd::DZone *zone, cfd::DParameter *param, int i, int j
   collect(i, j, k, collect_idx + 5) += rhoD;
 
   // O2
-  collect(i, j, k, collect_idx + 6) += zone->bv(i, j, k, 0) * sv(i, j, k, 1) * sv(i, j, k, 1);
+  collect(i, j, k, collect_idx + 13) += zone->bv(i, j, k, 0) * sv(i, j, k, 1) * sv(i, j, k, 1);
   zx = 0.5 * (xi_x * (sv(i + 1, j, k, 1) - sv(i - 1, j, k, 1)) +
               eta_x * (sv(i, j + 1, k, 1) - sv(i, j - 1, k, 1)) +
               zeta_x * (sv(i, j, k + 1, 1) - sv(i, j, k - 1, 1)));
@@ -285,17 +285,17 @@ H2AirMixingLayer::collect(cfd::DZone *zone, cfd::DParameter *param, int i, int j
               zeta_z * (sv(i, j, k + 1, 1) - sv(i, j, k - 1, 1)));
   rhoD = zone->rho_D(i, j, k, 1);
   // Rho*D*GradO2*GradO2
-  collect(i, j, k, collect_idx + 7) += rhoD * (zx * zx + zy * zy + zz * zz);
+  collect(i, j, k, collect_idx + 14) += rhoD * (zx * zx + zy * zy + zz * zz);
   // Rho*D*O2x
-  collect(i, j, k, collect_idx + 8) += rhoD * zx;
+  collect(i, j, k, collect_idx + 15) += rhoD * zx;
   // Rho*D*O2y
-  collect(i, j, k, collect_idx + 9) += rhoD * zy;
+  collect(i, j, k, collect_idx + 16) += rhoD * zy;
   // Rho*D*O2z
-  collect(i, j, k, collect_idx + 10) += rhoD * zz;
-  collect(i, j, k, collect_idx + 11) += rhoD;
+  collect(i, j, k, collect_idx + 17) += rhoD * zz;
+  collect(i, j, k, collect_idx + 18) += rhoD;
 
   // N2
-  collect(i, j, k, collect_idx + 12) += zone->bv(i, j, k, 0) * sv(i, j, k, 2) * sv(i, j, k, 2);
+  collect(i, j, k, collect_idx + 26) += zone->bv(i, j, k, 0) * sv(i, j, k, 2) * sv(i, j, k, 2);
   zx = 0.5 * (xi_x * (sv(i + 1, j, k, 2) - sv(i - 1, j, k, 2)) +
               eta_x * (sv(i, j + 1, k, 2) - sv(i, j - 1, k, 2)) +
               zeta_x * (sv(i, j, k + 1, 2) - sv(i, j, k - 1, 2)));
@@ -307,47 +307,47 @@ H2AirMixingLayer::collect(cfd::DZone *zone, cfd::DParameter *param, int i, int j
               zeta_z * (sv(i, j, k + 1, 2) - sv(i, j, k - 1, 2)));
   rhoD = zone->rho_D(i, j, k, 2);
   // Rho*D*GradN2*GradN2
-  collect(i, j, k, collect_idx + 13) += rhoD * (zx * zx + zy * zy + zz * zz);
+  collect(i, j, k, collect_idx + 27) += rhoD * (zx * zx + zy * zy + zz * zz);
   // Rho*D*N2x
-  collect(i, j, k, collect_idx + 14) += rhoD * zx;
+  collect(i, j, k, collect_idx + 28) += rhoD * zx;
   // Rho*D*N2y
-  collect(i, j, k, collect_idx + 15) += rhoD * zy;
+  collect(i, j, k, collect_idx + 29) += rhoD * zy;
   // Rho*D*N2z
-  collect(i, j, k, collect_idx + 16) += rhoD * zz;
-  collect(i, j, k, collect_idx + 17) += rhoD;
+  collect(i, j, k, collect_idx + 30) += rhoD * zz;
+  collect(i, j, k, collect_idx + 31) += rhoD;
 
   auto rho = zone->bv(i, j, k, 0), u = zone->bv(i, j, k, 1), v = zone->bv(i, j, k, 2), w = zone->bv(i, j, k, 3);
   // flux of H2
   real h2 = sv(i, j, k, 0);
-  collect(i, j, k, collect_idx + 18) += rho * h2 * u;
-  collect(i, j, k, collect_idx + 19) += rho * h2 * v;
-  collect(i, j, k, collect_idx + 20) += rho * h2 * w;
+  collect(i, j, k, collect_idx + 6) += rho * h2 * u;
+  collect(i, j, k, collect_idx + 7) += rho * h2 * v;
+  collect(i, j, k, collect_idx + 8) += rho * h2 * w;
   // flux of O2
   real o2 = sv(i, j, k, 1);
-  collect(i, j, k, collect_idx + 21) += rho * o2 * u;
-  collect(i, j, k, collect_idx + 22) += rho * o2 * v;
-  collect(i, j, k, collect_idx + 23) += rho * o2 * w;
+  collect(i, j, k, collect_idx + 19) += rho * o2 * u;
+  collect(i, j, k, collect_idx + 20) += rho * o2 * v;
+  collect(i, j, k, collect_idx + 21) += rho * o2 * w;
   // flux of N2
   real n2 = sv(i, j, k, 2);
-  collect(i, j, k, collect_idx + 24) += rho * n2 * u;
-  collect(i, j, k, collect_idx + 25) += rho * n2 * v;
-  collect(i, j, k, collect_idx + 26) += rho * n2 * w;
+  collect(i, j, k, collect_idx + 32) += rho * n2 * u;
+  collect(i, j, k, collect_idx + 33) += rho * n2 * v;
+  collect(i, j, k, collect_idx + 34) += rho * n2 * w;
   // flux of u H2 H2
-  collect(i, j, k, collect_idx + 27) += rho * h2 * h2 * u;
-  collect(i, j, k, collect_idx + 28) += rho * h2 * h2 * v;
-  collect(i, j, k, collect_idx + 29) += rho * h2 * h2 * w;
+  collect(i, j, k, collect_idx + 9) += rho * h2 * h2 * u;
+  collect(i, j, k, collect_idx + 10) += rho * h2 * h2 * v;
+  collect(i, j, k, collect_idx + 11) += rho * h2 * h2 * w;
   // flux of u O2 O2
-  collect(i, j, k, collect_idx + 30) += rho * o2 * o2 * u;
-  collect(i, j, k, collect_idx + 31) += rho * o2 * o2 * v;
-  collect(i, j, k, collect_idx + 32) += rho * o2 * o2 * w;
+  collect(i, j, k, collect_idx + 22) += rho * o2 * o2 * u;
+  collect(i, j, k, collect_idx + 23) += rho * o2 * o2 * v;
+  collect(i, j, k, collect_idx + 24) += rho * o2 * o2 * w;
   // flux of u N2 N2
-  collect(i, j, k, collect_idx + 33) += rho * n2 * n2 * u;
-  collect(i, j, k, collect_idx + 34) += rho * n2 * n2 * v;
-  collect(i, j, k, collect_idx + 35) += rho * n2 * n2 * w;
+  collect(i, j, k, collect_idx + 35) += rho * n2 * n2 * u;
+  collect(i, j, k, collect_idx + 36) += rho * n2 * n2 * v;
+  collect(i, j, k, collect_idx + 37) += rho * n2 * n2 * w;
 
   // laminar Schmidt number
-  collect(i, j, k, collect_idx + 36) += zone->mul(i, j, k) / zone->rho_D(i, j, k, 0);
-  collect(i, j, k, collect_idx + 37) += zone->mul(i, j, k) / zone->rho_D(i, j, k, 1);
+  collect(i, j, k, collect_idx + 12) += zone->mul(i, j, k) / zone->rho_D(i, j, k, 0);
+  collect(i, j, k, collect_idx + 25) += zone->mul(i, j, k) / zone->rho_D(i, j, k, 1);
   collect(i, j, k, collect_idx + 38) += zone->mul(i, j, k) / zone->rho_D(i, j, k, 2);
 }
 
@@ -413,9 +413,8 @@ H2AirMixingLayer::compute(cfd::DZone *zone, cfd::DParameter *param, const int *c
   stat(i, j, k, 5 + stat_idx) = abs(S13) > 1e-25 ? -Tau13 / S13 : 0;
   stat(i, j, k, 6 + stat_idx) = abs(S23) > 1e-25 ? -Tau23 / S23 : 0;
   real SiiSii = S11 * S11 + S22 * S22 + S33 * S33 + 2 * S12 * S12 + 2 * S13 * S13 + 2 * S23 * S23;
-  real nut =
-      SiiSii > 1e-25 ? -(Tau11 * S11 + Tau22 * S22 + Tau33 * S33 + Tau12 * S12 + Tau13 * S13 + Tau23 * S23) / SiiSii
-                     : 0;
+  real nut = SiiSii > 1e-25 ?
+             -(Tau11 * S11 + Tau22 * S22 + Tau33 * S33 + 2 * (Tau12 * S12 + Tau13 * S13 + Tau23 * S23)) / SiiSii : 0;
   stat(i, j, k, 7 + stat_idx) = nut;
 
   const real rho_inv = 1.0 / mean(i, j, k, 0);
@@ -435,8 +434,7 @@ H2AirMixingLayer::compute(cfd::DZone *zone, cfd::DParameter *param, const int *c
                    eta_z * (mean(i, j + 1, k, 6) - mean(i, j - 1, k, 6)) +
                    zeta_z * (mean(i, j, k + 1, 6) - mean(i, j, k - 1, 6)));
   real zizi = zx * zx + zy * zy + zz * zz;
-  const real two_rho_inv = 2.0 / mean(i, j, k, 0);
-  real chi = two_rho_inv * (collect(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
+  real chi = 2 * rho_inv * (collect(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
                             2 * collect(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] * zx -
                             2 * collect(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3] * zy -
                             2 * collect(i, j, k, collected_idx + 4) / counter_ud[collected_idx + 4] * zz +
@@ -500,7 +498,7 @@ H2AirMixingLayer::compute(cfd::DZone *zone, cfd::DParameter *param, const int *c
               eta_z * (mean(i, j + 1, k, 7) - mean(i, j - 1, k, 7)) +
               zeta_z * (mean(i, j, k + 1, 7) - mean(i, j, k - 1, 7)));
   zizi = zx * zx + zy * zy + zz * zz;
-  chi = two_rho_inv * (collect(i, j, k, collected_idx + 14) / counter_ud[collected_idx + 14] -
+  chi = 2 * rho_inv * (collect(i, j, k, collected_idx + 14) / counter_ud[collected_idx + 14] -
                        2 * collect(i, j, k, collected_idx + 15) / counter_ud[collected_idx + 15] * zx -
                        2 * collect(i, j, k, collected_idx + 16) / counter_ud[collected_idx + 16] * zy -
                        2 * collect(i, j, k, collected_idx + 17) / counter_ud[collected_idx + 17] * zz +
@@ -564,7 +562,7 @@ H2AirMixingLayer::compute(cfd::DZone *zone, cfd::DParameter *param, const int *c
               eta_z * (mean(i, j + 1, k, 8) - mean(i, j - 1, k, 8)) +
               zeta_z * (mean(i, j, k + 1, 8) - mean(i, j, k - 1, 8)));
   zizi = zx * zx + zy * zy + zz * zz;
-  chi = two_rho_inv * (collect(i, j, k, collected_idx + 27) / counter_ud[collected_idx + 27] -
+  chi = 2 * rho_inv * (collect(i, j, k, collected_idx + 27) / counter_ud[collected_idx + 27] -
                        2 * collect(i, j, k, collected_idx + 28) / counter_ud[collected_idx + 28] * zx -
                        2 * collect(i, j, k, collected_idx + 29) / counter_ud[collected_idx + 29] * zy -
                        2 * collect(i, j, k, collected_idx + 30) / counter_ud[collected_idx + 30] * zz +
@@ -689,20 +687,21 @@ H2AirMixingLayer::compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, co
       real zz = 0.5 * (xi_z * (stat(i + 1, j, k, stat_idx + 8) - stat(i - 1, j, k, stat_idx + 8)) +
                        eta_z * (stat(i, j + 1, k, stat_idx + 8) - stat(i, j - 1, k, stat_idx + 8)) +
                        zeta_z * (stat(i, j, k + 1, stat_idx + 8) - stat(i, j, k - 1, stat_idx + 8)));
-      real upH2pH2p = stat(i, j, k, stat_idx + 23), vpH2pH2p = stat(i, j, k, stat_idx + 24),
-          wpH2pH2p = stat(i, j, k, stat_idx + 25);
-      if (abs(upH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 26) = -stat(i, j, k, stat_idx + 7) * zx / upH2pH2p;
+      real upZpZp = stat(i, j, k, stat_idx + 23), vpZpZp = stat(i, j, k, stat_idx + 24),
+          wpZpZp = stat(i, j, k, stat_idx + 25);
+      const real nut = stat(i, j, k, stat_idx + 7);
+      if (abs(upZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 26) = -nut * zx / upZpZp;
       }
-      if (abs(vpH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 27) = -stat(i, j, k, stat_idx + 7) * zy / vpH2pH2p;
+      if (abs(vpZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 27) = -nut * zy / vpZpZp;
       }
-      if (abs(wpH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 28) = -stat(i, j, k, stat_idx + 7) * zz / wpH2pH2p;
+      if (abs(wpZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 28) = -nut * zz / wpZpZp;
       }
-      real ziUZFlux = upH2pH2p * zx + vpH2pH2p * zy + wpH2pH2p * zz;
+      real ziUZFlux = upZpZp * zx + vpZpZp * zy + wpZpZp * zz;
       if (abs(ziUZFlux) > 1e-25) {
-        stat(i, j, k, stat_idx + 29) = -stat(i, j, k, stat_idx + 7) * (zx * zx + zy * zy + zz * zz) / ziUZFlux;
+        stat(i, j, k, stat_idx + 29) = -nut * (zx * zx + zy * zy + zz * zz) / ziUZFlux;
       }
 
       // O2
@@ -715,21 +714,21 @@ H2AirMixingLayer::compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, co
       zz = 0.5 * (xi_z * (stat(i + 1, j, k, stat_idx + 30) - stat(i - 1, j, k, stat_idx + 30)) +
                   eta_z * (stat(i, j + 1, k, stat_idx + 30) - stat(i, j - 1, k, stat_idx + 30)) +
                   zeta_z * (stat(i, j, k + 1, stat_idx + 30) - stat(i, j, k - 1, stat_idx + 30)));
-      upH2pH2p = stat(i, j, k, stat_idx + 45);
-      vpH2pH2p = stat(i, j, k, stat_idx + 46);
-      wpH2pH2p = stat(i, j, k, stat_idx + 47);
-      if (abs(upH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 48) = -stat(i, j, k, stat_idx + 7) * zx / upH2pH2p;
+      upZpZp = stat(i, j, k, stat_idx + 45);
+      vpZpZp = stat(i, j, k, stat_idx + 46);
+      wpZpZp = stat(i, j, k, stat_idx + 47);
+      if (abs(upZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 48) = -nut * zx / upZpZp;
       }
-      if (abs(vpH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 49) = -stat(i, j, k, stat_idx + 7) * zy / vpH2pH2p;
+      if (abs(vpZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 49) = -nut * zy / vpZpZp;
       }
-      if (abs(wpH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 50) = -stat(i, j, k, stat_idx + 7) * zz / wpH2pH2p;
+      if (abs(wpZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 50) = -nut * zz / wpZpZp;
       }
-      ziUZFlux = upH2pH2p * zx + vpH2pH2p * zy + wpH2pH2p * zz;
+      ziUZFlux = upZpZp * zx + vpZpZp * zy + wpZpZp * zz;
       if (abs(ziUZFlux) > 1e-25) {
-        stat(i, j, k, stat_idx + 51) = -stat(i, j, k, stat_idx + 7) * (zx * zx + zy * zy + zz * zz) / ziUZFlux;
+        stat(i, j, k, stat_idx + 51) = -nut * (zx * zx + zy * zy + zz * zz) / ziUZFlux;
       }
 
       // N2
@@ -742,21 +741,21 @@ H2AirMixingLayer::compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, co
       zz = 0.5 * (xi_z * (stat(i + 1, j, k, stat_idx + 52) - stat(i - 1, j, k, stat_idx + 52)) +
                   eta_z * (stat(i, j + 1, k, stat_idx + 52) - stat(i, j - 1, k, stat_idx + 52)) +
                   zeta_z * (stat(i, j, k + 1, stat_idx + 52) - stat(i, j, k - 1, stat_idx + 52)));
-      upH2pH2p = stat(i, j, k, stat_idx + 67);
-      vpH2pH2p = stat(i, j, k, stat_idx + 68);
-      wpH2pH2p = stat(i, j, k, stat_idx + 69);
-      if (abs(upH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 70) = -stat(i, j, k, stat_idx + 7) * zx / upH2pH2p;
+      upZpZp = stat(i, j, k, stat_idx + 67);
+      vpZpZp = stat(i, j, k, stat_idx + 68);
+      wpZpZp = stat(i, j, k, stat_idx + 69);
+      if (abs(upZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 70) = -nut * zx / upZpZp;
       }
-      if (abs(vpH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 71) = -stat(i, j, k, stat_idx + 7) * zy / vpH2pH2p;
+      if (abs(vpZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 71) = -nut * zy / vpZpZp;
       }
-      if (abs(wpH2pH2p) > 1e-25) {
-        stat(i, j, k, stat_idx + 72) = -stat(i, j, k, stat_idx + 7) * zz / wpH2pH2p;
+      if (abs(wpZpZp) > 1e-25) {
+        stat(i, j, k, stat_idx + 72) = -nut * zz / wpZpZp;
       }
-      ziUZFlux = upH2pH2p * zx + vpH2pH2p * zy + wpH2pH2p * zz;
+      ziUZFlux = upZpZp * zx + vpZpZp * zy + wpZpZp * zz;
       if (abs(ziUZFlux) > 1e-25) {
-        stat(i, j, k, stat_idx + 73) = -stat(i, j, k, stat_idx + 7) * (zx * zx + zy * zy + zz * zz) / ziUZFlux;
+        stat(i, j, k, stat_idx + 73) = -nut * (zx * zx + zy * zy + zz * zz) / ziUZFlux;
       }
     }
   }
@@ -790,9 +789,9 @@ H2AirMixingLayer::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *pa
     // 2. chi_z, l=9, 31, 53
     real add{0};
     int num{0};
-    for (int i_var=0;i_var<2;++i_var){
-      add=0;
-      num=0;
+    for (int i_var = 0; i_var < 2; ++i_var) {
+      add = 0;
+      num = 0;
       for (int k = 0; k < mz; ++k) {
         if (auto val = stat(i, j, k, vol_stat_idx + l);val > 1e-30) {
           add += val;
