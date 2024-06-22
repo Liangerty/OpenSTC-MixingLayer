@@ -685,8 +685,7 @@ H2AirMixingLayer::compute(cfd::DZone *zone, cfd::DParameter *param, const int *c
 
 __device__ void
 H2AirMixingLayer::compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, const int *counter_ud, int i, int j,
-                                    int k,
-                                    int counter, int stat_idx, int collected_idx) {
+                                    int k, int counter, int stat_idx, int collected_idx) {
   auto &stat = zone->user_defined_statistical_data;
   const auto &m = zone->metric(i, j, k);
   const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
@@ -835,7 +834,6 @@ H2AirMixingLayer::compute_2nd_level(cfd::DZone *zone, cfd::DParameter *param, co
   } else {
     if (i > 0 && i < zone->mx - 1 && j > 0 && j < zone->my - 1) {
       if (k > 0 && k < zone->mz - 1) {
-        const real nut = stat(i, j, k, stat_idx + 7);
         for (int s = 0; s < 3; ++s) {
           int start = stat_idx + 17 * s;
           // Compute the gradient of {Z''Z''}, which is computed with the first level stat.
@@ -988,7 +986,8 @@ H2AirMixingLayer::compute_spanwise_average(cfd::DZone *zone, cfd::DParameter *pa
       if (num > 0) {
         add /= num;
       }
-      stat_span_ave(i, j, 0, start + i_dir + 26) = nut / add;
+      if (add > 1e-30)
+        stat_span_ave(i, j, 0, start + i_dir + 26) = nut / add;
     }
   }
 }

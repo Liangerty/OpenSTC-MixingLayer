@@ -62,7 +62,7 @@ struct turbulent_dissipation_rate {
 };
 
 struct H2AirMixingLayer {
-  static constexpr int n_collect = 18 + 9 + 9 + 1;
+  static constexpr int n_collect = 12 * 3 + 1;
   static constexpr std::array<std::string_view, n_collect> namelistCollect
       {"rhoH2H2"/*0*/, "rDGradH2GradH2"/*1*/, "rDH2x"/*2*/, "rDH2y"/*3*/, "rDH2z"/*4*/, "rDH2"/*5*/, "rhoUH2"/*6*/,
        "rhoVH2"/*7*/, "rhoWH2"/*8*/, "rhoUH2H2"/*9*/, "rhoVH2H2"/*10*/, "rhoWH2H2"/*11*/,
@@ -81,19 +81,19 @@ struct H2AirMixingLayer {
        "Dt<sub>H2</sub>"/*16*/, "{u''H2''<sup>2</sup>}"/*17*/, "{v''H2''<sup>2</sup>}"/*18*/,
        "{w''H2''<sup>2</sup>}"/*19*/, "Dt2<sub>H2,x</sub>"/*20*/, "Dt2<sub>H2,y</sub>"/*21*/,
        "Dt2<sub>H2,z</sub>"/*22*/, "Dt2<sub>H2</sub>"/*23*/, "rhoDH2"/*24*/,
-       //O2
-        "{O2''O2''}"/*25*/, "<<greek>c</greek>><sub>O2</sub>"/*26*/, "{u''O2''}"/*27*/, "{v''O2''}"/*28*/,
-        "{w''O2''}"/*29*/, "Dt<sub>O2,x</sub>"/*30*/, "Dt<sub>O2,y</sub>"/*31*/, "Dt<sub>O2,z</sub>"/*32*/,
-        "Dt<sub>O2</sub>"/*33*/, "{u''O2''<sup>2</sup>}"/*34*/, "{v''O2''<sup>2</sup>}"/*35*/,
-        "{w''O2''<sup>2</sup>}"/*36*/, "Dt2<sub>O2,x</sub>"/*37*/, "Dt2<sub>O2,y</sub>"/*38*/,
-        "Dt2<sub>O2,z</sub>"/*39*/, "Dt2<sub>O2</sub>"/*40*/, "rhoDO2"/*41*/,
+          //O2
+       "{O2''O2''}"/*25*/, "<<greek>c</greek>><sub>O2</sub>"/*26*/, "{u''O2''}"/*27*/, "{v''O2''}"/*28*/,
+       "{w''O2''}"/*29*/, "Dt<sub>O2,x</sub>"/*30*/, "Dt<sub>O2,y</sub>"/*31*/, "Dt<sub>O2,z</sub>"/*32*/,
+       "Dt<sub>O2</sub>"/*33*/, "{u''O2''<sup>2</sup>}"/*34*/, "{v''O2''<sup>2</sup>}"/*35*/,
+       "{w''O2''<sup>2</sup>}"/*36*/, "Dt2<sub>O2,x</sub>"/*37*/, "Dt2<sub>O2,y</sub>"/*38*/,
+       "Dt2<sub>O2,z</sub>"/*39*/, "Dt2<sub>O2</sub>"/*40*/, "rhoDO2"/*41*/,
           //N2
-        "{N2''N2''}"/*42*/, "<<greek>c</greek>><sub>N2</sub>"/*43*/, "{u''N2''}"/*44*/, "{v''N2''}"/*45*/,
-        "{w''N2''}"/*46*/, "Dt<sub>N2,x</sub>"/*47*/, "Dt<sub>N2,y</sub>"/*48*/, "Dt<sub>N2,z</sub>"/*49*/,
-        "Dt<sub>N2</sub>"/*50*/, "{u''N2''<sup>2</sup>}"/*51*/, "{v''N2''<sup>2</sup>}"/*52*/,
-        "{w''N2''<sup>2</sup>}"/*53*/, "Dt2<sub>N2,x</sub>"/*54*/, "Dt2<sub>N2,y</sub>"/*55*/,
-        "Dt2<sub>N2,z</sub>"/*56*/, "Dt2<sub>N2</sub>"/*57*/, "rhoDN2"/*58*/,
-        "mul"/*59*/
+       "{N2''N2''}"/*42*/, "<<greek>c</greek>><sub>N2</sub>"/*43*/, "{u''N2''}"/*44*/, "{v''N2''}"/*45*/,
+       "{w''N2''}"/*46*/, "Dt<sub>N2,x</sub>"/*47*/, "Dt<sub>N2,y</sub>"/*48*/, "Dt<sub>N2,z</sub>"/*49*/,
+       "Dt<sub>N2</sub>"/*50*/, "{u''N2''<sup>2</sup>}"/*51*/, "{v''N2''<sup>2</sup>}"/*52*/,
+       "{w''N2''<sup>2</sup>}"/*53*/, "Dt2<sub>N2,x</sub>"/*54*/, "Dt2<sub>N2,y</sub>"/*55*/,
+       "Dt2<sub>N2,z</sub>"/*56*/, "Dt2<sub>N2</sub>"/*57*/, "rhoDN2"/*58*/,
+       "mul"/*59*/
       };
   static constexpr int n_stat = 8 + 22 * 3 + 1;
   static constexpr std::array<std::string_view, n_stat> namelistStat
