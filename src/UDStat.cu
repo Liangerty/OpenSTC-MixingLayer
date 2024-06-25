@@ -1168,18 +1168,13 @@ __device__ void H2_variance_and_dissipation_rate::compute_spanwise_average(cfd::
         const real z_y = 0.5 * (xi_y * d_zFavre_x + eta_y * d_zFavre_y + zeta_y * d_zFavre_z);
         const real z_z = 0.5 * (xi_z * d_zFavre_x + eta_z * d_zFavre_y + zeta_z * d_zFavre_z);
         // chi=2/<rho>*[<rho*D*gradZ*gradZ>-2<rho*D*Zx>*{Z}_x-2<rho*D*Zy>*{Z}_y-2<rho*D*Zz>*{Z}_z+<rho*D>*grad{Z}*grad{Z}]
-        auto chi = 2.0 / density * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
-                                    2 * collected_moments(i, j, k, collected_idx + 2) /
-                                    counter_ud[collected_idx + 2] *
-                                    z_x -
-                                    2 * collected_moments(i, j, k, collected_idx + 3) /
-                                    counter_ud[collected_idx + 3] *
-                                    z_y -
-                                    2 * collected_moments(i, j, k, collected_idx + 4) /
-                                    counter_ud[collected_idx + 4] *
-                                    z_z +
-                                    collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
-                                    (z_x * z_x + z_y * z_y + z_z * z_z));
+        auto chi =
+            2.0 / density * (collected_moments(i, j, k, collected_idx + 1) / counter_ud[collected_idx + 1] -
+                             2 * collected_moments(i, j, k, collected_idx + 2) / counter_ud[collected_idx + 2] * z_x -
+                             2 * collected_moments(i, j, k, collected_idx + 3) / counter_ud[collected_idx + 3] * z_y -
+                             2 * collected_moments(i, j, k, collected_idx + 4) / counter_ud[collected_idx + 4] * z_z +
+                             collected_moments(i, j, k, collected_idx + 5) / counter_ud[collected_idx + 5] *
+                             (z_x * z_x + z_y * z_y + z_z * z_z));
         if (chi > 1e-30) {
           add_chi += chi;
           ++useful_counter[1];

@@ -88,12 +88,12 @@ cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in)
     userDefinedStatistics.resize(mx, my, mz, UserDefineStat::n_collect, 1);
 
     if (parameter.get_bool("perform_spanwise_average")) {
-      mean_value.resize(mx, my, 1, 6 + n_scalar, 0);
-      reynolds_stress_tensor_and_rms.resize(mx, my, 1, 9, 0);
+      mean_value.resize(mx, my, 1, 6 + n_scalar, 1);
+      reynolds_stress_tensor_and_rms.resize(mx, my, 1, 9, 1);
       user_defined_statistical_data.resize(mx, my, 1, UserDefineStat::n_stat, 0);
     } else {
-      mean_value.resize(mx, my, mz, 6 + n_scalar, 0);
-      reynolds_stress_tensor_and_rms.resize(mx, my, mz, 9, 0);
+      mean_value.resize(mx, my, mz, 6 + n_scalar, 1);
+      reynolds_stress_tensor_and_rms.resize(mx, my, mz, 9, 1);
       user_defined_statistical_data.resize(mx, my, mz, UserDefineStat::n_stat, 0);
     }
   }
@@ -617,15 +617,15 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   if (parameter.get_bool("if_collect_statistics")) {
     // If we need to collect the statistics, we need to allocate memory for the data.
     if (parameter.get_bool("perform_spanwise_average")) {
-      h_ptr->mean_value.allocate_memory(mx, my, mz, 6 + n_scalar, 0);
-      h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, mz, 6, 0);
+      h_ptr->mean_value.allocate_memory(mx, my, mz, 6 + n_scalar, 1);
+      h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, mz, 6, 1);
       h_ptr->user_defined_statistical_data.allocate_memory(mx, my, mz, UserDefineStat::n_vol_stat_when_span_ave, 0);
-      h_ptr->mean_value_span_ave.allocate_memory(mx, my, 1, 6 + n_scalar, 0);
-      h_ptr->reynolds_stress_tensor_span_ave.allocate_memory(mx, my, 1, 6, 0);
+      h_ptr->mean_value_span_ave.allocate_memory(mx, my, 1, 6 + n_scalar, 1);
+      h_ptr->reynolds_stress_tensor_span_ave.allocate_memory(mx, my, 1, 6, 1);
       h_ptr->user_defined_statistical_data_span_ave.allocate_memory(mx, my, 1, UserDefineStat::n_stat, 0);
     }else{
-      h_ptr->mean_value.allocate_memory(mx, my, mz, 6 + n_scalar, 0);
-      h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, mz, 6, 0);
+      h_ptr->mean_value.allocate_memory(mx, my, mz, 6 + n_scalar, 1);
+      h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, mz, 6, 1);
       h_ptr->user_defined_statistical_data.allocate_memory(mx, my, mz, UserDefineStat::n_stat, 0);
     }
 

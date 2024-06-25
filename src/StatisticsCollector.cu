@@ -246,32 +246,35 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
   cudaMemcpy(counter_ud_device, counter_ud.data(), sizeof(int) * UserDefineStat::n_collect, cudaMemcpyHostToDevice);
   const int n_scalar{parameter.get_int("n_scalar")};
   for (int b = 0; b < mesh.n_block; ++b) {
-    const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    const auto mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
     dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
     compute_statistical_data<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
+    bpg = {(mx - 2 - 1) / tpb.x + 1, (my - 2 - 1) / tpb.y + 1, (mz - 2 - 1) / tpb.z + 1};
     compute_user_defined_statistical_data<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
                                                                                 counter_ud_device);
     compute_UD_stat_data_2<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
     if (perform_spanwise_average) {
       compute_statistical_data_spanwise_average<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
       auto sz = mx * my * sizeof(real);
+      auto sz_without_ghost = (mx - 2) * (my - 2) * sizeof(real);
       cudaDeviceSynchronize();
       cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value_span_ave.data(), sz * (6 + n_scalar),
                  cudaMemcpyDeviceToHost);
       cudaMemcpy(field[b].reynolds_stress_tensor_and_rms.data(), field[b].h_ptr->reynolds_stress_tensor_span_ave.data(),
                  sz * 6, cudaMemcpyDeviceToHost);
       cudaMemcpy(field[b].user_defined_statistical_data.data(),
-                 field[b].h_ptr->user_defined_statistical_data_span_ave.data(), sz * UserDefineStat::n_stat,
-                 cudaMemcpyDeviceToHost);
+                 field[b].h_ptr->user_defined_statistical_data_span_ave.data(),
+                 sz_without_ghost * UserDefineStat::n_stat, cudaMemcpyDeviceToHost);
     } else {
       auto sz = mx * my * mz * sizeof(real);
+      auto sz_without_ghost = (mx - 2) * (my - 2) * (mz - 2) * sizeof(real);
       cudaDeviceSynchronize();
       cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value.data(), sz * (6 + n_scalar),
                  cudaMemcpyDeviceToHost);
       cudaMemcpy(field[b].reynolds_stress_tensor_and_rms.data(), field[b].h_ptr->reynolds_stress_tensor.data(), sz * 6,
                  cudaMemcpyDeviceToHost);
       cudaMemcpy(field[b].user_defined_statistical_data.data(), field[b].h_ptr->user_defined_statistical_data.data(),
-                 sz * UserDefineStat::n_stat, cudaMemcpyDeviceToHost);
+                 sz_without_ghost * UserDefineStat::n_stat, cudaMemcpyDeviceToHost);
     }
   }
 
@@ -348,31 +351,36 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
     }
 
     // 7. Zone Data.
-    MPI_Datatype ty;
-    int lsize[3]{mx, my, mz};
-    const int64_t memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    int start_idx[3]{0, 0, 0};
-    MPI_Type_create_subarray(3, lsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+    MPI_Datatype ty, ty_ud;
+    int lSize[3]{mx + 2, my + 2, mz + 2};
+    int sSize[3]{mx, my, mz};
+    const int64_t memSz = sSize[0] * sSize[1] * sSize[2] * 8;
+    int start_idx[3]{1, 1, 1};
+    MPI_Type_create_subarray(3, lSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
+    memset(start_idx, 0, 3 * sizeof(int));
+    MPI_Type_create_subarray(3, sSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty_ud);
+    MPI_Type_commit(&ty_ud);
 
     offset = offset_var[blk];
     for (int l = 0; l < 6; ++l) {
       auto var = v.mean_value[l];
       MPI_File_write_at(fp, offset, var, 1, ty, &status);
-      offset += memsz;
+      offset += memSz;
     }
     for (int l = 0; l < 6; ++l) {
       auto var = v.reynolds_stress_tensor_and_rms[l];
       MPI_File_write_at(fp, offset, var, 1, ty, &status);
-      offset += memsz;
+      offset += memSz;
     }
-    offset = write_ud_stat_data(offset, v, fp, ty, memsz);
+    offset = write_ud_stat_data(offset, v, fp, ty_ud, memSz);
     for (int q = 0; q < n_scalar; ++q) {
       auto var = v.mean_value[q + 6];
       MPI_File_write_at(fp, offset, var, 1, ty, &status);
-      offset += memsz;
+      offset += memSz;
     }
     MPI_Type_free(&ty);
+    MPI_Type_free(&ty_ud);
   }
   MPI_File_close(&fp);
 }
@@ -449,10 +457,10 @@ MPI_Offset write_ud_stat_data(MPI_Offset offset, const Field &field, MPI_File &f
 
 __global__ void compute_statistical_data(DZone *zone, DParameter *param, int counter, const int *counter_ud) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
-  if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
+  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - 1;
+  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - 1;
+  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - 1;
+  if (i > extent[0] || j > extent[1] || k > extent[2]) return;
 
   auto &mean = zone->mean_value;
   auto &firstOrderStat = zone->firstOrderMoment;
