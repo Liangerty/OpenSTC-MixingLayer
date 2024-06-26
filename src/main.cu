@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
         cfd::Driver<MixtureModel::FR, cfd::SST<cfd::TurbSimLevel::DES>> driver(parameter, mesh);
         driver.initialize_computation();
         simulate(driver);
-      }  else {
+      } else {
         // Pure mixing among species
         cfd::Driver<MixtureModel::Mixture, cfd::SST<cfd::TurbSimLevel::DES>> driver(parameter, mesh);
         driver.initialize_computation();
@@ -110,6 +110,8 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  printf("Yeah, baby, we are ok now\n");
+  if (parameter.get_int("myid") == 0)
+    printf("Yeah, baby, we are ok now\n");
+  MPI_Finalize();
   return 0;
 }

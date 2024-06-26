@@ -383,7 +383,7 @@ void cfd::Parameter::setup_default_settings() {
 
 void cfd::Parameter::diagnose_parallel_info() {
   if (int_parameters["myid"] == 0) {
-    fmt::print("\n{:*^80}\n", "Parallel Information");
+    fmt::print("{:*^80}\n", "Parallel Information");
     const bool parallel = bool_parameters["parallel"];
     const int n_proc = int_parameters["n_proc"];
     if (parallel) {
