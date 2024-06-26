@@ -350,11 +350,16 @@ acquire_mixture_fraction_expression(const Species &spec, const real *fuel, const
   half_nuo_mwo_inv = 1 / half_nuo_mwo_inv;
 
   const int myid = parameter.get_int("myid");
+  bool output_screen{false};
   if (myid == 0) {
-    fmt::print("{}{}{}", spec_eqn, elem_eqn, coupling_func);
-    std::ofstream out("output/message/mixture_fraction_info.txt", std::ios::trunc);
-    out << fmt::format("{}{}{}", spec_eqn, elem_eqn, coupling_func);
-    out.close();
+    if (!parameter.has_int("mixture_fraction_expression_outputted")) {
+      fmt::print("\t{}\t{}\t{}", spec_eqn, elem_eqn, coupling_func);
+      std::ofstream out("output/message/mixture_fraction_info.txt", std::ios::trunc);
+      out << fmt::format("{}{}{}", spec_eqn, elem_eqn, coupling_func);
+      out.close();
+      parameter.update_parameter("mixture_fraction_expression_outputted", 1);
+      output_screen = true;
+    }
   }
 
   int elem_label[3]{0, 1, 2};
@@ -406,14 +411,14 @@ acquire_mixture_fraction_expression(const Species &spec, const real *fuel, const
   z_o = z_elem[elem_label[2]] / tot_m;
   real beta_st = z_c * nuc_mwc_inv + z_h * nuh_mwh_inv - z_o * half_nuo_mwo_inv;
   real z_st = (beta_st - beta_o) / beta_diff;
-  if (myid == 0) {
-    fmt::print("z_st={}\n", z_st);
+  if (myid == 0 && output_screen) {
+    fmt::print("\tz_st={}\n", z_st);
     std::ofstream out("output/message/mixture_fraction_info.txt", std::ios::app);
     out << fmt::format("z_st={}\n", z_st);
     out.close();
   }
 
-  parameter.update_parameter("beta_diff_inv", 1.0/beta_diff);
+  parameter.update_parameter("beta_diff_inv", 1.0 / beta_diff);
   parameter.update_parameter("beta_o", beta_o);
   parameter.update_parameter("nuc_mwc_inv", nuc_mwc_inv);
   parameter.update_parameter("nuh_mwh_inv", nuh_mwh_inv);

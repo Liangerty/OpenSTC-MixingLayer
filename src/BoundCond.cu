@@ -271,9 +271,7 @@ void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Spe
 
   initialize_profile_and_rng(parameter, mesh, species, field);
 
-//  if (parameter.get_int("myid") == 0) {
-  printf("Finish setting up boundary conditions on %d.\n", parameter.get_int("myid"));
-//  }
+  printf("\tProcess [[%d]] has finished setting up boundary conditions.\n", parameter.get_int("myid"));
 }
 
 void DBoundCond::link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) const {

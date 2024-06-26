@@ -25,7 +25,7 @@ __global__ void update_physical_time(DParameter *param, real t) {
 template<MixtureModel mix_model, class turb>
 void RK3(Driver<mix_model, turb> &driver) {
   if (driver.myid == 0) {
-    printf("Unsteady flow simulation with 3rd order Runge-Kutta scheme for time advancing.\n");
+    printf("\n****************************Time advancement starts*****************************\n");
   }
 
   dim3 tpb{8, 8, 4};
@@ -77,14 +77,12 @@ void RK3(Driver<mix_model, turb> &driver) {
   // This should be got from a Parameter later, which may be got from a previous simulation.
   real physical_time{parameter.get_real("solution_time")};
   if (driver.myid == 0)
-    printf("Current physical time is %e\n", physical_time);
+    printf("\tCurrent physical time is %es\n", physical_time);
 
   real dt{1e+6};
   const bool fixed_time_step{parameter.get_bool("fixed_time_step")};
   if (fixed_time_step) {
     dt = parameter.get_real("dt");
-    if (driver.myid == 0)
-      printf("The physical time step is fixed to %e\n", dt);
   }
 
   const bool if_collect_statistics{parameter.get_bool("if_collect_statistics")};

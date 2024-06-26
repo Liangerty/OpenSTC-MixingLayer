@@ -49,7 +49,7 @@ void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<F
   parameter.update_parameter("solution_time", 0.0);
 
   if (parameter.get_int("myid") == 0) {
-    printf("Flowfield is initialized from given inflow conditions.\n");
+    printf("\t->-> %-20s : initialization method.\n", "From start");
     std::ofstream history("history.dat", std::ios::trunc);
     history << "step\terror_max\n";
     history.close();

@@ -18,6 +18,7 @@ cfd::Parameter::Parameter(int *argc, char ***argv) {
   read_param_from_file();
   diagnose_parallel_info();
   setup_gpu_device(n_proc, myid);
+  deduce_known_info();
 }
 
 cfd::Parameter::Parameter(const std::string &filename) {
@@ -32,30 +33,6 @@ void cfd::Parameter::read_param_from_file() {
     read_one_file(file);
     file.close();
   }
-
-  int_parameters.emplace("step", 0);
-
-  deduce_known_info();
-
-  update_parameter("n_var", 5);
-  update_parameter("n_turb", 0);
-  int n_scalar{0};
-  if (bool_parameters["turbulence"] == 1) {
-    if (int_parameters["turbulence_method"] == 1 || int_parameters["turbulence_method"] == 2) { // RANS or DES
-      if (int_parameters["RANS_model"] == 1) {// SA
-        update_parameter("n_turb", 1);
-        update_parameter("n_var", 5 + 1);
-        n_scalar += 1;
-      } else { // SST
-        update_parameter("n_turb", 2);
-        update_parameter("n_var", 5 + 2);
-        n_scalar += 2;
-      }
-    }
-  } else {
-    update_parameter("RANS_model", 0);
-  }
-  update_parameter("n_scalar", n_scalar);
 }
 
 void cfd::Parameter::read_one_file(std::ifstream &file) {
@@ -207,31 +184,73 @@ std::map<std::string, std::variant<std::string, int, real>> cfd::Parameter::read
 }
 
 void cfd::Parameter::deduce_known_info() {
+  int_parameters.emplace("step", 0);
+
   // Ghost grid number is decided from the inviscid scheme and viscous scheme.
   // For common 2nd order schemes, we need 2 ghost grids.
   // Here, because we now only implement 2nd order central difference for viscous flux, we need 2 ghost grids.
   // The main concern for the number of ghost grids is the inviscid flux, which in turn is decided from the reconstruction method.
   int ngg{2};
   int reconstruction_scheme = get_int("reconstruction");
-  switch (reconstruction_scheme) {
-    case 4: // WENO5
-      ngg = 3;
-      break;
-    case 5: // WENO7
-      ngg = 4;
-      break;
-    default: // 1st, MUSCL, NND2, etc.
-      break;
-  }
-
-  int inviscid_scheme{get_int("inviscid_scheme")};
-  if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 6) {
+  std::string reconstruction_name{};
+  if (reconstruction_scheme == 1) {
+    reconstruction_name = "1st-order upwind";
+  } else if (reconstruction_scheme == 2) {
+    reconstruction_name = "MUSCL";
+  } else if (reconstruction_scheme == 3) {
+    reconstruction_name = "NND2";
+  } else if (reconstruction_scheme == 4) {
+    reconstruction_name = "AWENO5";
     ngg = 3;
-  } else if (inviscid_scheme == 71 || inviscid_scheme == 72) {
+  } else if (reconstruction_scheme == 5) {
+    reconstruction_name = "AWENO7";
     ngg = 4;
   }
 
+  if (int_parameters["myid"] == 0)
+    fmt::print("\n{:*^80}\n", "Inviscid scheme Information");
+  int inviscid_scheme{get_int("inviscid_scheme")};
+  std::string inviscid_scheme_name{};
+  if (inviscid_scheme == 2) {
+    inviscid_scheme_name = "Roe";
+    if (int_parameters["myid"] == 0)
+      fmt::print("\t->-> {:<20} : reconstruction method.\n", reconstruction_name);
+  } else if (inviscid_scheme == 3) {
+    inviscid_scheme_name = "AUSM+";
+    if (int_parameters["myid"] == 0)
+      fmt::print("\t->-> {:<20} : reconstruction method.\n", reconstruction_name);
+  } else if (inviscid_scheme == 4) {
+    inviscid_scheme_name = "HLLC";
+    if (int_parameters["myid"] == 0)
+      fmt::print("\t->-> {:<20} : reconstruction method.\n", reconstruction_name);
+  } else if (inviscid_scheme == 51) {
+    inviscid_scheme_name = "WENO5-cp";
+    ngg = 3;
+  } else if (inviscid_scheme == 52) {
+    inviscid_scheme_name = "WENO5-ch";
+    ngg = 3;
+  } else if (inviscid_scheme == 71) {
+    inviscid_scheme_name = "WENO7-cp";
+    ngg = 4;
+  } else if (inviscid_scheme == 72) {
+    inviscid_scheme_name = "WENO7-ch";
+    ngg = 4;
+  } else if (inviscid_scheme == 6) {
+    inviscid_scheme_name = "energy-preserving-6";
+    ngg = 3;
+  }
+
   update_parameter("ngg", ngg);
+  if (int_parameters["myid"] == 0) {
+    fmt::print("\t->-> {:<20} : inviscid scheme.\n", inviscid_scheme_name);
+    fmt::print("\t->-> {:<20} : number of ghost layers\n", ngg);
+  }
+
+  if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 71 || inviscid_scheme == 72) {
+    if (bool_parameters["positive_preserving"] == 1) {
+      fmt::print("\t->-> {:<20} : positive preserving.\n", "Yes");
+    }
+  }
 
   // Next, based on the reconstruction scheme and inviscid flux method, we re-assign a new field called "inviscid_tag"
   // to identify the method to be used.
@@ -255,13 +274,32 @@ void cfd::Parameter::deduce_known_info() {
   if (inviscid_scheme == 6) {
     inviscid_type = 4;
   }
-//  update_parameter("inviscid_tag", inviscid_tag);
   update_parameter("inviscid_type", inviscid_type);
 
   if (bool_parameters["steady"] == 0 && int_parameters["temporal_scheme"] == 3) {
     // RK-3, the chemical source should be treated explicitly.
     update_parameter("chemSrcMethod", 0);
   }
+
+  update_parameter("n_var", 5);
+  update_parameter("n_turb", 0);
+  int n_scalar{0};
+  if (bool_parameters["turbulence"] == 1) {
+    if (int_parameters["turbulence_method"] == 1 || int_parameters["turbulence_method"] == 2) { // RANS or DES
+      if (int_parameters["RANS_model"] == 1) {// SA
+        update_parameter("n_turb", 1);
+        update_parameter("n_var", 5 + 1);
+        n_scalar += 1;
+      } else { // SST
+        update_parameter("n_turb", 2);
+        update_parameter("n_var", 5 + 2);
+        n_scalar += 2;
+      }
+    }
+  } else {
+    update_parameter("RANS_model", 0);
+  }
+  update_parameter("n_scalar", n_scalar);
 }
 
 void cfd::Parameter::setup_default_settings() {
@@ -345,6 +383,7 @@ void cfd::Parameter::setup_default_settings() {
 
 void cfd::Parameter::diagnose_parallel_info() {
   if (int_parameters["myid"] == 0) {
+    fmt::print("\n{:*^80}\n", "Parallel Information");
     const bool parallel = bool_parameters["parallel"];
     const int n_proc = int_parameters["n_proc"];
     if (parallel) {
@@ -352,15 +391,150 @@ void cfd::Parameter::diagnose_parallel_info() {
         fmt::print("You chose parallel computation, but the number of processes is equal to 1.\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
       }
-      fmt::print("Parallel computation chosen! Number of processes: {}. \n", n_proc);
+      fmt::print("\t->-> Parallel computation chosen! Number of processes: ->-> {}. \n", n_proc);
     } else {
       if (n_proc > 1) {
         fmt::print("You chose serial computation, but the number of processes is not equal to 1, n_proc={}.\n",
                    n_proc);
         MPI_Abort(MPI_COMM_WORLD, 1);
       }
-      fmt::print("Serial computation chosen!\n");
+      fmt::print("\t->-> Serial computation chosen!\n");
     }
   }
   MPI_Barrier(MPI_COMM_WORLD);
+}
+
+void cfd::Parameter::deduce_sim_info() {
+  int n_var = 5, n_scalar = 0, n_scalar_transported = 0, n_other_var = 1;
+  int i_turb_cv = 5, i_fl_cv = 0;
+
+  if (get_int("species") == 1) {
+    n_scalar += get_int("n_spec");
+    if (get_int("reaction") != 2) {
+      // Mixture / Finite rate chemistry
+      n_scalar_transported += get_int("n_spec");
+      i_turb_cv += get_int("n_spec");
+    } else {
+      // Flamelet model
+      n_scalar_transported += 2; // the mixture fraction and the variance of mixture fraction
+      n_scalar += 2;
+      i_fl_cv = 5 + get_int("n_turb");
+      ++n_other_var; // scalar dissipation rate
+    }
+  } else if (get_int("species") == 2) {
+    n_scalar += get_int("n_spec");
+    if (get_int("reaction") != 2) {
+      // Mixture with mixture fraction and variance solved.
+      n_scalar_transported += get_int("n_spec") + 2;
+      n_scalar += 2;
+      i_turb_cv += get_int("n_spec");
+      i_fl_cv = i_turb_cv + get_int("n_turb");
+      ++n_other_var; // scalar dissipation rate
+    } else {
+      // Flamelet model
+      n_scalar_transported += 2; // the mixture fraction and the variance of mixture fraction
+      n_scalar += 2;
+      i_fl_cv = 5 + get_int("n_turb");
+      ++n_other_var; // scalar dissipation rate
+    }
+  }
+  if (get_bool("turbulence")) {
+    // turbulence simulation
+    if (auto turb_method = get_int("turbulence_method");turb_method == 1) {
+      // RANS
+      n_scalar_transported += get_int("n_turb");
+      n_scalar += get_int("n_turb");
+      ++n_other_var; // mut
+    } else if (turb_method == 2) {
+      // DES type
+      n_scalar_transported += get_int("n_turb");
+      n_scalar += get_int("n_turb");
+      ++n_other_var; // mut
+    }
+  }
+  n_var += n_scalar_transported;
+  update_parameter("n_var", n_var);
+  update_parameter("n_scalar", n_scalar);
+  update_parameter("n_scalar_transported", n_scalar_transported);
+  update_parameter("i_turb_cv", i_turb_cv);
+  update_parameter("i_fl", get_int("n_turb") + get_int("n_spec"));
+  update_parameter("i_fl_cv", i_fl_cv);
+  update_parameter("n_other_var", n_other_var);
+
+  int myid = get_int("myid");
+  if (myid == 0) {
+    fmt::print("\n{:*^80}\n", "Simulation Details");
+    printf("\t->-> %-20d : number of equations to solve\n", n_var);
+    printf("\t->-> %-20d : number of scalar variables\n", n_scalar);
+
+    if (get_bool("steady")) {
+      // steady
+      fmt::print("\n\t->-> {:<20} : flow simulation will be conducted.\n", "Steady");
+      fmt::print("\t\t->-> {:<20} : CFL number\n", get_real("cfl"));
+      if (int_parameters["implicit_method"] == 0) {
+        // explicit
+        fmt::print("\t\t->-> {:<20} : time integration\n", "explicit");
+      } else {
+        // implicit
+        fmt::print("\t\t->-> {:<20} : time integration\n", "implicit DPLUR");
+        fmt::print("\t\t->-> {:<20} : inner iterations for DPLUR\n", get_int("DPLUR_inner_step"));
+      }
+      fmt::print("\t\t->-> {:<20} : convergence criteria\n", get_real("convergence_criteria"));
+    } else {
+      // transient simulation
+      fmt::print("\t->-> {:<20} : flow simulation will be conducted.\n", "Transient");
+      if (int_parameters["temporal_scheme"] == 2) {
+        // dual-time stepping
+        fmt::print("\t\t->-> {:<20} : temporal scheme\n", "Dual-time stepping");
+        fmt::print("\t\t->-> {:<20} : inner iterations for dual-time stepping\n", get_int("inner_iteration"));
+        fmt::print("\t\t->-> {:<20} : max inner iterations for dual-time stepping\n", get_int("max_inner_iteration"));
+        fmt::print("\t\t->-> {:<20} : iteration adjust step\n", get_int("iteration_adjust_step"));
+      } else if (int_parameters["temporal_scheme"] == 3) {
+        // RK-3
+        fmt::print("\t\t->-> {:<25} : temporal scheme\n", "3rd-order Runge-Kutta");
+        if (bool_parameters["fixed_time_step"]) {
+          fmt::print("\t\t->-> {:<25} : physical time step(s)\n", get_real("dt"));
+        } else {
+          fmt::print("\t\t->-> {:<25} : CFL number\n", get_real("cfl"));
+        }
+      }
+    }
+
+    fmt::print("\n\t->-> {:<20} : order CDS for viscous flux\n", get_int("viscous_order"));
+
+    if (get_bool("turbulence")) {
+      bool need_ras_model{false};
+      if (auto method = get_int("turbulence_method");method == 1) {
+        fmt::print("\n\t->-> {:<20} : simulation\n", "RAS");
+        need_ras_model = true;
+      } else if (method == 2) {
+        fmt::print("\n\t->-> {:<20} : simulation\n", "DDES");
+        need_ras_model = true;
+      }
+      if (need_ras_model) {
+        if (get_int("RANS_model") == 1) {
+          fmt::print("\t\t->-> {:<20} : model\n", "SA");
+        } else if (get_int("RANS_model") == 2) {
+          fmt::print("\t\t->-> {:<20} : model\n", "k-omega SST");
+        }
+        if (int_parameters["turb_implicit"]) {
+          fmt::print("\t\t->-> {:<20} : turbulence source term treatment\n", "implicit");
+        }
+        std::string cc_method{};
+        bool cc_flag = false;
+        if (auto cc = get_int("compressibility_correction");cc == 1) {
+          cc_flag = true;
+          cc_method = "Wilcox";
+        } else if (cc == 2) {
+          cc_flag = true;
+          cc_method = "Sarkar";
+        } else if (cc == 3) {
+          cc_flag = true;
+          cc_method = "Zeman";
+        }
+        if (cc_flag)
+          fmt::print("\t\t->-> {:<20} : compressibility correction\n", cc_method);
+      }
+    }
+  }
 }

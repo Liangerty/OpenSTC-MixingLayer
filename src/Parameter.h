@@ -83,6 +83,8 @@ public:
   void update_parameter(const std::string &name,
                         const std::vector<std::string> &new_value) { string_array[name] = new_value; }
 
+  void deduce_sim_info();
+
   ~Parameter() = default;
 
 private:

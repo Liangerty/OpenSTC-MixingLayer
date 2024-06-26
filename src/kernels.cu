@@ -17,6 +17,6 @@ void setup_gpu_device(int n_proc, int myid) {
   cudaDeviceProp prop{};
   cudaGetDeviceProperties(&prop, myid);
   cudaSetDevice(myid);
-  printf("Process %d will compute on device %s.\n", myid, prop.name);
+  printf("\tProcess %d will compute on device [[%s]].\n", myid, prop.name);
 }
 }

@@ -68,7 +68,7 @@ void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vec
       read_2D_for_3D<mix_model, turb>(parameter, mesh, field, species);
       break;
     default:
-      printf("The initialization method is unknown, use freestream value to initialize by default.\n");
+      printf("\tThe initialization method is unknown, use freestream value to initialize by default.\n");
       initialize_from_start(parameter, mesh, field, species);
   }
 }
@@ -256,7 +256,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
   parameter.update_parameter("step", step);
 
   if (parameter.get_int("myid") == 0) {
-    printf("Flowfield is initialized from previous simulation results.\n");
+    printf("\t->-> %-25s : initialization method.\n", "From previous results");
   }
 }
 

@@ -11,69 +11,12 @@
 cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in) {
   const int mx{block.mx}, my{block.my}, mz{block.mz}, ngg{block.ngg};
   // Let us re-compute the number of variables to be solved here.
-  n_var = 5;
+  n_var = parameter.get_int("n_var");
   // The variable "n_scalar_transported" is the number of scalar variables to be transported.
-  int n_scalar_transported{0};
-  int n_other_var{1}; // Default, mach number
+  int n_other_var{parameter.get_int("n_other_var")}; // Default, mach number
   // The variable "n_scalar" is the number of scalar variables in total, including those not transported.
   // This is different from the variable "n_scalar_transported" only when the flamelet model is used.
-  int n_scalar{0};
-  // turbulent variable in sv array is always located after mass fractions, thus its label is always n_spec;
-  // however, for conservative array, it may depend on whether the employed method is flamelet or finite rate.
-  // This label, "i_turb_cv", is introduced to label the index of the first turbulent variable in the conservative variable array.
-  int i_turb_cv{5}, i_fl_cv{0};
-
-  if (parameter.get_int("species") == 1) {
-    n_scalar += parameter.get_int("n_spec");
-    if (parameter.get_int("reaction") != 2) {
-      // Mixture / Finite rate chemistry
-      n_scalar_transported += parameter.get_int("n_spec");
-      i_turb_cv += parameter.get_int("n_spec");
-    } else {
-      // Flamelet model
-      n_scalar_transported += 2; // the mixture fraction and the variance of mixture fraction
-      n_scalar += 2;
-      i_fl_cv = 5 + parameter.get_int("n_turb");
-      ++n_other_var; // scalar dissipation rate
-    }
-  } else if (parameter.get_int("species") == 2) {
-    n_scalar += parameter.get_int("n_spec");
-    if (parameter.get_int("reaction") != 2) {
-      // Mixture with mixture fraction and variance solved.
-      n_scalar_transported += parameter.get_int("n_spec") + 2;
-      n_scalar += 2;
-      i_turb_cv += parameter.get_int("n_spec");
-      i_fl_cv = i_turb_cv + parameter.get_int("n_turb");
-      ++n_other_var; // scalar dissipation rate
-    } else {
-      // Flamelet model
-      n_scalar_transported += 2; // the mixture fraction and the variance of mixture fraction
-      n_scalar += 2;
-      i_fl_cv = 5 + parameter.get_int("n_turb");
-      ++n_other_var; // scalar dissipation rate
-    }
-  }
-  if (parameter.get_bool("turbulence")) {
-    // turbulence simulation
-    if (auto turb_method = parameter.get_int("turbulence_method");turb_method == 1) {
-      // RANS
-      n_scalar_transported += parameter.get_int("n_turb");
-      n_scalar += parameter.get_int("n_turb");
-      ++n_other_var; // mut
-    } else if (turb_method == 2) {
-      // DES type
-      n_scalar_transported += parameter.get_int("n_turb");
-      n_scalar += parameter.get_int("n_turb");
-      ++n_other_var; // mut
-    }
-  }
-  n_var += n_scalar_transported;
-  parameter.update_parameter("n_var", n_var);
-  parameter.update_parameter("n_scalar", n_scalar);
-  parameter.update_parameter("n_scalar_transported", n_scalar_transported);
-  parameter.update_parameter("i_turb_cv", i_turb_cv);
-  parameter.update_parameter("i_fl", parameter.get_int("n_turb") + parameter.get_int("n_spec"));
-  parameter.update_parameter("i_fl_cv", i_fl_cv);
+  int n_scalar{parameter.get_int("n_scalar")};
 
   // Acquire memory for variable arrays
   bv.resize(mx, my, mz, 6, ngg);
@@ -655,4 +598,118 @@ void cfd::Field::copy_data_from_device(const Parameter &parameter) {
     cudaMemcpy(ov[2], h_ptr->scalar_diss_rate.data(), size * sizeof(real), cudaMemcpyDeviceToHost);
   }
   copy_auxiliary_data_from_device(*this, size);
+}
+
+void cfd::Field::deallocate_memory(const Parameter &parameter) {
+  h_ptr->x.deallocate_memory();
+  h_ptr->y.deallocate_memory();
+  h_ptr->z.deallocate_memory();
+  if (parameter.get_bool("turbulence") && parameter.get_int("turbulence_method") == 2) {
+    h_ptr->des_delta.deallocate_memory();
+  }
+  h_ptr->jac.deallocate_memory();
+  h_ptr->metric.deallocate_memory();
+
+  h_ptr->cv.deallocate_memory();
+  h_ptr->bv.deallocate_memory();
+  h_ptr->bv_last.deallocate_memory();
+  h_ptr->mach.deallocate_memory();
+  h_ptr->mul.deallocate_memory();
+
+  const auto n_scalar = parameter.get_int("n_scalar");
+  if (n_scalar>0)
+    h_ptr->sv.deallocate_memory();
+  const auto n_spec{parameter.get_int("n_spec")};
+  if (n_spec > 0) {
+    h_ptr->rho_D.deallocate_memory();
+    h_ptr->acoustic_speed.deallocate_memory();
+    h_ptr->thermal_conductivity.deallocate_memory();
+    h_ptr->gamma.deallocate_memory();
+    h_ptr->cp.deallocate_memory();
+    if (parameter.get_int("reaction") == 1) {
+      // Finite rate chemistry
+      if (const int chemSrcMethod = parameter.get_int("chemSrcMethod");chemSrcMethod == 1) {
+        // EPI
+        h_ptr->chem_src_jac.deallocate_memory();
+      } else if (chemSrcMethod == 2) {
+        // DA
+        h_ptr->chem_src_jac.deallocate_memory();
+      }
+    } else if (parameter.get_int("reaction") == 2 || parameter.get_int("species") == 2) {
+      // Flamelet model
+      h_ptr->scalar_diss_rate.deallocate_memory();
+    }
+  }
+  if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
+    // RANS method or DES method
+    h_ptr->mut.deallocate_memory();
+    if (parameter.get_int("RANS_model") == 2) {
+      // SST
+      h_ptr->wall_distance.deallocate_memory();
+      if (parameter.get_int("turb_implicit") == 1) {
+        h_ptr->turb_src_jac.deallocate_memory();
+      }
+    }
+  }
+  if (parameter.get_int("if_compute_wall_distance") == 1) {
+    h_ptr->wall_distance.deallocate_memory();
+  }
+  h_ptr->dq.deallocate_memory();
+  if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3 &&
+        parameter.get_bool("fixed_time_step"))) {
+    h_ptr->inv_spectr_rad.deallocate_memory();
+//    h_ptr->visc_spectr_rad.deallocate_memory();
+    h_ptr->dt_local.deallocate_memory();
+  }
+  if (parameter.get_int("implicit_method") == 1) { // DPLUR
+    if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3)) {
+      h_ptr->dq.deallocate_memory();
+      h_ptr->dq0.deallocate_memory();
+      h_ptr->dqk.deallocate_memory();
+      h_ptr->inv_spectr_rad.deallocate_memory();
+//      h_ptr->visc_spectr_rad.deallocate_memory();
+    }
+  }
+  if (parameter.get_int("inviscid_scheme") == 2) {
+    // Roe scheme
+    h_ptr->entropy_fix_delta.deallocate_memory();
+  }
+
+  if (!parameter.get_bool("steady")) {
+    // unsteady simulation
+    if (parameter.get_int("temporal_scheme") == 2) {
+      // dual time stepping
+      h_ptr->qn1.deallocate_memory();
+      h_ptr->qn_star.deallocate_memory();
+      h_ptr->in_last_step.deallocate_memory();
+    }
+    if (parameter.get_int("temporal_scheme") == 3) {
+      // rk scheme
+      h_ptr->qn.deallocate_memory();
+    }
+  }
+
+  if (parameter.get_bool("if_collect_statistics")) {
+    // If we need to collect the statistics, we need to allocate memory for the data.
+    h_ptr->mean_value.deallocate_memory();
+    h_ptr->reynolds_stress_tensor.deallocate_memory();
+    h_ptr->user_defined_statistical_data.deallocate_memory();
+    if (parameter.get_bool("perform_spanwise_average")) {
+      h_ptr->mean_value_span_ave.deallocate_memory();
+      h_ptr->reynolds_stress_tensor_span_ave.deallocate_memory();
+      h_ptr->user_defined_statistical_data_span_ave.deallocate_memory();
+    }
+
+    // The collected data includes one layer of ghost mesh, which may be used to compute the gradients.
+    h_ptr->firstOrderMoment.deallocate_memory();
+    h_ptr->velocity2ndMoment.deallocate_memory();
+    h_ptr->userCollectForStat.deallocate_memory();
+  }
+
+  if (UserDefineIO::n_dynamic_auxiliary > 0) {
+    h_ptr->udv.deallocate_memory();
+  }
+
+  cudaFree(&d_ptr);
+  delete h_ptr;
 }

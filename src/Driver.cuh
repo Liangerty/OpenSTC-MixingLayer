@@ -17,6 +17,8 @@ struct Driver {
 
   void initialize_computation();
 
+  void deallocate();
+
 public:
   int myid = 0;
   gxl::Time time;
@@ -33,11 +35,20 @@ public:
   StatisticsCollector stat_collector;
 };
 
+template<MixtureModel mix_model, class turb>
+void Driver<mix_model, turb>::deallocate() {
+  for (auto& f:field){
+    f.deallocate_memory(parameter);
+  }
+}
+
 template<class turb>
 struct Driver<MixtureModel::FL, turb> {
   Driver(Parameter &parameter, Mesh &mesh_);
 
   void initialize_computation();
+
+  void deallocate();
 
   int myid = 0;
   gxl::Time time;
@@ -54,7 +65,14 @@ struct Driver<MixtureModel::FL, turb> {
   StatisticsCollector stat_collector;
 };
 
-void write_reference_state(const Parameter &parameter, const Species &species);
+template<class turb>
+void Driver<MixtureModel::FL, turb>::deallocate() {
+  for (auto& f:field){
+    f.deallocate_memory(parameter);
+  }
+}
+
+void write_reference_state(Parameter &parameter, const Species &species);
 
 __global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, int n_point_times3);
 } // cfd

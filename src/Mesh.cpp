@@ -598,12 +598,18 @@ void cfd::Block::compute_des_scale(const Parameter &parameter) {
       }
     }
   }
+
+  if (parameter.get_int("myid")==0){
+    fmt::print("\tFinish getting DES scales.\n");
+  }
 }
 
 cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg")},
                                         n_proc{parameter.get_int("n_proc")}, nblk{new int[n_proc]} {
   const int myid = parameter.get_int("myid");
   const bool parallel = parameter.get_bool("parallel");
+  if (myid == 0)
+    fmt::print("\n{:*^80}\n", "Grid Information");
   //First read the grid points into memory
   read_grid(myid, parameter);
   parameter.update_parameter("n_block", n_block);
@@ -612,7 +618,8 @@ cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg
     parameter.update_parameter("perform_spanwise_average", false);
   }
   if (myid == 0) {
-    fmt::print("Problem dimension: {}\nTotal grid number: {}\n", dimension, n_grid_total);
+    fmt::print("\t->-> {}-D problem\n", dimension);
+    fmt::print("\t->-> {:<20} : total grid number\n", n_grid_total);
   }
 
   read_boundary(myid/*, ngg*/);
@@ -627,11 +634,8 @@ cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg
   if (const auto grid_scale = parameter.get_real("gridScale"); std::abs(grid_scale - 1.0) > 1e-15) {
     scale(grid_scale);
     if (myid == 0) {
-      fmt::print("Grid scale is {}m.\n", grid_scale);
+      fmt::print("\t->-> {:<20} : grid scale(meter).\n", grid_scale);
     }
-  }
-  if (myid == 0) {
-    fmt::print("Finish reading mesh information.\n");
   }
 
   /*Initialize the coordinates of ghost grids*/
@@ -639,7 +643,7 @@ cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg
 
   /*Compute the metrics and jacobian values of all grid points*/
   for (auto &b: block) b.compute_jac_metric(myid);
-  if (myid == 0) fmt::print("Finish computing metrics and jacobian values.\n");
+  if (myid == 0) fmt::print("\tFinish computing metrics and jacobians.\n");
 
   if (parameter.get_bool("turbulence") && parameter.get_int("turbulence_method") == 2) {
     // When we use DES simulation, we need to compute the grid scale \Delta.
@@ -713,7 +717,6 @@ void cfd::Mesh::read_grid(const int myid, const Parameter &parameter) {
     grd.close();
   }
 
-  fmt::print("Grid number in process {} is {}.\n", myid, n_grid);
   MPI_Barrier(MPI_COMM_WORLD);
   //Sum grid number in all processes to the root process
   MPI_Reduce(&n_grid, &n_grid_total, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -744,16 +747,16 @@ void cfd::Mesh::read_grid(const int myid, const Parameter &parameter) {
   MPI_Allgatherv(mz_this, n_block, MPI_INT, mz_blk, nblk, disp, MPI_INT, MPI_COMM_WORLD);
   delete[]m_this;
 
-//  if (myid == 0) {
-//    fmt::print("There are {} blocks in all, the block number in each process is:\n", n_block_total);
-//    for (int i = 0; i < n_proc; ++i) {
-//      fmt::print("{}\n", n_block);
-//    }
-//    fmt::print("The dimension of the blocks are:\n");
-//    for (int i = 0; i < n_block_total; ++i) {
-//      fmt::print("Block {}:, mx = {}, my = {}, mz = {}\n", i, mx_blk[i], my_blk[i], mz_blk[i]);
-//    }
-//  }
+  if (myid == 0) {
+    fmt::print("\t[[{}]] blocks in all, the block number in each process is:\n", n_block_total);
+    for (int i = 0; i < n_proc; ++i) {
+      fmt::print("\t\t{}\n", n_block);
+    }
+    fmt::print("\tThe dimension of the blocks are:\n");
+    for (int i = 0; i < n_block_total; ++i) {
+      fmt::print("\t\tBlock {}:, mx = {}, my = {}, mz = {}\n", i, mx_blk[i], my_blk[i], mz_blk[i]);
+    }
+  }
 }
 
 void cfd::Mesh::read_boundary(int myid/*, const int ngg*/) {
@@ -774,7 +777,7 @@ void cfd::Mesh::read_boundary(int myid/*, const int ngg*/) {
   }
   grd.close();
   if (myid == 0) {
-    fmt::print("Finish reading boundary conditions.\n");
+    fmt::print("\tFinish reading boundary conditions.\n");
   }
 }
 
@@ -806,7 +809,7 @@ void cfd::Mesh::read_inner_interface(const int myid/*, int ngg*/) {
     }
   }
   if (myid == 0) {
-    fmt::print("Finish reading inner communication faces.\n");
+    fmt::print("\tFinish reading inner communication faces.\n");
   }
   grd.close();
   delete[]n_face;
@@ -840,7 +843,7 @@ void cfd::Mesh::read_parallel_interface(const int myid/*, int ngg*/) {
     }
   }
   delete[]n_face;
-  if (myid == 0) fmt::print("Finish reading parallel communication faces.\n");
+  if (myid == 0) fmt::print("\tFinish reading parallel communication faces.\n");
   grd.close();
 }
 
@@ -1010,7 +1013,7 @@ void cfd::Mesh::init_ghost_grid(const int myid, const bool parallel/*, const int
   }
   MPI_Barrier(MPI_COMM_WORLD);
   if (myid == 0) {
-    fmt::print("Finish creating ghost grids.\n");
+    fmt::print("\tFinish creating ghost grids.\n");
   }
 }
 

@@ -26,7 +26,10 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     v_ref{parameter.get_real("v_inf")}, weno_eps_scale{
     parameter.get_real("rho_inf") * parameter.get_real("v_inf") * parameter.get_real("rho_inf") *
     parameter.get_real("v_inf")} {
-  printf("WENO scale factor = %e\n", weno_eps_scale);
+  if (myid == 0) {
+    if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 71 || inviscid_scheme == 72)
+      printf("\t->-> %-20e : WENO scale factor\n", weno_eps_scale);
+  }
 
   if (parameter.get_bool("fixed_time_step")) {
     dt = parameter.get_real("dt");

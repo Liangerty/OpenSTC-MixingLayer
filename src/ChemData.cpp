@@ -86,13 +86,14 @@ cfd::Species::Species(Parameter &parameter) {
     read_tran(file);
 
     if (parameter.get_int("myid") == 0) {
-      fmt::print("Mixture composed of {} species will be simulated.\n", n_spec);
+      fmt::print("\n{:*^80}\n", "Species Information");
+      fmt::print("\t->-> {:<20} : number of species\n\t", n_spec);
       int counter_spec{0};
       for (auto &[name, label]: spec_list) {
         fmt::print("{}\t", name);
         ++counter_spec;
         if (counter_spec % 10 == 0) {
-          fmt::print("\n");
+          fmt::print("\n\t");
         }
       }
       fmt::print("\n");
@@ -685,7 +686,14 @@ cfd::Reaction::Reaction(Parameter &parameter, const Species &species) {
   }
   set_nreac(has_read, ns);
   if (parameter.get_int("myid") == 0) {
-    fmt::print("{} reactions will happen among these species.\n", n_reac);
+    fmt::print("\t->-> {:<20} : number of reactions\n", n_reac);
+    std::string method{"explicit"};
+    if (auto mm = parameter.get_int("chemSrcMethod");mm == 1) {
+      method = "Exact Point Implicit";
+    } else if (mm == 2) {
+      method = "Diagonal Approximation";
+    }
+    fmt::print("\t\t->-> {:<25} : chemical source treatment\n", method);
   }
   parameter.update_parameter("n_reac", n_reac);
 }

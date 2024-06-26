@@ -103,6 +103,8 @@ struct Field {
 
   void copy_data_from_device(const Parameter &parameter);
 
+  void deallocate_memory(const Parameter &parameter);
+
   int n_var = 5;
   const Block &block;
   ggxl::VectorField3DHost<real> bv;  // basic variables, including density, u, v, w, p, temperature

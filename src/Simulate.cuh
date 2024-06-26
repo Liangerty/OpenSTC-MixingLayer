@@ -38,5 +38,6 @@ void simulate(Driver<mix_model, turb> &driver) {
         break;
     }
   }
+  driver.deallocate();
 }
 }

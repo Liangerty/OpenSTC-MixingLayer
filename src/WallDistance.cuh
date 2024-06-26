@@ -57,7 +57,7 @@ void acquire_wall_distance(Driver<mix_model, turb> &driver) {
   cudaMalloc(&wall_corr_gpu, total_wall_number * sizeof(real));
   cudaMemcpy(wall_corr_gpu, wall_points.data(), total_wall_number * sizeof(real), cudaMemcpyHostToDevice);
   if (myid == 0) {
-    printf("Start computing wall distance.\n");
+    printf("\tStart computing wall distance.\n");
   }
   for (int blk = 0; blk < mesh.n_block; ++blk) {
     const int ngg{mesh[0].ngg};
@@ -71,7 +71,7 @@ void acquire_wall_distance(Driver<mix_model, turb> &driver) {
   }
   cudaDeviceSynchronize();
   if (myid == 0) {
-    printf("Finish computing wall distance.\n");
+    printf("\tFinish computing wall distance.\n");
   }
 }
 

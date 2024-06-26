@@ -9,8 +9,6 @@ private:
   int disp1 = 0, disp2 = 0, dispt = 0;
   int sz = 0;
   T *val = nullptr;
-//  int ng = 0;
-//  int n1 = 0, n2 = 0, n3 = 0;
 
 public:
 
@@ -35,6 +33,11 @@ public:
   T *data() { return val; }
 
   auto size() { return sz; }
+
+  cudaError_t deallocate_memory() {
+    cudaError_t err = cudaFree(val);
+    return err;
+  }
 };
 
 template<typename T, Major major>
@@ -119,8 +122,6 @@ private:
   int disp1 = 0, disp2 = 0, n4 = 0, dispt = 0;
   int sz = 0;
   T *val = nullptr;
-//  int ng = 0;
-//  int n1 = 0, n2 = 0, n3 = 0;
 
 public:
 
@@ -157,6 +158,11 @@ public:
   T *data() { return val; }
 
   auto size() { return sz; }
+
+  cudaError_t deallocate_memory() {
+    cudaError_t err = cudaFree(val);
+    return err;
+  }
 };
 
 template<typename T, Major major>
@@ -304,6 +310,7 @@ public:
 //  auto data() const { return data_.data(); }
 
   auto data() { return data_; }
+
 //  auto data() { return data_.data(); }
   auto size() { return sz; }
 

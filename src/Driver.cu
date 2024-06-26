@@ -11,8 +11,12 @@ template<MixtureModel mix_model, class turb>
 Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     myid(parameter.get_int("myid")), time(), mesh(mesh_), parameter(parameter),
     spec(parameter), reac(parameter, spec), stat_collector(parameter, mesh, field) {
-  printf("Initialize driver on process %d\n", myid);
   // Allocate the memory for every block
+  parameter.deduce_sim_info();
+
+  if (myid == 0)
+    printf("\n*****************************Driver initialization******************************\n");
+
   for (int blk = 0; blk < mesh.n_block; ++blk) {
     field.emplace_back(parameter, mesh[blk]);
   }
@@ -28,9 +32,12 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
   for (int blk = 0; blk < mesh.n_block; ++blk) {
     field[blk].setup_device_memory(parameter);
   }
+  printf("\tProcess [[%d]] has finished setting up device memory.\n", myid);
   bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter);
 
   initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec);
+
+  write_reference_state(parameter, spec);
 
   DParameter d_param(parameter, spec, &reac);
   cudaMalloc(&param, sizeof(DParameter));
@@ -39,8 +46,6 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
   if (parameter.get_bool("steady") == 0 && parameter.get_bool("if_collect_statistics")) {
     stat_collector.initialize_statistics_collector<mix_model, turb>(spec);
   }
-
-  write_reference_state(parameter, spec);
 }
 
 template<MixtureModel mix_model, class turb>
@@ -50,6 +55,9 @@ void Driver<mix_model, turb>::initialize_computation() {
     tpb = {16, 16, 1};
   }
   const auto ng_1 = 2 * mesh[0].ngg - 1;
+
+  if (myid == 0)
+    printf("\n******************************Prepare to compute********************************\n");
 
   // If we use k-omega SST model, we need the wall distance, thus we need to compute or read it here.
   if constexpr (TurbMethod<turb>::needWallDistance == true) {
@@ -73,7 +81,7 @@ void Driver<mix_model, turb>::initialize_computation() {
   for (int b = 0; b < mesh.n_block; ++b) {
     bound_cond.apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param);
   }
-  printf("Boundary conditions are applied successfully for initialization on process %d\n", myid);
+  printf("\tProcess [[%d]] has finished applying boundary conditions for initialization\n", myid);
 
 
   // First, compute the conservative variables from basic variables
@@ -86,10 +94,9 @@ void Driver<mix_model, turb>::initialize_computation() {
   }
   cudaDeviceSynchronize();
   // Third, communicate values between processes
-  printf("Before data communication on process %d\n", myid);
+  printf("\tProcess [[%d]] is going to transfer data\n", myid);
   data_communication<mix_model, turb>(mesh, field, parameter, 0, param);
-
-  printf("Finish data transfer on process %d.\n", myid);
+  printf("\tProcess [[%d]] has finished data transfer\n", myid);
   cudaDeviceSynchronize();
 
   for (auto b = 0; b < mesh.n_block; ++b) {
@@ -99,7 +106,7 @@ void Driver<mix_model, turb>::initialize_computation() {
   }
   cudaDeviceSynchronize();
   if (myid == 0) {
-    printf("The flowfield is completely initialized on GPU.\n");
+    printf("\tThe driver is completely initialized on GPU.\n");
   }
 }
 
@@ -126,9 +133,11 @@ __global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, 
   wall_dist = std::sqrt(wall_dist);
 }
 
-void write_reference_state(const Parameter &parameter, const Species &species) {
+void write_reference_state(Parameter &parameter, const Species &species) {
   if (parameter.get_int("myid") == 0) {
-    const std::filesystem::path out_dir("output/message");
+    printf("\n*******************************Flow Information*********************************\n");
+    printf("\tReference state:\n");
+    std::filesystem::path out_dir("output/message");
     if (!exists(out_dir)) {
       create_directories(out_dir);
     }
@@ -137,14 +146,25 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
       // For mixing layers, we need to output info about both streams.
       std::vector<real> var_info;
       cfd::get_mixing_layer_info(parameter, species, var_info);
+
+      printf("\tUpper stream\n");
+      printf("\t\t->-> %-16.10e : density(kg/m3)\n", var_info[0]);
+      printf("\t\t->-> %-16.10e : u(m/s)\n", var_info[1]);
+      printf("\t\t->-> %-16.10e : v(m/s)\n", var_info[2]);
+      printf("\t\t->-> %-16.10e : w(m/s)\n", var_info[3]);
+      real u1{std::sqrt(var_info[1] * var_info[1] + var_info[2] * var_info[2] + var_info[3] * var_info[3])};
+      printf("\t\t->-> %-16.10e : velocity(m/s)\n", u1);
+      printf("\t\t->-> %-16.10e : pressure(Pa)\n", var_info[4]);
+      printf("\t\t->-> %-16.10e : temperature(K)\n", var_info[5]);
+
       fprintf(ref_state, "Upper stream:\ndensity = %16.10e\n", var_info[0]);
       fprintf(ref_state, "u = %16.10e\n", var_info[1]);
       fprintf(ref_state, "v = %16.10e\n", var_info[2]);
       fprintf(ref_state, "w = %16.10e\n", var_info[3]);
-      real velocity{std::sqrt(var_info[1] * var_info[1] + var_info[2] * var_info[2] + var_info[3] * var_info[3])};
-      fprintf(ref_state, "velocity = %16.10e\n", velocity);
+      fprintf(ref_state, "velocity = %16.10e\n", u1);
       fprintf(ref_state, "pressure = %16.10e\n", var_info[4]);
       fprintf(ref_state, "temperature = %16.10e\n", var_info[5]);
+
       int ns{species.n_spec};
       real mu, gamma{gamma_air}, mw{mw_air};
       if (ns > 0) {
@@ -153,8 +173,10 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
         real cp{0};
         mw = 0;
         for (const auto &[name, i]: species.spec_list) {
-          if (var_info[6 + i] > 0)
+          if (var_info[6 + i] > 0) {
+            printf("\t\t->-> %-16.10e : Y_%s\n", var_info[6 + i], name.c_str());
             fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), var_info[6 + i]);
+          }
           mw += var_info[6 + i] / species.mw[i];
           cp += cp_i[i] * var_info[6 + i];
         }
@@ -164,20 +186,37 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
       } else {
         mu = Sutherland(var_info[5]);
       }
-      real c{std::sqrt(gamma * R_u / mw * var_info[5])};
-      fprintf(ref_state, "speed_of_sound = %16.10e\n", c);
+      real c1{std::sqrt(gamma * R_u / mw * var_info[5])};
+
+      printf("\t\t->-> %-16.10e : speed_of_sound(m/s)\n", c1);
+      printf("\t\t->-> %-16.10e : specific_heat_ratio\n", gamma);
+      printf("\t\t->-> %-16.10e : Ma\n", u1 / c1);
+      printf("\t\t->-> %-16.10e : Re_unit(/m)\n", var_info[0] * u1 / mu);
+      printf("\t\t->-> %-16.10e : mu(kg/m/s)\n", mu);
+
+      fprintf(ref_state, "speed_of_sound = %16.10e\n", c1);
       fprintf(ref_state, "specific_heat_ratio = %16.10e\n", gamma);
-      fprintf(ref_state, "Ma = %16.10e\n", velocity / c);
-      fprintf(ref_state, "Re_unit = %16.10e\n", var_info[0] * velocity / mu);
+      fprintf(ref_state, "Ma = %16.10e\n", u1 / c1);
+      fprintf(ref_state, "Re_unit = %16.10e\n", var_info[0] * u1 / mu);
       fprintf(ref_state, "mu = %16.10e\n", mu);
+
       // Next, the lower stream
+      printf("\tLower stream\n");
+      printf("\t\t->-> %-16.10e : density(kg/m3)\n", var_info[7 + ns]);
+      printf("\t\t->-> %-16.10e : u(m/s)\n", var_info[8 + ns]);
+      printf("\t\t->-> %-16.10e : v(m/s)\n", var_info[9 + ns]);
+      printf("\t\t->-> %-16.10e : w(m/s)\n", var_info[10 + ns]);
+      real u2{std::sqrt(var_info[8 + ns] * var_info[8 + ns] + var_info[9 + ns] * var_info[9 + ns] +
+                        var_info[10 + ns] * var_info[10 + ns])};
+      printf("\t\t->-> %-16.10e : velocity(m/s)\n", u2);
+      printf("\t\t->-> %-16.10e : pressure(Pa)\n", var_info[11 + ns]);
+      printf("\t\t->-> %-16.10e : temperature(K)\n", var_info[12 + ns]);
+
       fprintf(ref_state, "\nLower stream:\ndensity = %16.10e\n", var_info[7 + ns]);
       fprintf(ref_state, "u = %16.10e\n", var_info[8 + ns]);
       fprintf(ref_state, "v = %16.10e\n", var_info[9 + ns]);
       fprintf(ref_state, "w = %16.10e\n", var_info[10 + ns]);
-      velocity = std::sqrt(var_info[8 + ns] * var_info[8 + ns] + var_info[9 + ns] * var_info[9 + ns] +
-                           var_info[10 + ns] * var_info[10 + ns]);
-      fprintf(ref_state, "velocity = %16.10e\n", velocity);
+      fprintf(ref_state, "velocity = %16.10e\n", u2);
       fprintf(ref_state, "pressure = %16.10e\n", var_info[11 + ns]);
       fprintf(ref_state, "temperature = %16.10e\n", var_info[12 + ns]);
       if (ns > 0) {
@@ -186,8 +225,10 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
         real cp{0};
         mw = 0;
         for (const auto &[name, i]: species.spec_list) {
-          if (var_info[13 + ns + i] > 0)
+          if (var_info[13 + ns + i] > 0) {
+            printf("\t\t->-> %-16.10e : Y_%s\n", var_info[13 + ns + i], name.c_str());
             fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), var_info[13 + ns + i]);
+          }
           mw += var_info[13 + ns + i] / species.mw[i];
           cp += cp_i[i] * var_info[13 + ns + i];
         }
@@ -197,18 +238,54 @@ void write_reference_state(const Parameter &parameter, const Species &species) {
       } else {
         mu = Sutherland(var_info[12 + ns]);
       }
-      c = std::sqrt(gamma * R_u / mw * var_info[12 + ns]);
-      fprintf(ref_state, "speed_of_sound = %16.10e\n", c);
+
+      real c2 = std::sqrt(gamma * R_u / mw * var_info[12 + ns]);
+      printf("\t\t->-> %-16.10e : speed_of_sound(m/s)\n", c2);
+      printf("\t\t->-> %-16.10e : specific_heat_ratio\n", gamma);
+      printf("\t\t->-> %-16.10e : Ma\n", u2 / c2);
+      printf("\t\t->-> %-16.10e : Re_unit(/m)\n", var_info[7 + ns] * u2 / mu);
+      printf("\t\t->-> %-16.10e : mu(kg/m/s)\n", mu);
+
+      fprintf(ref_state, "speed_of_sound = %16.10e\n", c2);
       fprintf(ref_state, "specific_heat_ratio = %16.10e\n", gamma);
-      fprintf(ref_state, "Ma = %16.10e\n", velocity / c);
-      fprintf(ref_state, "Re_unit = %16.10e\n", var_info[7 + ns] * velocity / mu);
+      fprintf(ref_state, "Ma = %16.10e\n", u2 / c2);
+      fprintf(ref_state, "Re_unit = %16.10e\n", var_info[7 + ns] * u2 / mu);
       fprintf(ref_state, "mu = %16.10e\n", mu);
+
+      // Compute the convective velocity
+      real uc = (u1 * c2 + u2 * c1) / (c1 + c2);
+      parameter.update_parameter("convective velocity", uc);
+      printf("\n\t\t->-> %-16.10e : convective_velocity(m/s)\n", uc);
+      fprintf(ref_state, "convective_velocity = %16.10e\n", uc);
+      // Velocity ratio and density ratio
+      real density_ratio = var_info[0] / var_info[7 + ns];
+      real velocity_ratio = u1 / u2;
+      printf("\t\t->-> %-16.10e : density_ratio\n", density_ratio);
+      printf("\t\t->-> %-16.10e : velocity_ratio\n", velocity_ratio);
+      fprintf(ref_state, "density_ratio = %16.10e\n", density_ratio);
+      fprintf(ref_state, "velocity_ratio = %16.10e\n", velocity_ratio);
+      parameter.update_parameter("density_ratio", density_ratio);
+      parameter.update_parameter("velocity_ratio", velocity_ratio);
     } else {
+      printf("\t\t->-> %-16.10e : density(kg/m3)\n", parameter.get_real("rho_inf"));
+      printf("\t\t->-> %-16.10e : velocity(m/s)\n", parameter.get_real("v_inf"));
+      printf("\t\t->-> %-16.10e : pressure(Pa)\n", parameter.get_real("p_inf"));
+      printf("\t\t->-> %-16.10e : temperature(K)\n", parameter.get_real("T_inf"));
+      auto &sv_ref = parameter.get_real_array("sv_inf");
+      for (const auto &[name, i]: species.spec_list) {
+        if (sv_ref[i] > 0)
+          printf("\t\t->-> %-16.10e : Y_%s\n", sv_ref[i], name.c_str());
+      }
+      printf("\t\t->-> %-16.10e : Ma\n", parameter.get_real("M_inf"));
+      printf("\t\t->-> %-16.10e : Re_unit(/m)\n", parameter.get_real("Re_unit"));
+      printf("\t\t->-> %-16.10e : mu(kg/m/s)\n", parameter.get_real("mu_inf"));
+      printf("\t\t->-> %-16.10e : acoustic_speed(m/s)\n", parameter.get_real("speed_of_sound"));
+      printf("\t\t->-> %-16.10e : specific_heat_ratio\n", parameter.get_real("specific_heat_ratio_inf"));
+
       fprintf(ref_state, "Reference state\nrho_ref = %16.10e\n", parameter.get_real("rho_inf"));
       fprintf(ref_state, "v_ref = %16.10e\n", parameter.get_real("v_inf"));
       fprintf(ref_state, "p_ref = %16.10e\n", parameter.get_real("p_inf"));
       fprintf(ref_state, "T_ref = %16.10e\n", parameter.get_real("T_inf"));
-      auto &sv_ref = parameter.get_real_array("sv_inf");
       for (const auto &[name, i]: species.spec_list) {
         if (sv_ref[i] > 0)
           fprintf(ref_state, "Y_%s = %16.10e\n", name.c_str(), sv_ref[i]);
