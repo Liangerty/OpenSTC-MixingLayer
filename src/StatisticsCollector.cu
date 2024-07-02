@@ -246,17 +246,17 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
   cudaMemcpy(counter_ud_device, counter_ud.data(), sizeof(int) * UserDefineStat::n_collect, cudaMemcpyHostToDevice);
   const int n_scalar{parameter.get_int("n_scalar")};
   for (int b = 0; b < mesh.n_block; ++b) {
-    const auto mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
-    dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
+    const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    const auto nx{mx + 2}, ny{my + 2}, nz{mz + 2};
+    dim3 bpg = {(nx - 1) / tpb.x + 1, (ny - 1) / tpb.y + 1, (nz - 1) / tpb.z + 1};
     compute_statistical_data<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
-    bpg = {(mx - 2 - 1) / tpb.x + 1, (my - 2 - 1) / tpb.y + 1, (mz - 2 - 1) / tpb.z + 1};
+    bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
     compute_user_defined_statistical_data<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter,
                                                                                 counter_ud_device);
     compute_UD_stat_data_2<USER_DEFINE_STATISTICS><<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
     if (perform_spanwise_average) {
       compute_statistical_data_spanwise_average<<<bpg, tpb>>>(field[b].d_ptr, param, counter, counter_ud_device);
       auto sz = mx * my * sizeof(real);
-      auto sz_without_ghost = (mx - 2) * (my - 2) * sizeof(real);
       cudaDeviceSynchronize();
       cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value_span_ave.data(), sz * (6 + n_scalar),
                  cudaMemcpyDeviceToHost);
@@ -264,10 +264,10 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
                  sz * 6, cudaMemcpyDeviceToHost);
       cudaMemcpy(field[b].user_defined_statistical_data.data(),
                  field[b].h_ptr->user_defined_statistical_data_span_ave.data(),
-                 sz_without_ghost * UserDefineStat::n_stat, cudaMemcpyDeviceToHost);
+                 sz * UserDefineStat::n_stat, cudaMemcpyDeviceToHost);
     } else {
-      auto sz = mx * my * mz * sizeof(real);
-      auto sz_without_ghost = (mx - 2) * (my - 2) * (mz - 2) * sizeof(real);
+      auto sz = nx * ny * nz * sizeof(real);
+      auto sz_without_ghost = mx * my * mz * sizeof(real);
       cudaDeviceSynchronize();
       cudaMemcpy(field[b].mean_value.data(), field[b].h_ptr->mean_value.data(), sz * (6 + n_scalar),
                  cudaMemcpyDeviceToHost);
@@ -352,15 +352,23 @@ void StatisticsCollector::plot_statistical_data(DParameter *param, bool perform_
 
     // 7. Zone Data.
     MPI_Datatype ty, ty_ud;
-    int lSize[3]{mx + 2, my + 2, mz + 2};
     int sSize[3]{mx, my, mz};
     const int64_t memSz = sSize[0] * sSize[1] * sSize[2] * 8;
-    int start_idx[3]{1, 1, 1};
-    MPI_Type_create_subarray(3, lSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
-    MPI_Type_commit(&ty);
-    memset(start_idx, 0, 3 * sizeof(int));
-    MPI_Type_create_subarray(3, sSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty_ud);
-    MPI_Type_commit(&ty_ud);
+    if (perform_spanwise_average){
+      int start_idx[3]{0, 0, 0};
+      MPI_Type_create_subarray(3, sSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+      MPI_Type_commit(&ty);
+      MPI_Type_create_subarray(3, sSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty_ud);
+      MPI_Type_commit(&ty_ud);
+    }else{
+      int lSize[3]{mx + 2, my + 2, mz + 2};
+      int start_idx[3]{1, 1, 1};
+      MPI_Type_create_subarray(3, lSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+      MPI_Type_commit(&ty);
+      memset(start_idx, 0, 3 * sizeof(int));
+      MPI_Type_create_subarray(3, sSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty_ud);
+      MPI_Type_commit(&ty_ud);
+    }
 
     offset = offset_var[blk];
     for (int l = 0; l < 6; ++l) {

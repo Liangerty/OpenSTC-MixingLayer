@@ -598,10 +598,6 @@ void cfd::Block::compute_des_scale(const Parameter &parameter) {
       }
     }
   }
-
-  if (parameter.get_int("myid")==0){
-    fmt::print("\tFinish getting DES scales.\n");
-  }
 }
 
 cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg")},
@@ -648,6 +644,9 @@ cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg
   if (parameter.get_bool("turbulence") && parameter.get_int("turbulence_method") == 2) {
     // When we use DES simulation, we need to compute the grid scale \Delta.
     for (auto &b: block) b.compute_des_scale(parameter);
+    if (parameter.get_int("myid")==0){
+      fmt::print("\tFinish getting DES scales.\n");
+    }
   }
   for (auto &b: block) b.trim_abundant_ghost_mesh();
 }

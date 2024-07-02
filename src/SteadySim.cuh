@@ -14,6 +14,10 @@
 namespace cfd {
 template<MixtureModel mix_model, class turb>
 void steady_simulation(Driver<mix_model, turb> &driver) {
+  if (driver.myid == 0) {
+    printf("\n****************************Time advancement starts*****************************\n");
+  }
+
   auto &parameter{driver.parameter};
   auto &mesh{driver.mesh};
   std::vector<cfd::Field> &field{driver.field};
@@ -93,7 +97,7 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
 
       // limit unphysical values computed by the program
       //limit_unphysical_variables<mix_model, turb>(field[b].d_ptr, param, b, step, bpg[b], tpb);
-      limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+//      limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
       // Apply boundary conditions
       // Attention: "driver" is a template class, when a template class calls a member function of another template,
@@ -116,8 +120,8 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
     // update physical properties such as Mach number, transport coefficients et, al.
     for (auto b = 0; b < n_block; ++b) {
       int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
-      dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
-      update_physical_properties<mix_model><<<bpg, tpb>>>(field[b].d_ptr, param);
+      dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
+      update_physical_properties<mix_model><<<BPG, tpb>>>(field[b].d_ptr, param);
     }
 
     // Finally, test if the simulation reaches convergence state
