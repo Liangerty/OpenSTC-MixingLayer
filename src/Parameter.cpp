@@ -306,6 +306,7 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["problem_type"] = 0;
 
   int_parameters["mesh_file_type"] = 0;
+  int_parameters["gridIsBinary"] = 0;
   real_parameters["gridScale"] = 1.0;
   int_parameters["if_compute_wall_distance"] = 0;
   int_parameters["wall_distance"] = 0;

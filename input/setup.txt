@@ -3,6 +3,7 @@ bool parallel = 0      // specify the mode of computation. 0 - serial, 1 - paral
 int  problem_type = 0  // the type of problem. 0 - general problem, 1 - mixing layer.
 
 // Grid info
+int gridIsBinary = 0    // 0 - ASCII, 1 - binary
 real gridScale = 1    // grid scale(m)
 
 // controls
