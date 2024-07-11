@@ -16,12 +16,6 @@ __device__ constexpr real c[3]{1.0, 0.25, 2.0 / 3.0};
 template<MixtureModel mix_model, class turb_method>
 __global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt, int rk);
 
-__global__ void update_physical_time(DParameter *param, real t);
-
-__global__ void update_physical_time(DParameter *param, real t) {
-  param->physical_time = t;
-}
-
 template<MixtureModel mix_model, class turb>
 void RK3(Driver<mix_model, turb> &driver) {
   if (driver.myid == 0) {
@@ -144,7 +138,7 @@ void RK3(Driver<mix_model, turb> &driver) {
         update_cv_and_bv_rk<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param, dt, rk);
 
         // limit unphysical values computed by the program
-        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+//        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
         // Apply boundary conditions
         // Attention: "driver" is a template class, when a template class calls a member function of another template,

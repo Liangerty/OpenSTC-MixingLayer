@@ -6,6 +6,7 @@
 #include <fstream>
 #include "Parameter.h"
 #include <sstream>
+#include "fmt/os.h"
 
 cfd::Boundary::Boundary(int x1, int x2, int y1, int y2, int z1, int z2, int type) : range_start{x1, y1, z1},
                                                                                     range_end{x2, y2, z2},
@@ -516,8 +517,8 @@ void cfd::Block::log_negative_jacobian(const int myid, const int i, const int j,
   if (!exists(out_dir)) create_directories(out_dir);
   const auto path1 = out_dir.string();
   const auto name = fmt::format("{}/Process_{}-Block_{}.log", path1, myid, block_id);
-  std::ofstream err_log(name);
-  err_log << fmt::format("Block {}, I = {}\tJ = {}\tK = {}\n", block_id, i, j, k);
+  auto err_log = fmt::output_file(name, fmt::file::WRONLY | fmt::file::CREATE | fmt::file::APPEND);
+  err_log.print("Block {}, I = {}\tJ = {}\tK = {}\n", block_id, i, j, k);
   err_log.close();
 }
 
@@ -706,6 +707,7 @@ void cfd::Mesh::read_grid(const int myid, const Parameter &parameter) {
         MPI_File_read(grd, block[blk].z.data(), 1, ty, MPI_STATUS_IGNORE);
         MPI_Type_free(&ty);
       }
+      MPI_File_close(&grd);
     } else {
       // ASCII grid file
       std::ifstream grd(fmt::format("./input/grid/grid{:>4}.grd", myid), std::ios::in);

@@ -8,7 +8,6 @@ enum class Major {
   RowMajor
 };
 
-
 namespace gxl {
 /**
  * \brief a 3D array containing ghost elements in all directions.

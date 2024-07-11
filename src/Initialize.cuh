@@ -235,7 +235,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
     }
   }
   if constexpr ((mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) &&
-                (TurbMethod<turb>::type == TurbSimLevel::RANS ||
+                (TurbMethod<turb>::type == TurbSimLevel::RANS || TurbMethod<turb>::type == TurbSimLevel::DES ||
                  TurbMethod<turb>::type == TurbSimLevel::LES)) {
     if (old_data_info[0] == 1) {
       // From species field to mixture fraction field
@@ -287,7 +287,7 @@ identify_variable_labels(cfd::Parameter &parameter, std::vector<std::string> &va
       if constexpr (mix_model != MixtureModel::Air) {
         // We expect to find some species info. If not found, old_data_info[0] will remain 0.
         const auto &spec_name = species.spec_list;
-        for (const auto& [spec, sp_label]: spec_name) {
+        for (const auto &[spec, sp_label]: spec_name) {
           if (n == gxl::to_upper(spec)) {
             l = 6 + sp_label;
             old_data_info[0] = 1;

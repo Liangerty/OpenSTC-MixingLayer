@@ -104,6 +104,8 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
   while (!finished) {
     ++step;
 
+    update_physical_time<<<1, 1>>>(param, physical_time);
+
     // Start a single iteration
     // First, store the value of last step if we need to compute residual
     if (step % output_screen == 0) {
@@ -152,7 +154,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
         // update basic and conservative variables
         update_cv_and_bv<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
-        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+//        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
         // Apply boundary conditions
         // Attention: "driver" is a template class, when a template class calls a member function of another template,
@@ -194,10 +196,18 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
     }
     cudaDeviceSynchronize();
     if (physical_time > total_simulation_time || step == total_step) {
+      if (physical_time > total_simulation_time)
+        printf("The simulated physical time is %e, which is larger than required physical time %e.\n", physical_time,
+               total_simulation_time);
+      else if (step == total_step)
+        printf("The step %d reaches specified total step.\n", step);
       finished = true;
     }
     if (if_monitor) {
       monitor.monitor_point(step, physical_time, field);
+      if (step % parameter.get_int("slice_frequency") == 0) {
+        monitor.output_slices(parameter, field, step, physical_time);
+      }
     }
     if (if_collect_statistics && step > collect_statistics_iter_start) {
       stat_collector.template collect_data<mix_model, turb>(param);

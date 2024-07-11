@@ -20,6 +20,8 @@ real global_time_step(const Mesh &mesh, const Parameter &parameter, std::vector<
 
 __global__ void min_of_arr(real *arr, int size);
 
+__global__ void update_physical_time(DParameter *param, real t);
+
 template<MixtureModel mixture, class turb_method>
 __global__ void limit_flow(cfd::DZone *zone, cfd::DParameter *param);
 }

@@ -62,6 +62,10 @@ real cfd::global_time_step(const Mesh &mesh, const Parameter &parameter, std::ve
   return dt;
 }
 
+__global__ void cfd::update_physical_time(DParameter *param, real t) {
+  param->physical_time = t;
+}
+
 __global__ void cfd::min_of_arr(real *arr, int size) {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   const int t = threadIdx.x;
