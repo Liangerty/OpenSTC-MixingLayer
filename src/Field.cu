@@ -524,7 +524,7 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3 &&
         parameter.get_bool("fixed_time_step"))) {
     h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 0);
-//    h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 0);
+    h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 0);
     h_ptr->dt_local.allocate_memory(mx, my, mz, 0);
   }
   if (parameter.get_int("implicit_method") == 1) { // DPLUR
@@ -535,7 +535,7 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
       h_ptr->dq0.allocate_memory(mx, my, mz, n_var, 1);
       h_ptr->dqk.allocate_memory(mx, my, mz, n_var, 1);
       h_ptr->inv_spectr_rad.allocate_memory(mx, my, mz, 1);
-//      h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 1);
+      h_ptr->visc_spectr_rad.allocate_memory(mx, my, mz, 1);
     }
   }
   if (parameter.get_int("inviscid_scheme") == 2) {
@@ -656,7 +656,7 @@ void cfd::Field::deallocate_memory(const Parameter &parameter) {
   if (!(!parameter.get_bool("steady") && parameter.get_int("temporal_scheme") == 3 &&
         parameter.get_bool("fixed_time_step"))) {
     h_ptr->inv_spectr_rad.deallocate_memory();
-//    h_ptr->visc_spectr_rad.deallocate_memory();
+    h_ptr->visc_spectr_rad.deallocate_memory();
     h_ptr->dt_local.deallocate_memory();
   }
   if (parameter.get_int("implicit_method") == 1) { // DPLUR
@@ -665,7 +665,7 @@ void cfd::Field::deallocate_memory(const Parameter &parameter) {
       h_ptr->dq0.deallocate_memory();
       h_ptr->dqk.deallocate_memory();
       h_ptr->inv_spectr_rad.deallocate_memory();
-//      h_ptr->visc_spectr_rad.deallocate_memory();
+      h_ptr->visc_spectr_rad.deallocate_memory();
     }
   }
   if (parameter.get_int("inviscid_scheme") == 2) {
