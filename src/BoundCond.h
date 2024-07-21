@@ -57,6 +57,9 @@ struct Inflow {
   real density_lower = -1;
   real u_lower = 1, v_lower = 0, w_lower = 0;
   real *sv_lower = nullptr;
+  real mw_lower = mw_air;
+  real mu_lower = 0;
+  real mut_lower = 0;
   real mixture_fraction_lower = -1;
   // When inflow_type = 2, we need the initial vorticity thickness
   real delta_omega = -1;

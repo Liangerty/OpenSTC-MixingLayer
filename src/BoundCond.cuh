@@ -412,6 +412,9 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
         sv_b[l] = inflow->sv[l];
       }
       vel = sqrt(u * u + v * v + w * w);
+      if constexpr (TurbMethod<turb>::hasMut) {
+        mut = inflow->mut;
+      }
     } else {
       // The lower stream
       density = inflow->density_lower;
@@ -423,6 +426,9 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
         sv_b[l] = inflow->sv_lower[l];
       }
       vel = sqrt(u * u + v * v + w * w);
+      if constexpr (TurbMethod<turb>::hasMut) {
+        mut = inflow->mut_lower;
+      }
     }
 
     if (inflow->fluctuation_type == 1) {

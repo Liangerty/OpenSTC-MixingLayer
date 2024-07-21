@@ -33,11 +33,6 @@ struct Species {
   gxl::MatrixDyn<real> WjDivWi_to_One4th, sqrt_WiDivWjPl1Mul8; // Some constant value to compute partition functions
   gxl::MatrixDyn<real> binary_diffusivity_coeff;
   gxl::MatrixDyn<real> kb_over_eps_jk; // Used to compute reduced temperature for diffusion coefficients
-// Temporary variables to compute transport properties, should not be accessed from other functions
-//  std::vector<real> x;
-//  std::vector<real> vis_spec;
-//  std::vector<real> lambda;
-//  gxl::MatrixDyn<real> partition_fun;
 
 
 private:

@@ -89,7 +89,6 @@ int main(int argc, char *argv[]) {
       driver.initialize_computation();
       simulate(driver);
     }
-
   } else {
     // Air simulation
     if (turbulent_method == 1) {
