@@ -62,12 +62,14 @@ struct DParameter {
 #endif
 
   // Transport properties
+  real *geometry = nullptr;
   real *LJ_potent_inv = nullptr;
   real *vis_coeff = nullptr;
   ggxl::MatrixDyn<real> WjDivWi_to_One4th;
   ggxl::MatrixDyn<real> sqrt_WiDivWjPl1Mul8;
   ggxl::MatrixDyn<real> binary_diffusivity_coeff;
   ggxl::MatrixDyn<real> kb_over_eps_jk; // Used to compute reduced temperature for diffusion coefficients
+  real *ZRotF298 = nullptr;
   bool gradPInDiffusionFlux = false;
 
   real Sc = 0.9;
@@ -96,11 +98,13 @@ struct DParameter {
   real rho_ref = 1.0;
   real a_ref2 = 1.0;
   real v_ref = 1.0;
+  real T_ref = 1.0;
+  real p_ref = 1.0;
   real weno_eps_scale = 1.0;
 
   // For mixing layer computation, we need to collect statistical data of the mixture fraction.
-  real beta_diff_inv=0, beta_o=0;
-  real nuc_mwc_inv=0, nuh_mwh_inv=0, half_nuo_mwo_inv=0;
+  real beta_diff_inv = 0, beta_o = 0;
+  real nuc_mwc_inv = 0, nuh_mwh_inv = 0, half_nuo_mwo_inv = 0;
 
 private:
   struct LimitFlow {
@@ -117,5 +121,5 @@ public:
 //  ~DParameter();
 };
 
-__global__ void update_dt_global(DParameter* param, real dt);
+__global__ void update_dt_global(DParameter *param, real dt);
 }

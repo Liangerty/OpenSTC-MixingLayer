@@ -46,17 +46,51 @@ cfd::compute_transport_property(int i, int j, int k, real temperature, real mw_t
   const auto n_spec{param->n_spec};
   const real *mw = param->mw;
 
-  real X[MAX_SPEC_NUMBER], vis[MAX_SPEC_NUMBER], d_ij[MAX_SPEC_NUMBER * MAX_SPEC_NUMBER];
+  real X[MAX_SPEC_NUMBER], vis[MAX_SPEC_NUMBER], d_ij[MAX_SPEC_NUMBER * MAX_SPEC_NUMBER], ZRot[MAX_SPEC_NUMBER];
   for (int l = 0; l < n_spec; ++l) {
     X[l] = zone->sv(i, j, k, l) * mw_total / mw[l];
     const real t_dl{temperature * param->LJ_potent_inv[l]}; //dimensionless temperature
     const real collision_integral{1.147 * std::pow(t_dl, -0.145) + std::pow(t_dl + 0.5, -2)};
     vis[l] = param->vis_coeff[l] * std::sqrt(temperature) / collision_integral;
   }
+  // The binary-diffusion coefficients including self-diffusion coefficients are computed.
+  const real t_3over2_over_p{temperature * std::sqrt(temperature) / zone->bv(i, j, k, 4)};
+  for (int m = 0; m < n_spec; ++m) {
+    for (int n = m; n < n_spec; ++n) {
+      const real t_red{temperature * param->kb_over_eps_jk(m, n)};
+      const real omega_d{compute_Omega_D(t_red)};
+      d_ij[m * n_spec + n] = param->binary_diffusivity_coeff(m, n) * t_3over2_over_p / omega_d;
+      if (m != n) {
+        d_ij[n * n_spec + m] = d_ij[m * n_spec + n];
+      } else {
+        // compute ZRot
+        real tRedInv = 1 / t_red;
+        real FT = 1 + 0.5 * pi * pi * pi * sqrt(tRedInv) + (2 + 0.25 * pi * pi) * tRedInv +
+                  sqrt(pi * pi * pi * tRedInv * tRedInv * tRedInv);
+        ZRot[m] = param->ZRotF298[m] / FT;
+      }
+    }
+  }
 
   real viscosity = 0;
   real conductivity = 0;
+  const real density = zone->bv(i, j, k, 0);
   for (int m = 0; m < n_spec; ++m) {
+    // compute the thermal conductivity
+    real R = R_u / mw[m];
+    real lambda = 15 / 4.0 * vis[m] * R;
+    if (param->geometry[m] == 1) {
+      // Linear geometry
+      const real rhoD = density * d_ij[m * n_spec + m];
+      const real ADivPiB = (2.5 * vis[m] - rhoD) / ((pi * ZRot[m] * vis[m] + 10.0 / 3 * vis[m] + 2.0 * rhoD));
+      lambda += -5 * ADivPiB * vis[m] * R + rhoD * cp[m] + rhoD * (2 * ADivPiB - 2.5) * R;
+    } else if (param->geometry[m] == 2) {
+      // Non-linear geometry
+      const real rhoD = density * d_ij[m * n_spec + m];
+      const real ADivPiB = (2.5 * vis[m] - rhoD) / ((pi * ZRot[m] * vis[m] + 5 * vis[m] + 2.0 * rhoD));
+      lambda += -7.5 * ADivPiB * vis[m] * R + rhoD * cp[m] + rhoD * (3 * ADivPiB - 2.5) * R;
+    }
+
     real vis_temp{0};
     for (int n = 0; n < n_spec; ++n) {
       real partition_func{1.0};
@@ -68,7 +102,7 @@ cfd::compute_transport_property(int i, int j, int k, real temperature, real mw_t
     }
     const real cond_temp = 1.065 * vis_temp - 0.065 * X[m];
     viscosity += vis[m] * X[m] / vis_temp;
-    const real lambda = vis[m] * (cp[m] + 1.25 * R_u / mw[m]);
+//    const real lambda = vis[m] * (cp[m] + 1.25 * R_u / mw[m]);
     conductivity += lambda * X[m] / cond_temp;
   }
   zone->mul(i, j, k) = viscosity;
@@ -86,17 +120,6 @@ cfd::compute_transport_property(int i, int j, int k, real temperature, real mw_t
   }
   */
   // The diffusivity is computed by mixture-averaged method.
-  const real t_3over2_over_p{temperature * std::sqrt(temperature) / zone->bv(i, j, k, 4)};
-  for (int m = 0; m < n_spec; ++m) {
-    for (int n = m + 1; n < n_spec; ++n) {
-      if (m != n) {
-        const real t_red{temperature * param->kb_over_eps_jk(m, n)};
-        const real omega_d{compute_Omega_D(t_red)};
-        d_ij[m * n_spec + n] = param->binary_diffusivity_coeff(m, n) * t_3over2_over_p / omega_d;
-        d_ij[n * n_spec + m] = d_ij[m * n_spec + n];
-      }
-    }
-  }
   constexpr real eps{1e-12};
   for (int l = 0; l < n_spec; ++l) {
     real num{0};

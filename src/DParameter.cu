@@ -23,7 +23,8 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     Prt(parameter.get_real("turbulent_prandtl_number")), Sct(parameter.get_real("turbulent_schmidt_number")),
     c_chi{parameter.get_real("c_chi")}, rho_ref{parameter.get_real("rho_inf")},
     a_ref2{parameter.get_real("speed_of_sound") * parameter.get_real("speed_of_sound")},
-    v_ref{parameter.get_real("v_inf")}, weno_eps_scale{
+    v_ref{parameter.get_real("v_inf")}, T_ref{parameter.get_real("T_inf")},
+    p_ref{parameter.get_real("p_inf")}, weno_eps_scale{
     parameter.get_real("rho_inf") * parameter.get_real("v_inf") * parameter.get_real("rho_inf") *
     parameter.get_real("v_inf")} {
   if (myid == 0) {
@@ -73,6 +74,8 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   cudaMemcpy(t_mid, spec.t_mid.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMemcpy(t_high, spec.t_high.data(), mem_sz, cudaMemcpyHostToDevice);
 #endif
+  cudaMalloc(&geometry, mem_sz);
+  cudaMemcpy(geometry, spec.geometry.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMalloc(&LJ_potent_inv, mem_sz);
   cudaMemcpy(LJ_potent_inv, spec.LJ_potent_inv.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMalloc(&vis_coeff, mem_sz);
@@ -89,6 +92,8 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   kb_over_eps_jk.init_with_size(n_spec, n_spec);
   cudaMemcpy(kb_over_eps_jk.data(), spec.kb_over_eps_jk.data(),
              kb_over_eps_jk.size() * sizeof(real), cudaMemcpyHostToDevice);
+  cudaMalloc(&ZRotF298, mem_sz);
+  cudaMemcpy(ZRotF298, spec.ZRotF298.data(), mem_sz, cudaMemcpyHostToDevice);
   Sc = parameter.get_real("schmidt_number");
 
   // reactions info

@@ -158,12 +158,14 @@ void cfd::Species::set_nspec(int n_sp, int n_elem) {
   high_temp_coeff.resize(n_sp, 7);
   low_temp_coeff.resize(n_sp, 7);
 #endif
+  geometry.resize(n_sp, 0);
   LJ_potent_inv.resize(n_sp, 0);
   vis_coeff.resize(n_sp, 0);
   WjDivWi_to_One4th.resize(n_sp, n_sp);
   sqrt_WiDivWjPl1Mul8.resize(n_sp, n_sp);
   binary_diffusivity_coeff.resize(n_sp, n_sp);
   kb_over_eps_jk.resize(n_sp, n_sp);
+  ZRotF298.resize(n_sp, 0);
 }
 
 bool cfd::Species::read_therm(std::ifstream &therm_dat, bool read_from_comb_mech) {
@@ -523,11 +525,16 @@ void cfd::Species::read_tran(std::ifstream &tran_dat) {
     }
 
     gxl::to_stringstream(input, line);
-    real lj_potential{0}, collision_diameter{0}, pass{0};
-    line >> key >> pass >> eps_kb[curr_sp] >> sigma[curr_sp] >> mu[curr_sp] >> alpha[curr_sp];
+    line >> key >> geometry[curr_sp] >> eps_kb[curr_sp] >> sigma[curr_sp] >> mu[curr_sp] >> alpha[curr_sp]
+         >> ZRotF298[curr_sp];
     LJ_potent_inv[curr_sp] = 1.0 / eps_kb[curr_sp];
     vis_coeff[curr_sp] =
         2.6693e-6 * sqrt(mw[curr_sp]) / (sigma[curr_sp] * sigma[curr_sp]);
+    // compute ZRotF298*F(298)
+    real TRedInv = eps_kb[curr_sp] / 298;
+    real F298 = 1 + 0.5 * pi * pi * pi * sqrt(TRedInv) + (2 + 0.25 * pi * pi) * TRedInv +
+                sqrt(pi * pi * pi) * sqrt(TRedInv * TRedInv * TRedInv);
+    ZRotF298[curr_sp] *= F298;
 
     have_read.push_back(curr_sp);
     ++n_read;
@@ -543,6 +550,10 @@ void cfd::Species::read_tran(std::ifstream &tran_dat) {
   gxl::MatrixDyn<real> W_jk(n_spec, n_spec, 0), sigma_jk(n_spec, n_spec, 0), xi_jk(n_spec, n_spec, 1);
   gxl::MatrixDyn<real> eps_jk_kb(n_spec, n_spec, 0), mu_jk2(n_spec, n_spec, 0), delta_ij_star(n_spec, n_spec, 0);
   for (int j = 0; j < n_spec; ++j) {
+    W_jk(j, j) = mw[j] * 0.5;
+    mu_jk2(j, j) = mu[j] * mu[j];
+    sigma_jk(j, j) = sigma[j];
+    binary_diffusivity_coeff(j, j) = 0.0188324 / (std::sqrt(W_jk(j, j)) * sigma_jk(j, j) * sigma_jk(j, j));
     for (int k = j + 1; k < n_spec; ++k) {
       W_jk(j, k) = mw[j] * mw[k] / (mw[j] + mw[k]);
       W_jk(k, j) = W_jk(j, k);
