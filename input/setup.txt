@@ -6,7 +6,7 @@ int  problem_type = 1  // the type of problem. 0 - general problem, 1 - mixing l
 int mesh_file_type = 0  // Read the Plot3D file exported from Pointwise. 0 - Preprocessed by readGrid, 1 - directly read the Plot3D file.
 string mesh_prefix = mixingLayer // The name related to CAE files, where the grid is mesh_prefix.dat, and the boundary conditions are mesh_prefix.inp.
 int gridIsBinary = 1    // 0 - ASCII, 1 - binary
-real gridScale = 0.001    // grid scale(m)
+real gridScale = 1e-4    // grid scale(m)
 range real coreRegion = {  // The core region of computation. Only grids in core regions are monitored or probed.
   0  650   // x1,x2
   -60 60   // y1,y2
@@ -14,10 +14,10 @@ range real coreRegion = {  // The core region of computation. Only grids in core
 }
 
 // controls
-int initial = 1     // 0 - new case, 1 - continue from a previous case.
+int initial = 0     // 0 - new case, 1 - continue from a previous case.
 int total_step = 10000  // total number of steps
 int output_file = 2000  // frequency of output files
-int output_screen = 500 // frequency of screen output
+int output_screen = 100 // frequency of screen output
 
 // flow info.
 // for mixing layer computations(problem type=1), specify the following info.
@@ -45,8 +45,8 @@ bool upper_faster = 0   // 1 - upper stream has larger mach number, 0 - lower st
 
 // numerics
 // temporal scheme
-bool    steady = 1                         // 0 - unsteady, 1 - steady
-real    cfl = 0.2                         // CFL number
+bool    steady = 0                         // 0 - unsteady, 1 - steady
+real    cfl = 1.0                         // CFL number
 int     implicit_method = 0             	// How to implicitly treat the ODE. 0 - Explicit integration; 1 - DPLUR
 int     DPLUR_inner_step = 3 		// If we use DPLUR, then we need a specified number of inner iterations.
 real    convergence_criteria = 1e-6 	// The criteria of convergence
@@ -57,17 +57,17 @@ real    dt = 5e-9                          // In unsteady simulation, the time s
 real    total_simulation_time = 1.481144e-3   // In unsteady simulation, how long physical time to be simulated 2.2154e-3
 
 // spatial discretization
-int inviscid_scheme = 3                // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
+int inviscid_scheme = 72               // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
 bool positive_preserving = 1            // If the Positive-preserving limiter is activated, only implemented for 51/52
 int viscous_order = 2                   // Default: 2nd order central discretization. Other choices: 0(inviscid)
 
 // chemical info
-int species = 2  // If there is species involved. 0 - Air as perfect gas; 1 - Species involved; 2 - Species + mixture fraction + mixture fraction variance are solved
+int species = 1  // If there is species involved. 0 - Air as perfect gas; 1 - Species involved; 2 - Species + mixture fraction + mixture fraction variance are solved
 int reaction = 0 //0-No reaction; 1-Finite rate chemistry; 2-Flamelet model. Even no reactions are involved, the mechanism file should exit to clarify the species
 string mechanism_file = chemistry/H2_mech_mixing.inp  // H2_mech_mixing.inp
 
 // turbulent sim info
-bool    turbulence = 1                  // 0 - laminar/DNS, 1 - turbulent
+bool    turbulence = 0                  // 0 - laminar/DNS, 1 - turbulent
 int     turbulence_method = 1           // Turbulence model used. Options: 0 - DNS, 1 - RANS, 2 - DES, LES
 int     RANS_model = 2                  // RANS model used. Options: 2 - k-omega_SST, 1 - S-A
 int     turb_implicit   =   1           // If we use RANS, choose whether the source terms are implicitly treated. 1 - Yes(Default), 0 - No
