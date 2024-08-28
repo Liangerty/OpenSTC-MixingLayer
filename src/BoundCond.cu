@@ -818,7 +818,6 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
           for (int l = 3; l < nv_read; ++l) {
             if (label_order[l] < n_var + 1 + 3) {
               profile_to_match(ic, j, k, label_order[l]) = profile_read(i0, j0, k0, l);
-//              profile_to_match(j, k, label_order[l]) = profile_read(i0, j0, k0, l);
             }
           }
 
@@ -828,22 +827,18 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
             if (species.n_spec > 0) {
               mw = 0;
               for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
-//              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(j, k, 6 + l) / species.mw[l];
               mw = 1 / mw;
             }
             profile_to_match(ic, j, k, 5) = profile_to_match(ic, j, k, 4) * mw / (R_u * profile_to_match(ic, j, k, 0));
-//            profile_to_match(j, k, 5) = profile_to_match(j, k, 4) * mw / (R_u * profile_to_match(j, k, 0));
           }
           if (!has_pressure) {
             real mw{mw_air};
             if (species.n_spec > 0) {
               mw = 0;
               for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
-//              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(j, k, 6 + l) / species.mw[l];
               mw = 1 / mw;
             }
             profile_to_match(ic, j, k, 4) = profile_to_match(ic, j, k, 5) * R_u * profile_to_match(ic, j, k, 0) / mw;
-//            profile_to_match(j, k, 4) = profile_to_match(j, k, 5) * R_u * profile_to_match(j, k, 0) / mw;
           }
           if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
             // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
@@ -854,15 +849,11 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
               for (int l = 0; l < species.n_spec; ++l) {
                 mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
                 Y.push_back(profile_to_match(ic, j, k, 6 + l));
-//                mw += profile_to_match(j, k, 6 + l) / species.mw[l];
-//                Y.push_back(profile_to_match(j, k, 6 + l));
               }
               mw = 1 / mw;
               mu = compute_viscosity(profile_to_match(ic, j, k, 5), mw, Y.data(), species);
-//              mu = compute_viscosity(profile_to_match(j, k, 5), mw, Y.data(), species);
             } else {
               mu = Sutherland(profile_to_match(ic, j, k, 5));
-//              mu = Sutherland(profile_to_match(j, k, 5));
             }
             real mut = mu * turb_viscosity_ratio;
             const real vel2 = profile_to_match(ic, j, k, 1) * profile_to_match(ic, j, k, 1) +
@@ -871,12 +862,6 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
             profile_to_match(ic, j, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
             profile_to_match(ic, j, k, 6 + species.n_spec + 1) =
                 profile_to_match(ic, j, k, 0) * profile_to_match(ic, j, k, 6 + species.n_spec) / mut;
-//            const real vel2 = profile_to_match(j, k, 1) * profile_to_match(j, k, 1) +
-//                              profile_to_match(j, k, 2) * profile_to_match(j, k, 2) +
-//                              profile_to_match(j, k, 3) * profile_to_match(j, k, 3);
-//            profile_to_match(j, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
-//            profile_to_match(j, k, 6 + species.n_spec + 1) =
-//                profile_to_match(j, k, 0) * profile_to_match(j, k, 6 + species.n_spec) / mut;
           }
         }
       }

@@ -300,6 +300,139 @@ void cfd::Parameter::deduce_known_info() {
     update_parameter("RANS_model", 0);
   }
   update_parameter("n_scalar", n_scalar);
+
+  // sponge layer info
+  if (bool_parameters["sponge_layer"]) {
+    auto dirs = int_array["sponge_layer_direction"];
+    real scale = real_parameters["gridScale"];
+    int spongeX = 0, spongeY = 0, spongeZ = 0;
+    for (auto dir: dirs) {
+      if (dir == 0) {
+        real x0 = real_parameters["spongeXMinusStart"];
+        real x1 = real_parameters["spongeXMinusEnd"];
+        if (abs(x0 - x1) < 1e-10) {
+          fmt::print("The sponge layer in x- direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // x inflow, x0 should be larger than x1
+        if (x0 < x1) {
+          real temp = x0;
+          x0 = x1;
+          x1 = temp;
+        }
+        real_parameters["spongeXMinusStart"] = x0 * scale;
+        real_parameters["spongeXMinusEnd"] = x1 * scale;
+        if (spongeX == 0) {
+          spongeX = 1;
+        } else if (spongeX == 2) {
+          spongeX = 3;
+        }
+      } else if (dir == 1) {
+        real x0 = real_parameters["spongeXPlusStart"];
+        real x1 = real_parameters["spongeXPlusEnd"];
+        if (abs(x0 - x1) < 1e-10) {
+          fmt::print("The sponge layer in x+ direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // x outflow, x0 should be smaller
+        if (x0 > x1) {
+          real temp = x0;
+          x0 = x1;
+          x1 = temp;
+        }
+        real_parameters["spongeXPlusStart"] = x0 * scale;
+        real_parameters["spongeXPlusEnd"] = x1 * scale;
+        if (spongeX == 0) {
+          spongeX = 2;
+        } else if (spongeX == 1) {
+          spongeX = 3;
+        }
+      } else if (dir == 2) {
+        real y0 = real_parameters["spongeYMinusStart"];
+        real y1 = real_parameters["spongeYMinusEnd"];
+        if (abs(y0 - y1) < 1e-10) {
+          fmt::print("The sponge layer in y- direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // y0 should be larger than y1
+        if (y0 < y1) {
+          real temp = y0;
+          y0 = y1;
+          y1 = temp;
+        }
+        real_parameters["spongeYMinusStart"] = y0 * scale;
+        real_parameters["spongeYMinusEnd"] = y1 * scale;
+        if (spongeY == 0) {
+          spongeY = 1;
+        } else if (spongeY == 2) {
+          spongeY = 3;
+        }
+      } else if (dir == 3) {
+        real y0 = real_parameters["spongeYPlusStart"];
+        real y1 = real_parameters["spongeYPlusEnd"];
+        if (abs(y0 - y1) < 1e-10) {
+          fmt::print("The sponge layer in y+ direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // y0 should be smaller than y1
+        if (y0 > y1) {
+          real temp = y0;
+          y0 = y1;
+          y1 = temp;
+        }
+        real_parameters["spongeYPlusStart"] = y0 * scale;
+        real_parameters["spongeYPlusEnd"] = y1 * scale;
+        if (spongeY == 0) {
+          spongeY = 2;
+        } else if (spongeY == 1) {
+          spongeY = 3;
+        }
+      } else if (dir == 4) {
+        real z0 = real_parameters["spongeZMinusStart"];
+        real z1 = real_parameters["spongeZMinusEnd"];
+        if (abs(z0 - z1) < 1e-10) {
+          fmt::print("The sponge layer in z- direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // z0 should be larger than z1
+        if (z0 < z1) {
+          real temp = z0;
+          z0 = z1;
+          z1 = temp;
+        }
+        real_parameters["spongeZMinusStart"] = z0 * scale;
+        real_parameters["spongeZMinusEnd"] = z1 * scale;
+        if (spongeZ == 0) {
+          spongeZ = 1;
+        } else if (spongeZ == 2) {
+          spongeZ = 3;
+        }
+      } else if (dir == 5) {
+        real z0 = real_parameters["spongeZPlusStart"];
+        real z1 = real_parameters["spongeZPlusEnd"];
+        if (abs(z0 - z1) < 1e-10) {
+          fmt::print("The sponge layer in z+ direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // z0 should be smaller than z1
+        if (z0 > z1) {
+          real temp = z0;
+          z0 = z1;
+          z1 = temp;
+        }
+        real_parameters["spongeZPlusStart"] = z0 * scale;
+        real_parameters["spongeZPlusEnd"] = z1 * scale;
+        if (spongeZ == 0) {
+          spongeZ = 2;
+        } else if (spongeZ == 1) {
+          spongeZ = 3;
+        }
+      }
+    }
+    update_parameter("spongeX", spongeX);
+    update_parameter("spongeY", spongeY);
+    update_parameter("spongeZ", spongeZ);
+  }
 }
 
 void cfd::Parameter::setup_default_settings() {
@@ -365,6 +498,7 @@ void cfd::Parameter::setup_default_settings() {
   bool_parameters["if_continue_collect_statistics"] = false;
   int_parameters["start_collect_statistics_iter"] = 0;
   bool_parameters["perform_spanwise_average"] = false;
+  bool_parameters["output_statistics_plt"] = false;
 
   int_array["post_process"] = {};
   int_array["output_bc"] = {};
@@ -380,6 +514,26 @@ void cfd::Parameter::setup_default_settings() {
   string_array["fluctuation_profile_related_bc_name"] = {};
   bool_parameters["perform_spanwise_average"] = false;
   bool_parameters["positive_preserving"] = false;
+
+  bool_parameters["sponge_layer"] = false;
+  int_parameters["sponge_function"] = 0; // 0 - (Nektar++, CPC, 2024)
+  int_array["sponge_layer_direction"] = {};
+  int_parameters["sponge_iter"] = 0;
+  int_array["sponge_scalar_iter"] = {};
+  real_parameters["spongeXMinusStart"] = 0;
+  real_parameters["spongeXMinusEnd"] = 0;
+  real_parameters["spongeXPlusStart"] = 0;
+  real_parameters["spongeXPlusEnd"] = 0;
+  real_parameters["spongeYMinusStart"] = 0;
+  real_parameters["spongeYMinusEnd"] = 0;
+  real_parameters["spongeYPlusStart"] = 0;
+  real_parameters["spongeYPlusEnd"] = 0;
+  real_parameters["spongeZMinusStart"] = 0;
+  real_parameters["spongeZMinusEnd"] = 0;
+  real_parameters["spongeZPlusStart"] = 0;
+  real_parameters["spongeZPlusEnd"] = 0;
+
+  int_parameters["characteristic_velocity_ml"] = 1;
 }
 
 void cfd::Parameter::diagnose_parallel_info() {
@@ -535,6 +689,38 @@ void cfd::Parameter::deduce_sim_info() {
         }
         if (cc_flag)
           fmt::print("\t\t->-> {:<20} : compressibility correction\n", cc_method);
+      }
+    }
+
+    if (get_bool("sponge_layer")) {
+      fmt::print("\n\t->-> {:<20} : sponge layer\n", "With");
+      auto dirs = int_array["sponge_layer_direction"];
+      for (auto dir: dirs) {
+        if (dir == 0) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "x-");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeXMinusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeXMinusEnd"));
+        } else if (dir == 1) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "x+");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeXPlusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeXPlusEnd"));
+        } else if (dir == 2) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "y-");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeYMinusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeYMinusEnd"));
+        } else if (dir == 3) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "y+");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeYPlusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeYPlusEnd"));
+        } else if (dir == 4) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "z-");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeZMinusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeZMinusEnd"));
+        } else if (dir == 5) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "z+");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeZPlusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeZPlusEnd"));
+        }
       }
     }
   }

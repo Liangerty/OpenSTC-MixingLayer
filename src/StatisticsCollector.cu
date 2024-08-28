@@ -3,7 +3,9 @@
 namespace cfd {
 StatisticsCollector::StatisticsCollector(Parameter &_parameter, const Mesh &_mesh, std::vector<Field> &_field)
     : if_collect_statistics{_parameter.get_bool("if_collect_statistics")},
-      start_iter{_parameter.get_int("start_collect_statistics_iter")}, myid{_parameter.get_int("myid")},
+      start_iter{_parameter.get_int("start_collect_statistics_iter")},
+      output_statistics_plt{_parameter.get_bool("output_statistics_plt")},
+      myid{_parameter.get_int("myid")},
       mesh{_mesh}, field{_field}, parameter(_parameter) {
   if (!if_collect_statistics)
     return;

@@ -89,14 +89,14 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
   // Magic number, 8 bytes + byte order + file type
   offset += 16;
   // "solution file"
-  gxl::read_str_from_plt_MPI_ver(fp, offset);
+  gxl::read_str_from_binary_MPI_ver(fp, offset);
   int n_var_old{5};
   MPI_File_read_at(fp, offset, &n_var_old, 1, MPI_INT, &status);
   offset += 4;
   std::vector<std::string> var_name;
   var_name.resize(n_var_old);
   for (size_t i = 0; i < n_var_old; ++i) {
-    var_name[i] = gxl::read_str_from_plt_MPI_ver(fp, offset);
+    var_name[i] = gxl::read_str_from_binary_MPI_ver(fp, offset);
   }
   // The first one tells if species info exists, if exists (1), from air, (0); in flamelet model, if we have species field, but not mixture fraction field, then (1); if we have all of them, then (2).
   // That is, if the first value is not 0, we have species info.
@@ -113,7 +113,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
     // 1. Zone marker. Value = 299.0, indicates a V112 header.
     offset += 4;
     // 2. Zone name.
-    gxl::read_str_from_plt_MPI_ver(fp, offset);
+    gxl::read_str_from_binary_MPI_ver(fp, offset);
     // Jump through the following info which is not relevant to the current process.
     offset += 8;
     // Read the solution time
@@ -345,14 +345,14 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
   // Magic number, 8 bytes + byte order + file type
   offset += 16;
   // "solution file"
-  gxl::read_str_from_plt_MPI_ver(fp, offset);
+  gxl::read_str_from_binary_MPI_ver(fp, offset);
   int n_var_old{5};
   MPI_File_read_at(fp, offset, &n_var_old, 1, MPI_INT, &status);
   offset += 4;
   std::vector<std::string> var_name;
   var_name.resize(n_var_old);
   for (size_t i = 0; i < n_var_old; ++i) {
-    var_name[i] = gxl::read_str_from_plt_MPI_ver(fp, offset);
+    var_name[i] = gxl::read_str_from_binary_MPI_ver(fp, offset);
   }
   // The first one tells if species info exists, if exists (1), from air, (0); in flamelet model, if we have species field, but not mixture fraction field, then (1); if we have all of them, then (2).
   // That is, if the first value is not 0, we have species info.
@@ -368,7 +368,7 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
     // 1. Zone marker. Value = 299.0, indicates a V112 header.
     offset += 4;
     // 2. Zone name.
-    gxl::read_str_from_plt_MPI_ver(fp, offset);
+    gxl::read_str_from_binary_MPI_ver(fp, offset);
     // Jump through the following info which is not relevant to the current process.
     offset += 8;
     // Read the solution time

@@ -67,6 +67,10 @@ cfd::Species::Species(Parameter &parameter) {
       MpiParallel::exit();
     }
     parameter.update_parameter("n_spec", num_spec);
+    spec_name.resize(num_spec);
+    for (auto &[name, label]: spec_list) {
+      spec_name[label] = name;
+    }
     if (parameter.get_int("reaction") != 2) {
       // Not flamelet model, update these variables. If flamelet, these variables will be updated later.
       parameter.update_parameter("n_var", parameter.get_int("n_var") + num_spec);

@@ -4,6 +4,7 @@
 #include "FieldOperation.cuh"
 #include "Monitor.cuh"
 #include "StatisticsCollector.cuh"
+#include "SpongeLayer.cuh"
 
 namespace cfd {
 
@@ -102,6 +103,13 @@ void RK3(Driver<mix_model, turb> &driver) {
                  cudaMemcpyDeviceToDevice);
     }
 
+    if (parameter.get_bool("sponge_layer")) {
+      for (int b = 0; b < n_block; ++b) {
+        update_sponge_layer_value<<<bpg[b], tpb>>>(field[b].d_ptr, param);
+      }
+      update_sponge_iter(param, parameter);
+    }
+
     // Rk inner iteration
     for (int rk = 0; rk < 3; ++rk) {
       for (auto b = 0; b < n_block; ++b) {
@@ -168,6 +176,7 @@ void RK3(Driver<mix_model, turb> &driver) {
 
     // Finally, test if the simulation reaches convergence state
     physical_time += dt;
+    parameter.update_parameter("solution_time", physical_time);
     if (step % output_screen == 0 || step == 1) {
       real err_max = compute_residual(driver, step);
       if (driver.myid == 0) {
@@ -200,6 +209,9 @@ void RK3(Driver<mix_model, turb> &driver) {
       post_process(driver);
       if (if_monitor)
         monitor.output_data();
+      if (parameter.get_bool("sponge_layer")) {
+        output_sponge_layer(parameter, field, mesh, driver.spec);
+      }
     }
     err = cudaGetLastError();
     if (err != cudaSuccess) {

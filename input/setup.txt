@@ -42,6 +42,7 @@ struct lower_stream = {
     real turbulence_intensity = 0.01
 }
 bool upper_faster = 0   // 1 - upper stream has larger mach number, 0 - lower stream has larger mach number.
+int characteristic_velocity_ml = 0 // 0 - convective velocity, 1 - velocity delta.
 
 // numerics
 // temporal scheme
@@ -57,7 +58,7 @@ real    dt = 5e-9                          // In unsteady simulation, the time s
 real    total_simulation_time = 1.481144e-3   // In unsteady simulation, how long physical time to be simulated 2.2154e-3
 
 // spatial discretization
-int inviscid_scheme = 72               // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
+int inviscid_scheme = 71               // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
 bool positive_preserving = 1            // If the Positive-preserving limiter is activated, only implemented for 51/52
 int viscous_order = 2                   // Default: 2nd order central discretization. Other choices: 0(inviscid)
 
@@ -95,10 +96,27 @@ struct  periodic  {
     int label = 8
 }
 
+// sponge layer info
+bool sponge_layer = 1
+int sponge_function = 0 // 0 - (Nektar++, CPC, 2024)
+array int sponge_layer_direction = { // 0 - x-, 1 - x+, 2 - y-, 3 - y+, 4 - z-, 5 - z+
+    1   // 1 - x+
+    2   // 2 - y-
+    3   // 3 - y+
+}
+real spongeXPlusStart = 650
+real spongeXPlusEnd = 850
+real spongeYMinusStart = -60
+real spongeYMinusEnd = -180
+real spongeYPlusStart = 60
+real spongeYPlusEnd = 180
+real spongeCoefficient = 1e-8 // The coefficient for Uc/Dx.
+
 // statistical choice
 bool if_collect_statistics = 0
 bool if_continue_collect_statistics = 0
 bool perform_spanwise_average = 1
+bool output_statistics_plt = 0
 
 // monitor info
 int if_monitor = 0 // Monitor some points

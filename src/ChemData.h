@@ -11,6 +11,7 @@ struct Species {
 
   int n_spec{0};  // number of species
   std::map<std::string, int> spec_list; // species list
+  std::vector<std::string> spec_name; // species name
 
   void compute_cp(real temp, real *cp) const &;
 

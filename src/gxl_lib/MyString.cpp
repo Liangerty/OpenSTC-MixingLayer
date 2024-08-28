@@ -62,14 +62,14 @@ void gxl::read_until(std::ifstream &file, std::string &input,
 
 void gxl::read_until(std::ifstream &file, std::string &input, const std::vector<std::string> &to_find, Case u_l) {
   while (getline(file, input, u_l)) {
-    for(auto& s:to_find){
-      if (input.starts_with(s)){
+    for (auto &s: to_find) {
+      if (input.starts_with(s)) {
         return;
       }
     }
   }
   input = "end"; // 若没找到，就赋值为"end"代表结束了
-  for(auto& s:to_find){
+  for (auto &s: to_find) {
     fmt::print("{}\t", s);
   }
   fmt::print("are not found in file.\n");
@@ -117,21 +117,21 @@ void gxl::write_str(const char *str, FILE *file) {
 }
 
 std::string gxl::read_str_MPI_ver(MPI_File &file, MPI_Offset &offset, int n_bytes) {
-  char* ch=new char[n_bytes+1];
+  char *ch = new char[n_bytes + 1];
   MPI_File_read_at(file, offset, ch, n_bytes, MPI_CHAR, MPI_STATUS_IGNORE);
-  ch[n_bytes]='\0';
+  ch[n_bytes] = '\0';
   offset += n_bytes;
   std::string str{ch};
   delete[]ch;
   return str;
 }
 
-std::string gxl::read_str_from_plt_MPI_ver(MPI_File &file, MPI_Offset &offset) {
+std::string gxl::read_str_from_binary_MPI_ver(MPI_File &file, MPI_Offset &offset) {
   int value = 0;
   std::string str;
   while (true) {
-    MPI_File_read_at(file,offset,&value,1,MPI_INT32_T,MPI_STATUS_IGNORE);
-    offset+=4;
+    MPI_File_read_at(file, offset, &value, 1, MPI_INT32_T, MPI_STATUS_IGNORE);
+    offset += 4;
     const char ch = static_cast<char>(value);
     if (ch == '\0') {
       break;
@@ -154,13 +154,13 @@ void gxl::write_str(const char *str, MPI_File &file, MPI_Offset &offset) {
   while (*str != '\0') {
     value = static_cast<int>(*str);
     MPI_File_write_at(file, offset, &value, 1, MPI_INT32_T, MPI_STATUS_IGNORE);
-    offset+=4;
+    offset += 4;
     ++str;
   }
   constexpr char null_char = '\0';
   value = static_cast<int>(null_char);
   MPI_File_write_at(file, offset, &value, 1, MPI_INT32_T, MPI_STATUS_IGNORE);
-  offset+=4;
+  offset += 4;
 }
 
 std::string gxl::replace(std::string &str, char from, char to) {

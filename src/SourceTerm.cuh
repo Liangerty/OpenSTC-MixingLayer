@@ -6,6 +6,7 @@
 #include "DParameter.cuh"
 #include "SST.cuh"
 #include "FiniteRateChem.cuh"
+#include "SpongeLayer.cuh"
 
 namespace cfd {
 template<MixtureModel mix_model, class turb_method>
@@ -33,6 +34,11 @@ __global__ void compute_source(cfd::DZone *zone, DParameter *param) {
   } else if constexpr (mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) {
     // Flamelet model, the source term of the mixture fraction and its variance will be computed
     flamelet_source(zone, i, j, k, param);
+  }
+
+  if (param->sponge_layer) {
+    // Sponge layer will be computed
+    sponge_layer_source(zone, i, j, k, param);
   }
 }
 }

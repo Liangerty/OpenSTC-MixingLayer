@@ -4,6 +4,7 @@
 #include "TimeAdvanceFunc.cuh"
 #include "WallDistance.cuh"
 #include "MixingLayer.cuh"
+#include "SpongeLayer.cuh"
 
 namespace cfd {
 
@@ -36,6 +37,10 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
   bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter);
 
   initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec);
+
+  if (parameter.get_bool("sponge_layer")) {
+    initialize_sponge_layer(parameter, mesh, field, spec);
+  }
 
   write_reference_state(parameter, spec);
 
@@ -266,6 +271,11 @@ void write_reference_state(Parameter &parameter, const Species &species) {
       fprintf(ref_state, "velocity_ratio = %16.10e\n", velocity_ratio);
       parameter.update_parameter("density_ratio", density_ratio);
       parameter.update_parameter("velocity_ratio", velocity_ratio);
+      // Compute the velocity delta
+      real DeltaU = abs(u1 - u2);
+      parameter.update_parameter("DeltaU", DeltaU);
+      printf("\t\t->-> %-16.10e : DeltaU\n", DeltaU);
+      fprintf(ref_state, "DeltaU = %16.10e\n", DeltaU);
     } else {
       printf("\t\t->-> %-16.10e : density(kg/m3)\n", parameter.get_real("rho_inf"));
       printf("\t\t->-> %-16.10e : velocity(m/s)\n", parameter.get_real("v_inf"));

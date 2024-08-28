@@ -86,6 +86,9 @@ struct DZone {
   ggxl::VectorField3D<real> mean_value_span_ave;
   ggxl::VectorField3D<real> reynolds_stress_tensor_span_ave;
   ggxl::VectorField3D<real> user_defined_statistical_data_span_ave;
+
+  // sponge layer related mean conservative variables
+  ggxl::VectorField3D<real> sponge_mean_cv;
 };
 
 struct DParameter;
@@ -115,6 +118,9 @@ struct Field {
   // The following data is used for collecting statistics, whose memory is only allocated when we activate the statistics.
   ggxl::VectorField3DHost<real> firstOrderMoment, secondOrderMoment, userDefinedStatistics;
   ggxl::VectorField3DHost<real> mean_value, reynolds_stress_tensor_and_rms, user_defined_statistical_data;
+
+  // sponge layer related mean conservative variables
+  ggxl::VectorField3DHost<real> sponge_mean_cv;
 
   DZone *d_ptr = nullptr;
   DZone *h_ptr = nullptr;

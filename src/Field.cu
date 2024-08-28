@@ -30,15 +30,21 @@ cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in)
     secondOrderMoment.resize(mx, my, mz, 6, 1);
     userDefinedStatistics.resize(mx, my, mz, UserDefineStat::n_collect, 1);
 
-    if (parameter.get_bool("perform_spanwise_average")) {
-      mean_value.resize(mx, my, 1, 6 + n_scalar, 0);
-      reynolds_stress_tensor_and_rms.resize(mx, my, 1, 6, 0);
-      user_defined_statistical_data.resize(mx, my, 1, UserDefineStat::n_stat, 0);
-    } else {
-      mean_value.resize(mx, my, mz, 6 + n_scalar, 1);
-      reynolds_stress_tensor_and_rms.resize(mx, my, mz, 6, 1);
-      user_defined_statistical_data.resize(mx, my, mz, UserDefineStat::n_stat, 0);
+    if (parameter.get_bool("output_statistics_plt")) {
+      if (parameter.get_bool("perform_spanwise_average")) {
+        mean_value.resize(mx, my, 1, 6 + n_scalar, 0);
+        reynolds_stress_tensor_and_rms.resize(mx, my, 1, 6, 0);
+        user_defined_statistical_data.resize(mx, my, 1, UserDefineStat::n_stat, 0);
+      } else {
+        mean_value.resize(mx, my, mz, 6 + n_scalar, 1);
+        reynolds_stress_tensor_and_rms.resize(mx, my, mz, 6, 1);
+        user_defined_statistical_data.resize(mx, my, mz, UserDefineStat::n_stat, 0);
+      }
     }
+  }
+
+  if (parameter.get_bool("sponge_layer")) {
+    sponge_mean_cv.resize(mx, my, mz, n_var, 0);
   }
 }
 
@@ -558,22 +564,28 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
   }
 
   if (parameter.get_bool("if_collect_statistics")) {
-    h_ptr->mean_value.allocate_memory(mx, my, mz, 6 + n_scalar, 1);
-    h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, mz, 6, 1);
-    // If we need to collect the statistics, we need to allocate memory for the data.
-    if (parameter.get_bool("perform_spanwise_average")) {
-      h_ptr->user_defined_statistical_data.allocate_memory(mx, my, mz, UserDefineStat::n_vol_stat_when_span_ave, 0);
-      h_ptr->mean_value_span_ave.allocate_memory(mx, my, 1, 6 + n_scalar, 0);
-      h_ptr->reynolds_stress_tensor_span_ave.allocate_memory(mx, my, 1, 6, 0);
-      h_ptr->user_defined_statistical_data_span_ave.allocate_memory(mx, my, 1, UserDefineStat::n_stat, 0);
-    }else{
-      h_ptr->user_defined_statistical_data.allocate_memory(mx, my, mz, UserDefineStat::n_stat, 0);
+    if (parameter.get_bool("output_statistics_plt")) {
+      h_ptr->mean_value.allocate_memory(mx, my, mz, 6 + n_scalar, 1);
+      h_ptr->reynolds_stress_tensor.allocate_memory(mx, my, mz, 6, 1);
+      // If we need to collect the statistics, we need to allocate memory for the data.
+      if (parameter.get_bool("perform_spanwise_average")) {
+        h_ptr->user_defined_statistical_data.allocate_memory(mx, my, mz, UserDefineStat::n_vol_stat_when_span_ave, 0);
+        h_ptr->mean_value_span_ave.allocate_memory(mx, my, 1, 6 + n_scalar, 0);
+        h_ptr->reynolds_stress_tensor_span_ave.allocate_memory(mx, my, 1, 6, 0);
+        h_ptr->user_defined_statistical_data_span_ave.allocate_memory(mx, my, 1, UserDefineStat::n_stat, 0);
+      } else {
+        h_ptr->user_defined_statistical_data.allocate_memory(mx, my, mz, UserDefineStat::n_stat, 0);
+      }
     }
 
     // The collected data includes one layer of ghost mesh, which may be used to compute the gradients.
     h_ptr->firstOrderMoment.allocate_memory(mx, my, mz, 6 + n_scalar, 1);
     h_ptr->velocity2ndMoment.allocate_memory(mx, my, mz, 6, 1);
     h_ptr->userCollectForStat.allocate_memory(mx, my, mz, UserDefineStat::n_collect, 1);
+  }
+
+  if (parameter.get_bool("sponge_layer")) {
+    h_ptr->sponge_mean_cv.allocate_memory(mx, my, mz, n_var, 0);
   }
 
   // Assign memory for auxiliary variables
@@ -615,7 +627,7 @@ void cfd::Field::deallocate_memory(const Parameter &parameter) {
   h_ptr->mul.deallocate_memory();
 
   const auto n_scalar = parameter.get_int("n_scalar");
-  if (n_scalar>0)
+  if (n_scalar > 0)
     h_ptr->sv.deallocate_memory();
   const auto n_spec{parameter.get_int("n_spec")};
   if (n_spec > 0) {

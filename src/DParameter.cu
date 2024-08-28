@@ -26,7 +26,15 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     v_ref{parameter.get_real("v_inf")}, T_ref{parameter.get_real("T_inf")},
     p_ref{parameter.get_real("p_inf")}, weno_eps_scale{
     parameter.get_real("rho_inf") * parameter.get_real("v_inf") * parameter.get_real("rho_inf") *
-    parameter.get_real("v_inf")} {
+    parameter.get_real("v_inf")}, sponge_layer{parameter.get_bool("sponge_layer")},
+    sponge_function{parameter.get_int("sponge_function")},
+    sponge_iter{parameter.get_int("sponge_iter")}, spongeXPlusStart{parameter.get_real("spongeXPlusStart")},
+    spongeXPlusEnd{parameter.get_real("spongeXPlusEnd")}, spongeXMinusStart{parameter.get_real("spongeXMinusStart")},
+    spongeXMinusEnd{parameter.get_real("spongeXMinusEnd")}, spongeYPlusStart{parameter.get_real("spongeYPlusStart")},
+    spongeYPlusEnd{parameter.get_real("spongeYPlusEnd")}, spongeYMinusStart{parameter.get_real("spongeYMinusStart")},
+    spongeYMinusEnd{parameter.get_real("spongeYMinusEnd")}, spongeZPlusStart{parameter.get_real("spongeZPlusStart")},
+    spongeZPlusEnd{parameter.get_real("spongeZPlusEnd")}, spongeZMinusStart{parameter.get_real("spongeZMinusStart")},
+    spongeZMinusEnd{parameter.get_real("spongeZMinusEnd")} {
   if (myid == 0) {
     if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 71 || inviscid_scheme == 72)
       printf("\t->-> %-20e : WENO scale factor\n", weno_eps_scale);
@@ -180,6 +188,17 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     half_nuo_mwo_inv = parameter.get_real("half_nuo_mwo_inv");
   }
 
+  // the following parameters have been computed in "write_reference_state".
+  if (problem_type == 1) {
+    if (int i = parameter.get_int("characteristic_velocity_ml");i == 0) {
+      v_char = parameter.get_real("convective velocity");
+    } else {
+      v_char = parameter.get_real("DeltaU");
+    }
+  } else {
+    v_char = parameter.get_real("v_inf");
+  }
+
   memset(limit_flow.ll, 0, sizeof(real) * LimitFlow::max_n_var);
   memset(limit_flow.ul, 0, sizeof(real) * LimitFlow::max_n_var);
   memset(limit_flow.sv_inf, 0, sizeof(real) * (MAX_SPEC_NUMBER + 2));
@@ -205,6 +224,41 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   auto &sv_inf{parameter.get_real_array("sv_inf")};
   for (int l = 0; l < n_scalar; ++l) {
     limit_flow.sv_inf[l] = sv_inf[l];
+  }
+
+  if (parameter.get_bool("sponge_layer")) {
+    spongeX = parameter.get_int("spongeX");
+    spongeY = parameter.get_int("spongeY");
+    spongeZ = parameter.get_int("spongeZ");
+    if (parameter.get_int("n_scalar") > 0) {
+      cudaMalloc(&sponge_scalar_iter, n_scalar * sizeof(int));
+      cudaMemcpy(sponge_scalar_iter, parameter.get_int_array("sponge_scalar_iter").data(), n_scalar * sizeof(int),
+                 cudaMemcpyHostToDevice);
+    }
+    if (spongeX == 1 || spongeX == 3) {
+      sponge_sigma0 = parameter.get_real("spongeCoefficient") * v_char / (spongeXMinusStart - spongeXMinusEnd);
+      printf("sponge_sigma0=%e\n", sponge_sigma0);
+    }
+    if (spongeX == 2 || spongeX == 3) {
+      sponge_sigma1 = parameter.get_real("spongeCoefficient") * v_char / (spongeXPlusEnd - spongeXPlusStart);
+      printf("sponge_sigma1=%e\n", sponge_sigma1);
+    }
+    if (spongeY == 1 || spongeY == 3) {
+      sponge_sigma2 = parameter.get_real("spongeCoefficient") * v_char / (spongeYMinusStart - spongeYMinusEnd);
+      printf("sponge_sigma2=%e\n", sponge_sigma2);
+    }
+    if (spongeY == 2 || spongeY == 3) {
+      sponge_sigma3 = parameter.get_real("spongeCoefficient") * v_char / (spongeYPlusEnd - spongeYPlusStart);
+      printf("sponge_sigma3=%e\n", sponge_sigma3);
+    }
+    if (spongeZ == 1 || spongeZ == 3) {
+      sponge_sigma4 = parameter.get_real("spongeCoefficient") * v_char / (spongeZMinusStart - spongeZMinusEnd);
+      printf("sponge_sigma4=%e\n", sponge_sigma4);
+    }
+    if (spongeZ == 2 || spongeZ == 3) {
+      sponge_sigma5 = parameter.get_real("spongeCoefficient") * v_char / (spongeZPlusEnd - spongeZPlusStart);
+      printf("sponge_sigma5=%e\n", sponge_sigma5);
+    }
   }
 }
 

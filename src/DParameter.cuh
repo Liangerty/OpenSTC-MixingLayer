@@ -101,6 +101,34 @@ struct DParameter {
   real T_ref = 1.0;
   real p_ref = 1.0;
   real weno_eps_scale = 1.0;
+  real v_char = 1.0; // characteristic velocity
+
+  // Sponge layer info
+  bool sponge_layer = false;
+  int sponge_function = 0; // 0 - (Nektar++, CPC, 2024)
+  int sponge_iter = 0;
+  int *sponge_scalar_iter = nullptr;
+  real sponge_sigma0 = 0;
+  real sponge_sigma1 = 0;
+  real sponge_sigma2 = 0;
+  real sponge_sigma3 = 0;
+  real sponge_sigma4 = 0;
+  real sponge_sigma5 = 0;
+  int spongeX = 0; // 0 - no sponge; 1 - sponge layer at x-; 2 - sponge layer at x+; 3 - sponge layer at both x- and x+.
+  int spongeY = 0; // 0 - no sponge; 1 - sponge layer at y-; 2 - sponge layer at y+; 3 - sponge layer at both y- and y+.
+  int spongeZ = 0; // 0 - no sponge; 1 - sponge layer at z-; 2 - sponge layer at z+; 3 - sponge layer at both z- and z+.
+  real spongeXMinusStart = 0;
+  real spongeXMinusEnd = 0;
+  real spongeXPlusStart = 0;
+  real spongeXPlusEnd = 0;
+  real spongeYMinusStart = 0;
+  real spongeYMinusEnd = 0;
+  real spongeYPlusStart = 0;
+  real spongeYPlusEnd = 0;
+  real spongeZMinusStart = 0;
+  real spongeZMinusEnd = 0;
+  real spongeZPlusStart = 0;
+  real spongeZPlusEnd = 0;
 
   // For mixing layer computation, we need to collect statistical data of the mixture fraction.
   real beta_diff_inv = 0, beta_o = 0;
