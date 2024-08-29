@@ -911,7 +911,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
 
           // Assign the values in 0th order
           for (int l = 3; l < nv_read; ++l) {
-            if (label_order[l] < n_var + 1) {
+            if (label_order[l] < n_var + 1 + 3) {
               profile_to_match(i, jc, k, label_order[l]) = profile_read(i0, j0, k0, l);
             }
           }
@@ -1006,7 +1006,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
 
           // Assign the values in 0th order
           for (int l = 3; l < nv_read; ++l) {
-            if (label_order[l] < n_var + 1) {
+            if (label_order[l] < n_var + 1 + 3) {
               profile_to_match(i, j, kc, label_order[l]) = profile_read(i0, j0, k0, l);
             }
           }
