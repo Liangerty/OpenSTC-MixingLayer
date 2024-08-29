@@ -827,6 +827,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
   bv(i, j, k, 4) = p;
   bv(i, j, k, 5) = t_wall;
 
+  real v_blow{0};
   if (if_fluctuation == 1) {
     // Pirozzoli & Li fluctuations
     real phil[10] = {0.03, 0.47, 0.43, 0.73, 0.86, 0.36, 0.96, 0.47, 0.36, 0.61};
@@ -851,6 +852,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
 //      ht += wall->Tm[m] * sin((m + 1) * omega * t + 2.0 * pi * (m + 1) * phim[m]);
     }
     if (x > x0 && x < x1) {
+      v_blow = A0 * param->v_ref * fx * gz * ht;
       bv(i, j, k, 2) = A0 * param->v_ref * fx * gz * ht;
     }
   } else if (if_fluctuation == 3) {
@@ -934,7 +936,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     const real rho_g{p_i * mw / (t_g * cfd::R_u)};
     bv(i_gh[0], i_gh[1], i_gh[2], 0) = rho_g;
     bv(i_gh[0], i_gh[1], i_gh[2], 1) = -bv(i_in[0], i_in[1], i_in[2], 1);
-    bv(i_gh[0], i_gh[1], i_gh[2], 2) = -bv(i_in[0], i_in[1], i_in[2], 2);
+    bv(i_gh[0], i_gh[1], i_gh[2], 2) = v_blow * 2 - bv(i_in[0], i_in[1], i_in[2], 2);
     bv(i_gh[0], i_gh[1], i_gh[2], 3) = -bv(i_in[0], i_in[1], i_in[2], 3);
 //    bv(i_gh[0], i_gh[1], i_gh[2], 1) = 0;
 //    bv(i_gh[0], i_gh[1], i_gh[2], 2) = 0;

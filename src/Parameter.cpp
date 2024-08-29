@@ -498,7 +498,7 @@ void cfd::Parameter::setup_default_settings() {
   bool_parameters["if_continue_collect_statistics"] = false;
   int_parameters["start_collect_statistics_iter"] = 0;
   bool_parameters["perform_spanwise_average"] = false;
-  bool_parameters["output_statistics_plt"] = false;
+  bool_parameters["output_statistics_plt"] = true;
 
   int_array["post_process"] = {};
   int_array["output_bc"] = {};
