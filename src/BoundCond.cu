@@ -101,7 +101,7 @@ register_bc<FarField>(FarField *&bc, int n_bc, std::vector<int> &indices, BCInfo
         continue;
       }
       bc_info[i].label = bc_label;
-      FarField farfield(species, parameter);
+      FarField farfield(bc_name, species, parameter);
       farfield.copy_to_gpu(&(bc[i]), species, parameter);
       break;
     }

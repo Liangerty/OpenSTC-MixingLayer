@@ -514,8 +514,8 @@ cfd::Outflow::Outflow(const std::string &inflow_name, cfd::Parameter &parameter)
   label = std::get<int>(info.at("label"));
 }
 
-cfd::FarField::FarField(cfd::Species &spec, cfd::Parameter &parameter) {
-  auto &info = parameter.get_struct("farfield");
+cfd::FarField::FarField(const std::string &inflow_name, cfd::Species &spec, cfd::Parameter &parameter) {
+  auto &info = parameter.get_struct(inflow_name);
   label = std::get<int>(info.at("label"));
 
   // In default, the mach number, pressure and temperature should be given.

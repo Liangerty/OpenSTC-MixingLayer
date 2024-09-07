@@ -121,7 +121,7 @@ struct Symmetry {
 };
 
 struct FarField {
-  explicit FarField(cfd::Species &spec, cfd::Parameter &parameter);
+  explicit FarField(const std::string &inflow_name, cfd::Species &spec, cfd::Parameter &parameter);
 
   void copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter &parameter);
 

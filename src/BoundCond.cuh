@@ -641,6 +641,63 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
       }
     }
   } else {
+    // Temporarily using the ACANS method, only for air
+//    if (mach_b <= 0) {
+//      // Only for subsonic inflow!!
+//      int i1 = i - dir[0], j1 = j - dir[1], k1 = k - dir[2];
+//      real rho1 = bv(i1, j1, k1, 0), p1 = bv(i1, j1, k1, 4);
+//      real c1 = sqrt(gamma_air * p1 / rho1);
+//      real pb = 0.5 * (p1 + farfield->pressure - rho1 * c1 * ((farfield->u - bv(i1, j1, k1, 1)) * nx +
+//                                                              (farfield->v - bv(i1, j1, k1, 2)) * ny +
+//                                                              (farfield->w - bv(i1, j1, k1, 3)) * nz));
+//      real db = farfield->density + gamma_air * (pb - farfield->pressure) / (c1 * c1);
+//      real ub = farfield->u + (pb - farfield->pressure) / (rho1 * c1) * nx;
+//      real vb = farfield->v + (pb - farfield->pressure) / (rho1 * c1) * ny;
+//      real wb = farfield->w + (pb - farfield->pressure) / (rho1 * c1) * nz;
+//
+//      // Specify the boundary value as given.
+//      bv(i, j, k, 0) = db;
+//      bv(i, j, k, 1) = ub;
+//      bv(i, j, k, 2) = vb;
+//      bv(i, j, k, 3) = wb;
+//      bv(i, j, k, 4) = pb;
+//      bv(i, j, k, 5) = pb / (db * R_u / mw_air);
+//      for (int l = 0; l < n_scalar; ++l) {
+//        sv(i, j, k, l) = farfield->sv[l];
+//      }
+//      if constexpr (TurbMethod<turb>::hasMut) {
+//        zone->mut(i, j, k) = farfield->mut;
+//      }
+//      if constexpr (with_cv) {
+//        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
+//      }
+//
+//      for (int g = 1; g <= ngg; g++) {
+//        const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+//        const int ii{i - g * dir[0]}, ij{j - g * dir[1]}, ik{k - g * dir[2]};
+//
+//        real d2 = 2 * db - bv(ii, ij, ik, 0);
+//        real p2 = 2 * pb - bv(ii, ij, ik, 4);
+//        if (p2 < 0.1 * pb) p2 = pb;
+//
+//        bv(gi, gj, gk, 0) = (d2 <= 0.1 * db ? db : d2);
+//        bv(gi, gj, gk, 1) = 2 * ub - bv(ii, ij, ik, 1);
+//        bv(gi, gj, gk, 2) = 2 * vb - bv(ii, ij, ik, 2);
+//        bv(gi, gj, gk, 3) = 2 * wb - bv(ii, ij, ik, 3);
+//        bv(gi, gj, gk, 4) = p2;
+//        bv(gi, gj, gk, 5) = p2 / (d2 * R_u / mw_air);
+//        for (int l = 0; l < n_scalar; ++l) {
+//          sv(gi, gj, gk, l) = farfield->sv[l];
+//        }
+//        if constexpr (TurbMethod<turb>::hasMut) {
+//          zone->mut(gi, gj, gk) = farfield->mut;
+//        }
+//        if constexpr (with_cv) {
+//          compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+//        }
+//      }
+//    }
+
     // subsonic inflow and outflow
 
     // The positive riemann invariant is in the same direction of the boundary normal, which points to the outside of the computational domain.
@@ -1063,23 +1120,75 @@ __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DPa
   auto &bv = zone->bv;
   auto &sv = zone->sv;
 
-  for (int g = 1; g <= ngg; ++g) {
-    const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
-    for (int l = 0; l < 4; ++l) {
-      bv(gi, gj, gk, l) = bv(i, j, k, l);
+  // The multi-species type is not implemented.
+  real nx{zone->metric(i, j, k)(b.face + 1, 1)},
+      ny{zone->metric(i, j, k)(b.face + 1, 2)},
+      nz{zone->metric(i, j, k)(b.face + 1, 3)};
+  real grad_n_inv = b.direction / sqrt(nx * nx + ny * ny + nz * nz);
+  nx *= grad_n_inv;
+  ny *= grad_n_inv;
+  nz *= grad_n_inv;
+  real u_b{bv(i, j, k, 1)}, v_b{bv(i, j, k, 2)}, w_b{bv(i, j, k, 3)};
+  const real u_face{nx * u_b + ny * v_b + nz * w_b};
+  real p_b{bv(i, j, k, 4)}, rho_b{bv(i, j, k, 0)};
+  const real a_b{sqrt(gamma_air * p_b / rho_b)};
+  const real mach_b{abs(u_face / a_b)};
+
+  if (mach_b < 1) {
+    p_b = backPressure->pressure;
+    int i1 = i - dir[0], j1 = j - dir[1], k1 = k - dir[2];
+    real d1{bv(i1, j1, k1, 0)}, u1{bv(i1, j1, k1, 1)}, v1{bv(i1, j1, k1, 2)}, w1{bv(i1, j1, k1, 3)}, p1{
+        bv(i1, j1, k1, 4)};
+    real c1{sqrt(gamma_air * p1 / d1)};
+    rho_b = d1 + (p_b - p1) / (c1 * c1);
+    u_b = u1 + nx * (p1 - p_b) / (d1 * c1);
+    v_b = v1 + ny * (p1 - p_b) / (d1 * c1);
+    w_b = w1 + nz * (p1 - p_b) / (d1 * c1);
+
+    for (int g = 1; g <= ngg; ++g) {
+      const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+      const int ii{i - g * dir[0]}, ij{j - g * dir[1]}, ik{k - g * dir[2]};
+
+      real p_g{2 * p_b - bv(ii, ij, ik, 4)}, rho_g{2 * rho_b - bv(ii, ij, ik, 0)};
+      real u_g{2 * u_b - bv(ii, ij, ik, 1)}, v_g{2 * v_b - bv(ii, ij, ik, 2)}, w_g{2 * w_b - bv(ii, ij, ik, 3)};
+
+      bv(gi, gj, gk, 0) = rho_g;
+      bv(gi, gj, gk, 1) = u_g;
+      bv(gi, gj, gk, 2) = v_g;
+      bv(gi, gj, gk, 3) = w_g;
+      bv(gi, gj, gk, 4) = p_g;
+      bv(gi, gj, gk, 5) = p_g / (rho_g * R_u / mw_air);
+      for (int l = 0; l < param->n_scalar_transported; ++l) {
+        sv(gi, gj, gk, l) = sv(i, j, k, l);
+      }
+
+      if constexpr (TurbMethod<turb>::hasMut) {
+        zone->mut(gi, gj, gk) = zone->mut(i, j, k);
+      }
+      if constexpr (with_cv) {
+        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+      }
     }
-    bv(gi, gj, gk, 4) = backPressure->pressure;
-    // This should be modified later, as p is specified, temperature is extrapolated,
-    // the density should be acquired from EOS instead of extrapolation.
-    bv(gi, gj, gk, 5) = bv(i, j, k, 5);
-    for (int l = 0; l < param->n_scalar; ++l) {
-      sv(gi, gj, gk, l) = sv(i, j, k, l);
-    }
-    if constexpr (TurbMethod<turb>::hasMut) {
-      zone->mut(gi, gj, gk) = zone->mut(i, j, k);
-    }
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+  } else {
+    for (int g = 1; g <= ngg; ++g) {
+      const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+
+      bv(gi, gj, gk, 0) = rho_b;
+      bv(gi, gj, gk, 1) = u_b;
+      bv(gi, gj, gk, 2) = v_b;
+      bv(gi, gj, gk, 3) = w_b;
+      bv(gi, gj, gk, 4) = p_b;
+      bv(gi, gj, gk, 5) = p_b / (rho_b * R_u / mw_air);
+      for (int l = 0; l < param->n_scalar_transported; ++l) {
+        sv(gi, gj, gk, l) = sv(i, j, k, l);
+      }
+
+      if constexpr (TurbMethod<turb>::hasMut) {
+        zone->mut(gi, gj, gk) = zone->mut(i, j, k);
+      }
+      if constexpr (with_cv) {
+        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+      }
     }
   }
 }
