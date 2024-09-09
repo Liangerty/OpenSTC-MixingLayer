@@ -914,16 +914,16 @@ compute_weno_flux_cp(const real *cv, DParameter *param, int tid, const real *met
   }
   __syncthreads();
 
-  const real eps_ref = 1e-6 * param->weno_eps_scale;
-  // constexpr real eps{1e-20};
-  // const real jac1{jac[i_shared]}, jac2{jac[i_shared + 1]};
-  // const real eps_ref = eps * param->weno_eps_scale * 0.25 *
-  //                      ((metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) *
-  //                       (metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) +
-  //                       (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) *
-  //                       (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) +
-  //                       (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2) *
-  //                       (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2));
+//  const real eps_ref = 1e-6 * param->weno_eps_scale;
+   constexpr real eps{1e-20};
+   const real jac1{jac[i_shared]}, jac2{jac[i_shared + 1]};
+   const real eps_ref = eps * param->weno_eps_scale * 0.25 *
+                        ((metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) *
+                         (metric[i_shared * 3] * jac1 + metric[(i_shared + 1) * 3] * jac2) +
+                         (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) *
+                         (metric[i_shared * 3 + 1] * jac1 + metric[(i_shared + 1) * 3 + 1] * jac2) +
+                         (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2) *
+                         (metric[i_shared * 3 + 2] * jac1 + metric[(i_shared + 1) * 3 + 2] * jac2));
   real eps_scaled[3];
   eps_scaled[0] = eps_ref;
   eps_scaled[1] = eps_ref * param->v_ref * param->v_ref;
