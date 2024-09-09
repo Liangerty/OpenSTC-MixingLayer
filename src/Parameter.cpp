@@ -483,6 +483,8 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["compressibility_correction"] = 0; // No compressibility correction is added by default
   int_parameters["des_scale_method"] = 0; // How to compute the grid scale in DES simulations. 0 - cubic root of cell volume, 1 - max of cell dimension
 
+  int_parameters["n_passive_scalar"] = 0;
+
   int_parameters["n_profile"] = 0;
 
   int_parameters["groups_init"] = 1;
@@ -562,36 +564,40 @@ void cfd::Parameter::diagnose_parallel_info() {
 void cfd::Parameter::deduce_sim_info() {
   int n_var = 5, n_scalar = 0, n_scalar_transported = 0, n_other_var = 1;
   int i_turb_cv = 5, i_fl_cv = 0;
+  int i_ps = 0, i_ps_cv = 0; // ps - passive scalar
 
   if (get_int("species") == 1) {
     n_scalar += get_int("n_spec");
+    i_ps += get_int("n_spec");
     if (get_int("reaction") != 2) {
       // Mixture / Finite rate chemistry
       n_scalar_transported += get_int("n_spec");
       i_turb_cv += get_int("n_spec");
+      i_ps_cv += get_int("n_spec");
     } else {
       // Flamelet model
       n_scalar_transported += 2; // the mixture fraction and the variance of mixture fraction
       n_scalar += 2;
       i_fl_cv = 5 + get_int("n_turb");
+      i_ps_cv = i_fl_cv + 2;
       ++n_other_var; // scalar dissipation rate
     }
   } else if (get_int("species") == 2) {
-    n_scalar += get_int("n_spec");
+    n_scalar += get_int("n_spec") + 2;
+    i_ps += get_int("n_spec");
     if (get_int("reaction") != 2) {
       // Mixture with mixture fraction and variance solved.
       n_scalar_transported += get_int("n_spec") + 2;
-      n_scalar += 2;
       i_turb_cv += get_int("n_spec");
       i_fl_cv = i_turb_cv + get_int("n_turb");
       ++n_other_var; // scalar dissipation rate
     } else {
       // Flamelet model
       n_scalar_transported += 2; // the mixture fraction and the variance of mixture fraction
-      n_scalar += 2;
       i_fl_cv = 5 + get_int("n_turb");
       ++n_other_var; // scalar dissipation rate
     }
+    i_ps_cv = i_fl_cv + 2;
   }
   if (get_bool("turbulence")) {
     // turbulence simulation
@@ -599,13 +605,22 @@ void cfd::Parameter::deduce_sim_info() {
       // RANS
       n_scalar_transported += get_int("n_turb");
       n_scalar += get_int("n_turb");
+      i_ps += get_int("n_turb");
+      i_ps_cv += get_int("n_turb");
       ++n_other_var; // mut
     } else if (turb_method == 2) {
       // DES type
       n_scalar_transported += get_int("n_turb");
       n_scalar += get_int("n_turb");
+      i_ps += get_int("n_turb");
+      i_ps_cv += get_int("n_turb");
       ++n_other_var; // mut
     }
+  }
+  if (get_int("n_passive_scalar")) {
+    // Some passive scalar is transported
+    n_scalar_transported += get_int("n_passive_scalar");
+    n_scalar += get_int("n_passive_scalar");
   }
   n_var += n_scalar_transported;
   update_parameter("n_var", n_var);
@@ -614,6 +629,8 @@ void cfd::Parameter::deduce_sim_info() {
   update_parameter("i_turb_cv", i_turb_cv);
   update_parameter("i_fl", get_int("n_turb") + get_int("n_spec"));
   update_parameter("i_fl_cv", i_fl_cv);
+  update_parameter("i_ps", i_ps);
+  update_parameter("i_ps_cv", i_ps_cv);
   update_parameter("n_other_var", n_other_var);
 
   int myid = get_int("myid");
@@ -621,6 +638,9 @@ void cfd::Parameter::deduce_sim_info() {
     fmt::print("\n{:*^80}\n", "Simulation Details");
     printf("\t->-> %-20d : number of equations to solve\n", n_var);
     printf("\t->-> %-20d : number of scalar variables\n", n_scalar);
+    if (auto n_ps = get_int("n_passive_scalar");n_ps > 0) {
+      printf("\t->-> %-20d : number of passive scalar variables\n", n_ps);
+    }
 
     if (get_bool("steady")) {
       // steady

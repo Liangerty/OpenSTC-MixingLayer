@@ -118,6 +118,14 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
         sv_lower[i_fl + 1] = 0;
       }
     }
+
+    if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+      int i_ps = parameter.get_int("i_ps");
+      for (int i = 0; i < n_ps; ++i) {
+        sv[i_ps] = var_info[13 + 2 * n_spec + 5 + 2 * i];
+        sv_lower[i_ps] = var_info[13 + 2 * n_spec + 5 + 2 * i + 1];
+      }
+    }
   } else {
     // In default, the mach number, pressure and temperature should be given.
     // If other combinations are given, then implement it later.
@@ -226,6 +234,13 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
         const auto i_fl{parameter.get_int("i_fl")};
         sv[i_fl] = std::get<real>(info.at("mixture_fraction"));
         sv[i_fl + 1] = 0;
+      }
+    }
+
+    if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+      int i_ps = parameter.get_int("i_ps");
+      for (int i = 0; i < n_ps; ++i) {
+        sv[i_ps] = std::get<real>(info.at("ps" + std::to_string(i + 1)));
       }
     }
 

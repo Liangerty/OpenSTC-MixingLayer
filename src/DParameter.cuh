@@ -24,10 +24,13 @@ struct DParameter {
   int n_var = 0;                    // The number of variables in the conservative variable
   int n_scalar = 0;               // The number of scalar variables
   int n_scalar_transported = 0;   // The number of scalar variables in the conservative equation, this is only different from n_scalar when we use flamelet model
+  int n_ps = 0;                   // The number of passive scalars
   int n_spec = 0;                 // The number of species
   int i_fl = 0;                   // The index of flamelet variable in the scalar variable
   int i_fl_cv = 0;                // The index of flamelet variable in the conservative variable
   int i_turb_cv = 0;              // The index of turbulent variable in the conservative variable
+  int i_ps = 0;                   // The index of passive scalar in the scalar variable
+  int i_ps_cv = 0;                // The index of passive scalar in the conservative variable
 
   int inviscid_scheme = 0;  // The tag for inviscid scheme. 3 - AUSM+
   int reconstruction = 2; // The reconstruction method for inviscid flux computation

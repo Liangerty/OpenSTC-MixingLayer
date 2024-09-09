@@ -90,9 +90,6 @@ __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DP
       zone->sv(idx[0], idx[1], idx[2], l) = ave;
       tar_zone->sv(idx_tar[0], idx_tar[1], idx_tar[2], l) = ave;
     }
-    const real vel{std::sqrt(zone->bv(idx[0], idx[1], idx[2], 1) * zone->bv(idx[0], idx[1], idx[2], 1) +
-                             zone->bv(idx[0], idx[1], idx[2], 2) * zone->bv(idx[0], idx[1], idx[2], 2) +
-                             zone->bv(idx[0], idx[1], idx[2], 3) * zone->bv(idx[0], idx[1], idx[2], 3))};
   } else {
     // Else, get the inner value for this block's ghost grid
 #pragma unroll

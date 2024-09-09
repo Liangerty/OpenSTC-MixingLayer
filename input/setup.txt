@@ -31,6 +31,9 @@ struct upper_stream = {
     real mixture_fraction = 1
     real turb_viscosity_ratio =	1
     real turbulence_intensity = 0.01
+    real ps1 = 1
+    real ps2 = 1
+    real ps3 = 1
 }
 struct lower_stream = {
     real temperature = 3304.504458
@@ -40,6 +43,9 @@ struct lower_stream = {
     real mixture_fraction = 0
     real turb_viscosity_ratio =	1
     real turbulence_intensity = 0.01
+    real ps1 = 0
+    real ps2 = 0
+    real ps3 = 0
 }
 bool upper_faster = 0   // 1 - upper stream has larger mach number, 0 - lower stream has larger mach number.
 int characteristic_velocity_ml = 0 // 0 - convective velocity, 1 - velocity delta.
@@ -63,7 +69,7 @@ bool positive_preserving = 1            // If the Positive-preserving limiter is
 int viscous_order = 2                   // Default: 2nd order central discretization. Other choices: 0(inviscid)
 
 // chemical info
-int species = 1  // If there is species involved. 0 - Air as perfect gas; 1 - Species involved; 2 - Species + mixture fraction + mixture fraction variance are solved
+int species = 0  // If there is species involved. 0 - Air as perfect gas; 1 - Species involved; 2 - Species + mixture fraction + mixture fraction variance are solved
 int reaction = 0 //0-No reaction; 1-Finite rate chemistry; 2-Flamelet model. Even no reactions are involved, the mechanism file should exit to clarify the species
 string mechanism_file = chemistry/H2_mech_mixing.inp  // H2_mech_mixing.inp
 
@@ -96,8 +102,11 @@ struct  periodic  {
     int label = 8
 }
 
+// Additional passive scalar
+int n_passive_scalar = 3 // number of additional scalars
+
 // sponge layer info
-bool sponge_layer = 1
+bool sponge_layer = 0
 int sponge_function = 0 // 0 - (Nektar++, CPC, 2024)
 array int sponge_layer_direction = { // 0 - x-, 1 - x+, 2 - y-, 3 - y+, 4 - z-, 5 - z+
     1   // 1 - x+

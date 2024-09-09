@@ -39,9 +39,6 @@ struct DBoundCond {
   template<MixtureModel mix_model, class turb, bool with_cv = false>
   void apply_boundary_conditions(const Block &block, Field &field, DParameter *param) const;
 
-  template<MixtureModel mix_model, class turb>
-  void apply_boundary_conditions(const Mesh &mesh, std::vector<Field> &field, DParameter *param) const;
-
   // There may be time-dependent BCs, which need to be updated at each time step.
   // E.g., the turbulent library method, we need to update the profile and fluctuation.
   // E.g., the NSCBC
@@ -211,7 +208,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
   const int n_scalar = param->n_scalar;
 
   real density, u, v, w, p, T, mut, vel;
-  real sv_b[MAX_SPEC_NUMBER + 4];
+  real sv_b[MAX_SPEC_NUMBER + 4 + MAX_PASSIVE_SCALAR_NUMBER];
 
   if (inflow->inflow_type == 1) {
     // Profile inflow
@@ -960,6 +957,13 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     sv(i, j, k, i_fl + 1) = sv(idx[0], idx[1], idx[2], i_fl + 1);
   }
 
+  if (param->n_ps > 0) {
+    const int i_ps{param->i_ps};
+    for (int l = 0; l < param->n_ps; l++) {
+      sv(i, j, k, i_ps + l) = sv(idx[0], idx[1], idx[2], i_ps + l);
+    }
+  }
+
   if constexpr (with_cv) {
     compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
   }
@@ -984,6 +988,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
       const auto mwk = param->mw;
       mw = 0;
       for (int l = 0; l < param->n_spec; ++l) {
+        // The mass fraction is given by a symmetry condition, is this reasonable?
         sv(i_gh[0], i_gh[1], i_gh[2], l) = sv(i_in[0], i_in[1], i_in[2], l);
         mw += sv(i_gh[0], i_gh[1], i_gh[2], l) / mwk[l];
       }
@@ -1013,6 +1018,13 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     if constexpr (mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) {
       sv(i_gh[0], i_gh[1], i_gh[2], param->i_fl) = sv(i_in[0], i_in[1], i_in[2], param->i_fl);
       sv(i_gh[0], i_gh[1], i_gh[2], param->i_fl + 1) = sv(i_in[0], i_in[1], i_in[2], param->i_fl + 1);
+    }
+
+    if (param->n_ps > 0) {
+      const int i_ps{param->i_ps};
+      for (int l = 0; l < param->n_ps; l++) {
+        sv(i_gh[0], i_gh[1], i_gh[2], i_ps + l) = sv(i_in[0], i_in[1], i_in[2], i_ps + l);
+      }
     }
 
     if constexpr (with_cv) {
@@ -1409,163 +1421,6 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
       apply_periodic<mix_model, turb, with_cv><<<BPG, TPB>>>(field.d_ptr, param, i_face);
-    }
-  }
-}
-
-template<MixtureModel mix_model, class turb>
-void DBoundCond::apply_boundary_conditions(const Mesh &mesh, std::vector<Field> &field, DParameter *param) const {
-  // Boundary conditions are applied in the order of priority, which with higher priority is applied later.
-  // Finally, the communication between faces will be carried out after these bc applied
-  // Priority: (-1 - inner faces >) 2-wall > 3-symmetry > 5-inflow = 7-subsonic inflow > 6-outflow = 9-back pressure > 4-farfield
-
-  // 4-farfield
-  for (size_t l = 0; l < n_farfield; ++l) {
-    const auto nb = farfield_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = farfield_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &h_f = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_farfield<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, &farfield[l], i_face, param);
-    }
-  }
-
-  // 6-outflow
-  for (size_t l = 0; l < n_outflow; l++) {
-    const auto nb = outflow_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = outflow_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &h_f = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_outflow<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, i_face, param);
-    }
-  }
-  for (size_t l = 0; l < n_back_pressure; l++) {
-    const auto nb = back_pressure_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = back_pressure_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &h_f = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_back_pressure<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, &back_pressure[l], param, i_face);
-    }
-  }
-
-  // 5-inflow
-  for (size_t l = 0; l < n_inflow; l++) {
-    const auto nb = inflow_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = inflow_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_inflow<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, &inflow[l], i_face, param);
-    }
-  }
-  // 7 - subsonic inflow
-  for (size_t l = 0; l < n_subsonic_inflow; l++) {
-    const auto nb = subsonic_inflow_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = subsonic_inflow_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_subsonic_inflow<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, &subsonic_inflow[l], param,
-                                                                  i_face);
-    }
-  }
-
-  // 3-symmetry
-  for (size_t l = 0; l < n_symmetry; l++) {
-    const auto nb = symmetry_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = symmetry_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &h_f = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_symmetry<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, i_face, param);
-    }
-  }
-
-  // 2 - wall
-  for (size_t l = 0; l < n_wall; l++) {
-    const auto nb = wall_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = wall_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_wall<mix_model, turb, true><<<BPG, TPB>>>(field[i_zone].d_ptr, &wall[l], param, i_face);
-    }
-  }
-
-  // 8 - periodic
-  for (size_t l = 0; l < n_periodic; l++) {
-    const auto nb = periodic_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = periodic_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_periodic<mix_model, turb, true><<<BPG, TPB>>>(field[i_zone].d_ptr, param, i_face);
     }
   }
 }

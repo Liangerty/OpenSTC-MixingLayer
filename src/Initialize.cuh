@@ -24,8 +24,8 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
 void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
 
 __global__ void
-initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec, real delta_omega, int n_turb,
-                                  int n_fl);
+initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec, real delta_omega, int n_turb, int n_fl,
+                                  int n_ps);
 
 /**
  * @brief To relate the order of variables from the flowfield files to bv, yk, turbulent arrays

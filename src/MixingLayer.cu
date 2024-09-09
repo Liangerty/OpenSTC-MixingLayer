@@ -129,6 +129,8 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
   }
   var_info[13 + 2 * n_spec] = mix_frac_lower;
 
+  int counter = 13 + 2 * n_spec;
+
   if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
     if (parameter.get_int("RANS_model") == 2) {
       // SST model
@@ -154,10 +156,22 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
       real tke_lower = 1.5 * turb_intensity * turb_intensity * u_lower * u_lower;
       real omega_lower = rho_lower * tke_lower / (mutMul * mu_lower);
 
-      var_info[13 + 2 * n_spec + 1] = tke_upper;
-      var_info[13 + 2 * n_spec + 2] = omega_upper;
-      var_info[13 + 2 * n_spec + 3] = tke_lower;
-      var_info[13 + 2 * n_spec + 4] = omega_lower;
+      var_info[counter + 1] = tke_upper;
+      var_info[counter + 2] = omega_upper;
+      var_info[counter + 3] = tke_lower;
+      var_info[counter + 4] = omega_lower;
+      counter += 4;
+    }
+  }
+
+  if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+    for (int i = 1; i <= n_ps; ++i) {
+      if (upper.find("ps" + std::to_string(i)) != upper.cend()) {
+        var_info.push_back(std::get<real>(upper.at("ps" + std::to_string(i))));
+      }
+      if (lower.find("passive_scalar_" + std::to_string(i)) != lower.cend()) {
+        var_info.push_back(std::get<real>(lower.at("ps" + std::to_string(i))));
+      }
     }
   }
 }
