@@ -30,6 +30,9 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
   bool converged{false};
   int step{parameter.get_int("step")};
   int total_step{parameter.get_int("total_step") + step};
+  if (parameter.get_bool("steady_before_transient")) {
+    total_step = parameter.get_int("total_step_steady");
+  }
   const int n_block{mesh.n_block};
   const int n_var{parameter.get_int("n_var")};
   const int ngg{mesh[0].ngg};
@@ -97,7 +100,8 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
 
       // limit unphysical values computed by the program
       //limit_unphysical_variables<mix_model, turb>(field[b].d_ptr, param, b, step, bpg[b], tpb);
-//      limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+      if (parameter.get_bool("limit_flow"))
+        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
       // Apply boundary conditions
       // Attention: "driver" is a template class, when a template class calls a member function of another template,

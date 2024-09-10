@@ -14,7 +14,7 @@ list(APPEND src_file
     Field.h Field.cu FieldOperation.cuh FieldOperation.cu FiniteRateChem.cu FiniteRateChem.cuh FieldIO.h FirstOrderEuler.cuh
     FlameletDriver.cu FlameletLib.cu FlameletLib.cuh
     ImplicitTreatmentHPP.cuh Initialize.cuh Initialize.cu InviscidScheme.cuh InviscidScheme.cu IOManager.h
-    kernels.cuh kernels.cu
+    kernels.cuh kernels.cu kernels.h
     Limiter.cuh
     main.cu Mesh.h Mesh.cpp MixtureFraction.cpp MixtureFraction.h Monitor.cuh Monitor.cu MixingLayer.cuh MixingLayer.cu
     Parallel.h Parallel.cpp Parameter.h Parameter.cpp PostProcess.h PostProcess.cu

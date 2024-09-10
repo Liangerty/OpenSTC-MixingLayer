@@ -57,6 +57,7 @@ void RK3(Driver<mix_model, turb> &driver) {
   auto &parameter{driver.parameter};
   IOManager<mix_model, turb> ioManager(driver.myid, mesh, field, parameter, driver.spec, 0);
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
+  int output_time_series = parameter.get_int("output_time_series");
 
   Monitor monitor(parameter, driver.spec, mesh);
   const int if_monitor{parameter.get_int("if_monitor")};
@@ -71,8 +72,6 @@ void RK3(Driver<mix_model, turb> &driver) {
   bool finished{false};
   // This should be got from a Parameter later, which may be got from a previous simulation.
   real physical_time{parameter.get_real("solution_time")};
-  if (driver.myid == 0)
-    printf("\tCurrent physical time is %es\n", physical_time);
 
   real dt{1e+6};
   const bool fixed_time_step{parameter.get_bool("fixed_time_step")};
@@ -146,7 +145,8 @@ void RK3(Driver<mix_model, turb> &driver) {
         update_cv_and_bv_rk<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param, dt, rk);
 
         // limit unphysical values computed by the program
-//        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+        if (parameter.get_bool("limit_flow"))
+          limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
         // Apply boundary conditions
         // Attention: "driver" is a template class, when a template class calls a member function of another template,
@@ -203,7 +203,6 @@ void RK3(Driver<mix_model, turb> &driver) {
     }
     if (step % output_file == 0 || finished) {
       ioManager.print_field(step, parameter, physical_time);
-      timeSeriesIOManager.print_field(step, parameter, physical_time);
       if (if_collect_statistics && step > collect_statistics_iter_start)
         statistics_collector.export_statistical_data(param, parameter.get_bool("perform_spanwise_average"));
       post_process(driver);
@@ -212,6 +211,9 @@ void RK3(Driver<mix_model, turb> &driver) {
       if (parameter.get_bool("sponge_layer")) {
         output_sponge_layer(parameter, field, mesh, driver.spec);
       }
+    }
+    if (output_time_series > 0 && step % output_time_series == 0) {
+      timeSeriesIOManager.print_field(step, parameter, physical_time);
     }
     err = cudaGetLastError();
     if (err != cudaSuccess) {

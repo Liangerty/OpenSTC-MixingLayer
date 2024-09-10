@@ -194,7 +194,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   // the following parameters have been computed in "write_reference_state".
   if (problem_type == 1) {
     if (int i = parameter.get_int("characteristic_velocity_ml");i == 0) {
-      v_char = parameter.get_real("convective velocity");
+      v_char = parameter.get_real("convective_velocity");
     } else {
       v_char = parameter.get_real("DeltaU");
     }

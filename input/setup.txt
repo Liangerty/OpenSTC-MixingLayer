@@ -15,9 +15,33 @@ range real coreRegion = {  // The core region of computation. Only grids in core
 
 // controls
 int initial = 0     // 0 - new case, 1 - continue from a previous case.
-int total_step = 10000  // total number of steps
-int output_file = 2000  // frequency of output files
+int total_step = 1000  // total number of steps
+int output_file = 500  // frequency of output files
 int output_screen = 100 // frequency of screen output
+int output_time_series = 0 // frequency of output time series data. 0 - Not output, else - output every output_time_series steps.
+bool limit_flow = 0     // 0 - no limit, 1 - limit the flow field.
+
+// numerics
+// temporal scheme
+bool    steady = 0                         // 0 - unsteady, 1 - steady
+real    cfl = 1.0                         // CFL number
+int     implicit_method = 1             	// How to implicitly treat the ODE. 0 - Explicit integration; 1 - DPLUR
+int     DPLUR_inner_step = 3 		// If we use DPLUR, then we need a specified number of inner iterations.
+real    convergence_criteria = 1e-6 	// The criteria of convergence
+
+int     temporal_scheme = 3                // Temporal scheme for transient sims: 2-Dual-time iteration with DPLUR; 3-SSPRK
+bool    fixed_time_step   = 0              // If the time step is fixed(1), then the time step should be given; otherwise(0), the time step is determined by CFL number.
+real    dt = 5e-9                          // In unsteady simulation, the time step should be given
+real     n_flowThroughTime = 2               // The number of flow-through time for the unsteady simulation
+real    domain_length   = 0.065            // The length of the domain in the x direction, which is used to compute the flow-through time
+real    characteristic_velocity = -1        // The characteristic velocity for the flow-through time computation. If it is negative, the reference velocity is used.
+real    set_current_physical_time = 0      // In unsteady simulation, the current physical time is set to be this value if it is positive.
+
+// only for transient simulation, specify if the steady simulation is conducted before the transient simulation to
+// accelerate the development of the flow field.
+bool steady_before_transient = 0
+real cfl_steady = 0.2
+int total_step_steady = 100
 
 // flow info.
 // for mixing layer computations(problem type=1), specify the following info.
@@ -49,19 +73,6 @@ struct lower_stream = {
 }
 bool upper_faster = 0   // 1 - upper stream has larger mach number, 0 - lower stream has larger mach number.
 int characteristic_velocity_ml = 0 // 0 - convective velocity, 1 - velocity delta.
-
-// numerics
-// temporal scheme
-bool    steady = 0                         // 0 - unsteady, 1 - steady
-real    cfl = 1.0                         // CFL number
-int     implicit_method = 0             	// How to implicitly treat the ODE. 0 - Explicit integration; 1 - DPLUR
-int     DPLUR_inner_step = 3 		// If we use DPLUR, then we need a specified number of inner iterations.
-real    convergence_criteria = 1e-6 	// The criteria of convergence
-
-int     temporal_scheme = 3                // Temporal scheme for transient sims: 2-Dual-time iteration with DPLUR; 3-SSPRK
-bool    fixed_time_step   = 0              // If the time step is fixed(1), then the time step should be given; otherwise(0), the time step is determined by CFL number.
-real    dt = 5e-9                          // In unsteady simulation, the time step should be given
-real    total_simulation_time = 1.481144e-3   // In unsteady simulation, how long physical time to be simulated 2.2154e-3
 
 // spatial discretization
 int inviscid_scheme = 71               // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch

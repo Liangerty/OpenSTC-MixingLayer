@@ -78,6 +78,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
 
   IOManager<mix_model, turb> ioManager(driver.myid, mesh, field, parameter, driver.spec, 0);
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
+  int output_time_series = parameter.get_int("output_time_series");
 
   Monitor monitor(parameter, driver.spec, mesh);
   const int if_monitor{parameter.get_int("if_monitor")};
@@ -154,7 +155,8 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
         // update basic and conservative variables
         update_cv_and_bv<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
-//        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+        if (parameter.get_bool("limit_flow"))
+          limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
         // Apply boundary conditions
         // Attention: "driver" is a template class, when a template class calls a member function of another template,
@@ -220,6 +222,9 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
       post_process(driver);
       if (if_monitor)
         monitor.output_data();
+    }
+    if (output_time_series > 0 && step % output_time_series == 0) {
+      timeSeriesIOManager.print_field(step, parameter, physical_time);
     }
     err = cudaGetLastError();
     if (err != cudaSuccess) {

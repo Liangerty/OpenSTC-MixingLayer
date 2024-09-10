@@ -72,6 +72,8 @@ public:
 
   [[nodiscard]] bool has_int_array(const std::string &name) const { return int_array.find(name) != int_array.end(); }
 
+  void update_parameter(const std::string &name, const bool new_value) { bool_parameters[name] = new_value; }
+
   void update_parameter(const std::string &name, const int new_value) { int_parameters[name] = new_value; }
 
   void update_parameter(const std::string &name, const real new_value) { real_parameters[name] = new_value; }

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Define.h"
+
 namespace cfd{
-void setup_gpu_device(int n_proc, int myid);
+struct DParameter;
+__global__ void modify_cfl(DParameter *param, real cfl);
 }

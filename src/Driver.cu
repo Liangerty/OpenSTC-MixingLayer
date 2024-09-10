@@ -259,9 +259,9 @@ void write_reference_state(Parameter &parameter, const Species &species) {
 
       // Compute the convective velocity
       real uc = (u1 * c2 + u2 * c1) / (c1 + c2);
-      parameter.update_parameter("convective velocity", uc);
-      printf("\n\t\t->-> %-16.10e : convective_velocity(m/s)\n", uc);
-      fprintf(ref_state, "convective_velocity = %16.10e\n", uc);
+      parameter.update_parameter("convective_velocity", uc);
+      printf("\n\t\t->-> %-16.10e : convective velocity(m/s)\n", uc);
+      fprintf(ref_state, "convective velocity = %16.10e\n", uc);
       // Velocity ratio and density ratio
       real density_ratio = var_info[0] / var_info[7 + ns];
       real velocity_ratio = u1 / u2;

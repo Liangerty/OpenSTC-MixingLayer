@@ -721,6 +721,9 @@ FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::FieldIO(int _myid, const
                                                                 std::vector<Field> &_field, const Parameter &_parameter,
                                                                 const Species &spec, int ngg_out):
     myid{_myid}, mesh{_mesh}, field(_field), parameter{_parameter}, species{spec}, ngg_output{ngg_out} {
+  if (parameter.get_int("output_time_series") == 0) {
+    return;
+  }
   const std::filesystem::path out_dir("output/time_series");
   if (!exists(out_dir)) {
     create_directories(out_dir);

@@ -4,7 +4,7 @@
 #include <filesystem>
 #include "gxl_lib/MyString.h"
 #include <fmt/format.h>
-#include "kernels.cuh"
+#include "kernels.h"
 
 cfd::Parameter::Parameter(int *argc, char ***argv) {
   int myid, n_proc;
@@ -452,6 +452,10 @@ void cfd::Parameter::setup_default_settings() {
   // If we conduct transient simulations, the following parameters are used by default.
   int_parameters["temporal_scheme"] = 3; // RK3 is used by default
   bool_parameters["fixed_time_step"] = false; // The time step is computed with CFL condition.
+  real_parameters["n_flowThroughTime"] = 1;
+  real_parameters["domain_length"] = 1.0;
+  real_parameters["characteristic_velocity"] = -1;
+  real_parameters["set_current_physical_time"] = -1;
 
   // If dual-time stepping is used, the following parameters are needed.
   int_parameters["inner_iteration"] = 20;
@@ -536,6 +540,9 @@ void cfd::Parameter::setup_default_settings() {
   real_parameters["spongeZPlusEnd"] = 0;
 
   int_parameters["characteristic_velocity_ml"] = 1;
+
+  int_parameters["output_time_series"] = 0;
+  bool_parameters["limit_flow"] = false;
 }
 
 void cfd::Parameter::diagnose_parallel_info() {
