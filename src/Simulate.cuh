@@ -3,7 +3,6 @@
 #include "Driver.cuh"
 #include <cstdio>
 #include "SteadySim.cuh"
-#include "FirstOrderEuler.cuh"
 #include "RK.cuh"
 #include "DualTimeStepping.cuh"
 #include "kernels.cuh"
@@ -79,9 +78,6 @@ void simulate(Driver<mix_model, turb> &driver) {
 
     const auto temporal_tag{parameter.get_int("temporal_scheme")};
     switch (temporal_tag) {
-      case 1: // Explicit Euler, only first order time accuracy, should be avoided in most cases.
-        first_order_euler<mix_model, turb, reconstruct_bv>(driver);
-        break;
       case 2:
         dual_time_stepping<mix_model, turb>(driver);
         break;
