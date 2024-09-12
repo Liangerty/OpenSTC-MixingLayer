@@ -53,6 +53,14 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   n_ps = parameter.get_int("n_passive_scalar");
   i_ps = parameter.get_int("i_ps");
   i_ps_cv = parameter.get_int("i_ps_cv");
+  if (n_ps > 0) {
+    cudaMalloc(&sc_ps, n_ps * sizeof(real));
+    cudaMemcpy(sc_ps, parameter.get_real_array("sc_passive_scalar").data(), n_ps * sizeof(real),
+               cudaMemcpyHostToDevice);
+    cudaMalloc(&sct_ps, n_ps * sizeof(real));
+    cudaMemcpy(sct_ps, parameter.get_real_array("sct_passive_scalar").data(), n_ps * sizeof(real),
+               cudaMemcpyHostToDevice);
+  }
 
   // species info
   auto mem_sz = n_spec * sizeof(real);

@@ -571,7 +571,7 @@ void cfd::Parameter::diagnose_parallel_info() {
 void cfd::Parameter::deduce_sim_info() {
   int n_var = 5, n_scalar = 0, n_scalar_transported = 0, n_other_var = 1;
   int i_turb_cv = 5, i_fl_cv = 0;
-  int i_ps = 0, i_ps_cv = 0; // ps - passive scalar
+  int i_ps = 0, i_ps_cv = 5; // ps - passive scalar
 
   if (get_int("species") == 1) {
     n_scalar += get_int("n_spec");

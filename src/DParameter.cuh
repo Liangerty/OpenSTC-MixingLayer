@@ -31,6 +31,8 @@ struct DParameter {
   int i_turb_cv = 0;              // The index of turbulent variable in the conservative variable
   int i_ps = 0;                   // The index of passive scalar in the scalar variable
   int i_ps_cv = 0;                // The index of passive scalar in the conservative variable
+  real* sc_ps = nullptr;          // The Schmidt number of passive scalars
+  real* sct_ps = nullptr;         // The turbulent Schmidt number of passive scalars
 
   int inviscid_scheme = 0;  // The tag for inviscid scheme. 3 - AUSM+
   int reconstruction = 2; // The reconstruction method for inviscid flux computation

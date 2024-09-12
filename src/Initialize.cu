@@ -288,7 +288,7 @@ initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec,
     }
     if (n_ps > 0) {
       for (int l = 0; l < n_ps; ++l) {
-        sv(i, j, k, n_spec + n_turb + n_fl + l) = var[13 + 2 * n_spec + n_turb * 2 + 1 + 2 * l];
+        sv(i, j, k, n_spec + n_turb + n_fl + l) = var[14 + 2 * n_spec + 4 + 2 * l];
       }
     }
   } else {
@@ -313,7 +313,7 @@ initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec,
     }
     if (n_ps > 0) {
       for (int l = 0; l < n_ps; ++l) {
-        sv(i, j, k, n_spec + n_turb + n_fl + l) = var[13 + 2 * n_spec + n_turb * 2 + 1 + 2 * l + 1];
+        sv(i, j, k, n_spec + n_turb + n_fl + l) = var[14 + 2 * n_spec + 4 + 2 * l + 1];
       }
     }
   }

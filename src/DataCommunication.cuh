@@ -123,7 +123,6 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
   //Added with iterate through faces and will equal to the total face number when the loop ends
   int fc_num = 0;
   //Compute the array size of different faces and allocate them. Different for different faces.
-//  if (step == 0) {
   for (int blk = 0; blk < n_block; ++blk) {
     auto &B = mesh[blk];
     const int fc = static_cast<int>(B.parallel_face.size());
@@ -137,13 +136,9 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
       length[fc_num] = len;
       cudaMalloc(&(temp_s[fc_num]), len * sizeof(real));
       cudaMalloc(&(temp_r[fc_num]), len * sizeof(real));
-//        printf("Step %d, temp_s[%d][0] is allocated at %p\n", step, fc_num, &temp_s[fc_num][0]);
-//        printf("Step %d, temp_r[%d][0] is allocated at %p\n", step, fc_num, &temp_r[fc_num][0]);
-//        printf("Length[%d] = %d\n", fc_num, len);
       ++fc_num;
     }
   }
-//  }
 
   // Create array for MPI_ISEND/IRecv
   // MPI_REQUEST is an array representing whether the face sends/recvs successfully

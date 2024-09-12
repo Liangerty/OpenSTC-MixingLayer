@@ -44,7 +44,7 @@ void simulate(Driver<mix_model, turb> &driver) {
     }
     int myid = parameter.get_int("myid");
     if (myid == 0) {
-      printf("\n\tCurrent physical time is %es\n", physical_time);
+      printf("\n\t-> %10.4es : Current physical time\n", physical_time);
     }
     real length = parameter.get_real("domain_length");
     real u = parameter.get_real("v_inf");
