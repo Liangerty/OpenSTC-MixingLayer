@@ -151,6 +151,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
     ++i_blk;
   }
   // Read data of current process
+  int n_ps = parameter.get_int("n_passive_scalar");
   for (size_t blk = 0; blk < mesh.n_block; ++blk) {
     // 1. Zone marker. Value = 299.0, indicates a V112 header.
     offset += 4;
@@ -210,6 +211,12 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
         }
       } else if (index < 6 + n_spec + n_turb + 2) {
         // Flamelet info
+        index -= 6;
+        auto sv = field[blk].sv[index];
+        MPI_File_read_at(fp, offset, sv, 1, ty, &status);
+        offset += memsz;
+      } else if (index < 6 + parameter.get_int("i_ps") + n_ps) {
+        // Passive scalar
         index -= 6;
         auto sv = field[blk].sv[index];
         MPI_File_read_at(fp, offset, sv, 1, ty, &status);
@@ -323,6 +330,15 @@ identify_variable_labels(cfd::Parameter &parameter, std::vector<std::string> &va
             l = 6 + n_spec;
           }
           old_data_info[1] = 1; // SA model in previous simulation
+        }
+      }
+      if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+        const int i_ps = parameter.get_int("i_ps");
+        for (int i = 0; i < n_ps; ++i) {
+          if (n == "PS" + std::to_string(i + 1)) {
+            l = i_ps + i + 6;
+            break;
+          }
         }
       }
     }

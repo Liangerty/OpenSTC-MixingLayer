@@ -15,7 +15,7 @@ range real coreRegion = {  // The core region of computation. Only grids in core
 
 // controls
 int initial = 0     // 0 - new case, 1 - continue from a previous case.
-int total_step = 1000  // total number of steps
+int total_step = 100000  // total number of steps
 int output_file = 500  // frequency of output files
 int output_screen = 100 // frequency of screen output
 int output_time_series = 0 // frequency of output time series data. 0 - Not output, else - output every output_time_series steps.
@@ -34,8 +34,6 @@ bool    fixed_time_step   = 0              // If the time step is fixed(1), then
 real    dt = 5e-9                          // In unsteady simulation, the time step should be given
 real     n_flowThroughTime = 2               // The number of flow-through time for the unsteady simulation
 real    domain_length   = 0.065            // The length of the domain in the x direction, which is used to compute the flow-through time
-real    characteristic_velocity = -1        // The characteristic velocity for the flow-through time computation. If it is negative, the reference velocity is used.
-real    set_current_physical_time = 0      // In unsteady simulation, the current physical time is set to be this value if it is positive.
 
 // only for transient simulation, specify if the steady simulation is conducted before the transient simulation to
 // accelerate the development of the flow field.
@@ -58,9 +56,10 @@ struct upper_stream = {
     real ps1 = 1
     real ps2 = 1
     real ps3 = 1
+    real ps4 = 1
 }
 struct lower_stream = {
-    real temperature = 3304.504458
+    real temperature = 230
     real pressure = 100000
     real O2 = 0.232
     real N2 = 0.768
@@ -70,6 +69,7 @@ struct lower_stream = {
     real ps1 = 0
     real ps2 = 0
     real ps3 = 0
+    real ps4 = 0
 }
 bool upper_faster = 0   // 1 - upper stream has larger mach number, 0 - lower stream has larger mach number.
 int characteristic_velocity_ml = 0 // 0 - convective velocity, 1 - velocity delta.
@@ -114,7 +114,13 @@ struct  periodic  {
 }
 
 // Additional passive scalar
-int n_passive_scalar = 3 // number of additional scalars
+int n_passive_scalar = 4 // number of additional scalars
+array real sc_passive_scalar {
+    0.2 0.5 1.0 1.2
+}
+array real sct_passive_scalar {
+    1 1 1 1
+}
 
 // sponge layer info
 bool sponge_layer = 0
