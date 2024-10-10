@@ -20,12 +20,6 @@ template<MixtureModel mix_model, class turb>
 void IOManager<mix_model, turb>::print_field(int step, const Parameter &parameter, real physical_time) {
   field_io.print_field(step, physical_time);
   boundary_io.print_boundary();
-
-  if constexpr (mix_model == MixtureModel::FL) {
-    std::ofstream out("output/message/flamelet_step.txt", std::ios::trunc);
-    out << parameter.get_int("n_fl_step") << std::endl;
-    out.close();
-  }
 }
 
 template<MixtureModel mix_model, class turb>

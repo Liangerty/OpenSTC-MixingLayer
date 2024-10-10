@@ -32,6 +32,7 @@ private:
   // Basic info
   bool if_collect_statistics{false};
   int start_iter{0};
+  bool output_statistics_plt{false};
 public:
   int counter{0};
 private:
@@ -82,7 +83,8 @@ void StatisticsCollector::initialize_statistics_collector(const Species &species
     read_previous_statistical_data();
   }
 
-  prepare_for_statistical_data_plot<mix_model, turb>(species);
+  if (parameter.get_bool("output_statistics_plt"))
+    prepare_for_statistical_data_plot<mix_model, turb>(species);
   cudaMalloc(&counter_ud_device, sizeof(int) * UserDefineStat::n_collect);
 }
 

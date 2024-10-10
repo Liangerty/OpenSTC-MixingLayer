@@ -1,34 +1,82 @@
 bool parallel = 0      // specify the mode of computation. 0 - serial, 1 - parallel.
 
-int  problem_type = 0  // the type of problem. 0 - general problem, 1 - mixing layer.
+int  problem_type = 1  // the type of problem. 0 - general problem, 1 - mixing layer.
 
 // Grid info
-int gridIsBinary = 0    // 0 - ASCII, 1 - binary
-real gridScale = 1    // grid scale(m)
+int mesh_file_type = 0  // Read the Plot3D file exported from Pointwise. 0 - Preprocessed by readGrid, 1 - directly read the Plot3D file.
+string mesh_prefix = mixingLayer // The name related to CAE files, where the grid is mesh_prefix.dat, and the boundary conditions are mesh_prefix.inp.
+int gridIsBinary = 1    // 0 - ASCII, 1 - binary
+real gridScale = 1e-4    // grid scale(m)
+range real coreRegion = {  // The core region of computation. Only grids in core regions are monitored or probed.
+  0  650   // x1,x2
+  -60 60   // y1,y2
+  -20 20   // z1,z2
+}
 
 // controls
-int initial = 0         // 0 - new case, 1 - continue from a previous case.
-int total_step = 1000000  // total number of steps
-int output_file = 10000  // frequency of output files
-int output_screen = 1000 // frequency of screen output
+int initial = 0     // 0 - new case, 1 - continue from a previous case.
+int total_step = 100000  // total number of steps
+int output_file = 500  // frequency of output files
+int output_screen = 100 // frequency of screen output
+int output_time_series = 0 // frequency of output time series data. 0 - Not output, else - output every output_time_series steps.
+bool limit_flow = 0     // 0 - no limit, 1 - limit the flow field.
 
 // numerics
 // temporal scheme
-bool steady = 0                         // 0 - unsteady, 1 - steady
-real cfl = 0.5                            // CFL number
-int     implicit_method = 1         // How to implicitly treat the ODE. 0 - Explicit integration; 1 - DPLUR
-int     DPLUR_inner_step = 3        // If we use DPLUR, then we need a specified number of inner iterations.
-real convergence_criteria = 1e-7    // The criteria of convergence
+bool    steady = 0                         // 0 - unsteady, 1 - steady
+real    cfl = 1.0                         // CFL number
+int     implicit_method = 1             	// How to implicitly treat the ODE. 0 - Explicit integration; 1 - DPLUR
+int     DPLUR_inner_step = 3 		// If we use DPLUR, then we need a specified number of inner iterations.
+real    convergence_criteria = 1e-6 	// The criteria of convergence
 
-int	 temporal_scheme = 3                // Temporal scheme for transient sims: 2-Dual-time iteration with DPLUR; 3-SSPRK
-bool fixed_time_step   = 0              // If the time step is fixed(1), then the time step should be given; otherwise(0), the time step is determined by CFL number.
-real dt = 5e-9                          // In unsteady simulation, the time step should be given
-real total_simulation_time = 4e-3   // In unsteady simulation, how long physical time to be simulated 2.2154e-3
+int     temporal_scheme = 3                // Temporal scheme for transient sims: 2-Dual-time iteration with DPLUR; 3-SSPRK
+bool    fixed_time_step   = 0              // If the time step is fixed(1), then the time step should be given; otherwise(0), the time step is determined by CFL number.
+real    dt = 5e-9                          // In unsteady simulation, the time step should be given
+real     n_flowThroughTime = 2               // The number of flow-through time for the unsteady simulation
+real    domain_length   = 0.065            // The length of the domain in the x direction, which is used to compute the flow-through time
+
+// only for transient simulation, specify if the steady simulation is conducted before the transient simulation to
+// accelerate the development of the flow field.
+bool steady_before_transient = 0
+real cfl_steady = 0.2
+int total_step_steady = 100
+
+// flow info.
+// for mixing layer computations(problem type=1), specify the following info.
+real ma_c = 0.3            // the convective Mach number Ma_c
+real delta_omega = 1e-4     // the inlet vorticity thickness(m)
+struct upper_stream = {
+    real mach = 1.1
+    real temperature = 230
+    real pressure = 100000
+    real H2 = 1.0
+    real mixture_fraction = 1
+    real turb_viscosity_ratio =	1
+    real turbulence_intensity = 0.01
+    real ps1 = 1
+    real ps2 = 1
+    real ps3 = 1
+    real ps4 = 1
+}
+struct lower_stream = {
+    real temperature = 230
+    real pressure = 100000
+    real O2 = 0.232
+    real N2 = 0.768
+    real mixture_fraction = 0
+    real turb_viscosity_ratio =	1
+    real turbulence_intensity = 0.01
+    real ps1 = 0
+    real ps2 = 0
+    real ps3 = 0
+    real ps4 = 0
+}
+bool upper_faster = 0   // 1 - upper stream has larger mach number, 0 - lower stream has larger mach number.
+int characteristic_velocity_ml = 0 // 0 - convective velocity, 1 - velocity delta.
 
 // spatial discretization
-int inviscid_scheme = 71                // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch, 6 - Energy Preserving Scheme
-int reconstruction = 4                  // 2 - MUSCL, 3 - NND2, 4 - WENO5, 5 - WENO7
-bool positive_preserving = 0            // If the Positive-preserving limiter is activated, only implemented for 51/52
+int inviscid_scheme = 71               // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
+bool positive_preserving = 1            // If the Positive-preserving limiter is activated, only implemented for 51/52
 int viscous_order = 2                   // Default: 2nd order central discretization. Other choices: 0(inviscid)
 
 // chemical info
@@ -37,21 +85,24 @@ int reaction = 0 //0-No reaction; 1-Finite rate chemistry; 2-Flamelet model. Eve
 string mechanism_file = chemistry/H2_mech_mixing.inp  // H2_mech_mixing.inp
 
 // turbulent sim info
-bool turbulence = 0 // 0 - laminar/DNS, 1 - turbulent
+bool    turbulence = 0                  // 0 - laminar/DNS, 1 - turbulent
+int     turbulence_method = 1           // Turbulence model used. Options: 0 - DNS, 1 - RANS, 2 - DES, LES
+int     RANS_model = 2                  // RANS model used. Options: 2 - k-omega_SST, 1 - S-A
+int     turb_implicit   =   1           // If we use RANS, choose whether the source terms are implicitly treated. 1 - Yes(Default), 0 - No
 
 // bc info
 array string boundary_conditions {
- freestream outflow wall
+ freestream outflow
 }
 string  reference_state =   freestream  // Specify the reference state for the simulation. The reference state is used to calculate the stagnation enthalpy and the stagnation pressure.
 struct  freestream {
     string  type            =   inflow
     int     label           =   5
-    int     inflow_type     =   0 // 0 for constant inflow, 1 for mixing-layer-type inflow, other types may be added(such as 2 for self-similar inflow)
+    int     inflow_type     =   1 // 0 for constant inflow, 1 for mixing-layer-type inflow, other types may be added(such as 2 for self-similar inflow)
     int     fluctuation_type    =  0       // Specify the type of fluctuation. 0 for no fluctuation, 1 for fluctuation in velocity with white noise.
-    real    temperature     =   56.2
-    real    mach            =   3.5
-    real    reynolds        =   1.107e+6
+    real    fluctuation_intensity    =   0.01    // Specify the intensity of fluctuation in velocity. The intensity is defined as the ratio of the standard deviation of the fluctuation to the mean value of the velocity.
+    real    turb_viscosity_ratio	=	1
+    real    turbulence_intensity               =   0.01
 }
 struct outflow {
     string type = outflow
@@ -61,22 +112,37 @@ struct  periodic  {
     string type = periodic
     int label = 8
 }
-struct wall {
-    string type = wall
-    int label = 2
-    string  thermal_type    =   isothermal  // Thermal wall type can be 1. "adiabatic" wall; 2. "isothermal" wall
-    real temperature = 172.208
-    int fluctuation_type = 0
+
+// Additional passive scalar
+int n_passive_scalar = 4 // number of additional scalars
+array real sc_passive_scalar {
+    0.2 0.5 1.0 1.2
+}
+array real sct_passive_scalar {
+    1 1 1 1
 }
 
-array int post_process {
-    0
+// sponge layer info
+bool sponge_layer = 0
+int sponge_function = 0 // 0 - (Nektar++, CPC, 2024)
+array int sponge_layer_direction = { // 0 - x-, 1 - x+, 2 - y-, 3 - y+, 4 - z-, 5 - z+
+    1   // 1 - x+
+    2   // 2 - y-
+    3   // 3 - y+
 }
+real spongeXPlusStart = 650
+real spongeXPlusEnd = 850
+real spongeYMinusStart = -60
+real spongeYMinusEnd = -180
+real spongeYPlusStart = 60
+real spongeYPlusEnd = 180
+real spongeCoefficient = 1e-8 // The coefficient for Uc/Dx.
 
 // statistical choice
 bool if_collect_statistics = 0
 bool if_continue_collect_statistics = 0
 bool perform_spanwise_average = 1
+bool output_statistics_plt = 0
 
 // monitor info
 int if_monitor = 0 // Monitor some points
@@ -84,12 +150,8 @@ string monitor_file = input/monitor_points.txt
 array string monitor_var {
     density u   v  w  pressure temperature H2 O2 N2
 }
-// The slices are only for mixing layers, whose x coordinate is fixed for the same i. (scaled by gridScale)
+// The slices are only for mixing layers, whose x coordinate is fixed for the same i.
 int slice_frequency = 1000
 array real xSlice = {
    600
-}
-// We assume the z coordinate is fixed for the same k index. (scaled by gridScale)
-array real zSlice = {
-    0
 }

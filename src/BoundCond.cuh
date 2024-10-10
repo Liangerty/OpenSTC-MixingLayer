@@ -36,11 +36,8 @@ struct DBoundCond {
 
   void link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) const;
 
-  template<MixtureModel mix_model, class turb, bool with_cv = false>
-  void apply_boundary_conditions(const Block &block, Field &field, DParameter *param) const;
-
   template<MixtureModel mix_model, class turb>
-  void apply_boundary_conditions(const Mesh &mesh, std::vector<Field> &field, DParameter *param) const;
+  void apply_boundary_conditions(const Block &block, Field &field, DParameter *param) const;
 
   // There may be time-dependent BCs, which need to be updated at each time step.
   // E.g., the turbulent library method, we need to update the profile and fluctuation.
@@ -90,7 +87,7 @@ void link_boundary_and_condition(const std::vector<Boundary> &boundary, BCInfo *
 __global__ void
 initialize_rng(curandState *rng_states, int size, int64_t time_stamp);
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
   const auto &b = zone->boundary[i_face];
   auto range_start = b.range_start, range_end = b.range_end;
@@ -153,13 +150,11 @@ __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
       zone->mut(gi, gj, gk) = zone->mut(ii, ij, ik);
     }
 
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
   }
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void apply_outflow(DZone *zone, int i_face, const DParameter *param) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
@@ -185,13 +180,11 @@ __global__ void apply_outflow(DZone *zone, int i_face, const DParameter *param) 
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(gi, gj, gk) = zone->mut(i, j, k);
     }
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
   }
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void
 apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::VectorField3D<real> *profile_d_ptr,
              curandState *rng_states_d_ptr, ggxl::VectorField3D<real> *fluctuation_dPtr) {
@@ -211,7 +204,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
   const int n_scalar = param->n_scalar;
 
   real density, u, v, w, p, T, mut, vel;
-  real sv_b[MAX_SPEC_NUMBER + 4];
+  real sv_b[MAX_SPEC_NUMBER + 4 + MAX_PASSIVE_SCALAR_NUMBER];
 
   if (inflow->inflow_type == 1) {
     // Profile inflow
@@ -219,7 +212,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
     // Therefore, all parts including fluctuations and assigning values to ghost layers are done in this function.
     // After all operations, we return directly.
 
-    auto &prof = profile_d_ptr[inflow->profile_idx];
+    const auto &prof = profile_d_ptr[inflow->profile_idx];
     int idx[3] = {i, j, k};
     idx[b.face] = b.direction == 1 ? 0 : ngg;
 
@@ -265,20 +258,18 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       // LST fluctuation
       int idx_fluc[3]{i, j, k};
       idx_fluc[b.face] = 0;
-      auto &fluc_info = fluctuation_dPtr[inflow->fluc_prof_idx];
+      const auto &fluc_info = fluctuation_dPtr[inflow->fluc_prof_idx];
 
       // rho u v w p t
       bv_fluc_real[0] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 0);
       bv_fluc_real[1] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 1);
       bv_fluc_real[2] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 2);
       bv_fluc_real[3] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 3);
-      bv_fluc_real[4] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 4);
       bv_fluc_real[5] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 5);
       bv_fluc_imag[0] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 6);
       bv_fluc_imag[1] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 7);
       bv_fluc_imag[2] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 8);
       bv_fluc_imag[3] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 9);
-      bv_fluc_imag[4] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 10);
       bv_fluc_imag[5] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 11);
 
       real x = zone->x(i, j, k), z = zone->z(i, j, k);
@@ -289,11 +280,11 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       real beta = 2.0 * pi / inflow->spanwise_wavelength;
       real t = param->physical_time;
       real phi = alpha * x - omega * t;
-      density += A0 * (bv_fluc_real[0] * cos(phi) - bv_fluc_imag[0] * sin(phi)) * cos(beta * z);
-      u += A0 * (bv_fluc_real[1] * cos(phi) - bv_fluc_imag[1] * sin(phi)) * cos(beta * z);
-      v += A0 * (bv_fluc_real[2] * cos(phi) - bv_fluc_imag[2] * sin(phi)) * cos(beta * z);
-      w += A0 * (bv_fluc_real[3] * cos(phi) - bv_fluc_imag[3] * sin(phi)) * cos(beta * z);
-      T += A0 * (bv_fluc_real[5] * cos(phi) - bv_fluc_imag[5] * sin(phi)) * cos(beta * z);
+      density += A0 * (bv_fluc_real[0] * cos(phi) - bv_fluc_imag[0] * sin(phi)) * cos(beta * z) * param->rho_ref;
+      u += A0 * (bv_fluc_real[1] * cos(phi) - bv_fluc_imag[1] * sin(phi)) * cos(beta * z) * param->v_ref;
+      v += A0 * (bv_fluc_real[2] * cos(phi) - bv_fluc_imag[2] * sin(phi)) * cos(beta * z) * param->v_ref;
+      w += A0 * (bv_fluc_real[3] * cos(phi) - bv_fluc_imag[3] * sin(phi)) * cos(beta * z) * param->v_ref;
+      T += A0 * (bv_fluc_real[5] * cos(phi) - bv_fluc_imag[5] * sin(phi)) * cos(beta * z) * param->T_ref;
       p = density * R_u / mw_air * T;
     }
 
@@ -310,9 +301,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(i, j, k) = mut;
     }
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
 
     // For ghost grids
     for (int g = 1; g <= ngg; g++) {
@@ -369,13 +358,12 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
         real beta = 2.0 * pi / inflow->spanwise_wavelength;
         real t = param->physical_time;
         real phi = alpha * x - omega * t;
-        density += A0 * (bv_fluc_real[0] * cos(phi) - bv_fluc_imag[0] * sin(phi)) * cos(beta * z);
-        u += A0 * (bv_fluc_real[1] * cos(phi) - bv_fluc_imag[1] * sin(phi)) * cos(beta * z);
-        v += A0 * (bv_fluc_real[2] * cos(phi) - bv_fluc_imag[2] * sin(phi)) * cos(beta * z);
-        w += A0 * (bv_fluc_real[3] * cos(phi) - bv_fluc_imag[3] * sin(phi)) * cos(beta * z);
-        T += A0 * (bv_fluc_real[5] * cos(phi) - bv_fluc_imag[5] * sin(phi)) * cos(beta * z);
+        density += A0 * (bv_fluc_real[0] * cos(phi) - bv_fluc_imag[0] * sin(phi)) * cos(beta * z) * param->rho_ref;
+        u += A0 * (bv_fluc_real[1] * cos(phi) - bv_fluc_imag[1] * sin(phi)) * cos(beta * z) * param->v_ref;
+        v += A0 * (bv_fluc_real[2] * cos(phi) - bv_fluc_imag[2] * sin(phi)) * cos(beta * z) * param->v_ref;
+        w += A0 * (bv_fluc_real[3] * cos(phi) - bv_fluc_imag[3] * sin(phi)) * cos(beta * z) * param->v_ref;
+        T += A0 * (bv_fluc_real[5] * cos(phi) - bv_fluc_imag[5] * sin(phi)) * cos(beta * z) * param->T_ref;
         p = density * R_u / mw_air * T;
-
       }
 
       bv(gi, gj, gk, 0) = density;
@@ -390,9 +378,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       if constexpr (TurbMethod<turb>::hasMut) {
         zone->mut(gi, gj, gk) = mut;
       }
-      if constexpr (with_cv) {
-        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-      }
+      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
     }
     return;
   }
@@ -412,6 +398,9 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
         sv_b[l] = inflow->sv[l];
       }
       vel = sqrt(u * u + v * v + w * w);
+      if constexpr (TurbMethod<turb>::hasMut) {
+        mut = inflow->mut;
+      }
     } else {
       // The lower stream
       density = inflow->density_lower;
@@ -423,6 +412,9 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
         sv_b[l] = inflow->sv_lower[l];
       }
       vel = sqrt(u * u + v * v + w * w);
+      if constexpr (TurbMethod<turb>::hasMut) {
+        mut = inflow->mut_lower;
+      }
     }
 
     if (inflow->fluctuation_type == 1) {
@@ -510,9 +502,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
   if constexpr (TurbMethod<turb>::hasMut) {
     zone->mut(i, j, k) = mut;
   }
-  if constexpr (with_cv) {
-    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
-  }
+  compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
   for (int g = 1; g <= ngg; g++) {
     const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
     bv(gi, gj, gk, 0) = density;
@@ -527,13 +517,11 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(gi, gj, gk) = mut;
     }
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
   }
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DParameter *param) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
@@ -598,9 +586,7 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(i, j, k) = farfield->mut;
     }
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
 
     for (int g = 1; g <= ngg; g++) {
       const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
@@ -616,9 +602,7 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
       if constexpr (TurbMethod<turb>::hasMut) {
         zone->mut(gi, gj, gk) = farfield->mut;
       }
-      if constexpr (with_cv) {
-        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-      }
+      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
     }
   } else if (mach_b >= 1) {
     // supersonic outflow
@@ -633,11 +617,62 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
       if constexpr (TurbMethod<turb>::hasMut) {
         zone->mut(gi, gj, gk) = zone->mut(i, j, k);
       }
-      if constexpr (with_cv) {
-        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-      }
+      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
     }
   } else {
+    // Temporarily using the ACANS method, only for air
+//    if (mach_b <= 0) {
+//      // Only for subsonic inflow!!
+//      int i1 = i - dir[0], j1 = j - dir[1], k1 = k - dir[2];
+//      real rho1 = bv(i1, j1, k1, 0), p1 = bv(i1, j1, k1, 4);
+//      real c1 = sqrt(gamma_air * p1 / rho1);
+//      real pb = 0.5 * (p1 + farfield->pressure - rho1 * c1 * ((farfield->u - bv(i1, j1, k1, 1)) * nx +
+//                                                              (farfield->v - bv(i1, j1, k1, 2)) * ny +
+//                                                              (farfield->w - bv(i1, j1, k1, 3)) * nz));
+//      real db = farfield->density + gamma_air * (pb - farfield->pressure) / (c1 * c1);
+//      real ub = farfield->u + (pb - farfield->pressure) / (rho1 * c1) * nx;
+//      real vb = farfield->v + (pb - farfield->pressure) / (rho1 * c1) * ny;
+//      real wb = farfield->w + (pb - farfield->pressure) / (rho1 * c1) * nz;
+//
+//      // Specify the boundary value as given.
+//      bv(i, j, k, 0) = db;
+//      bv(i, j, k, 1) = ub;
+//      bv(i, j, k, 2) = vb;
+//      bv(i, j, k, 3) = wb;
+//      bv(i, j, k, 4) = pb;
+//      bv(i, j, k, 5) = pb / (db * R_u / mw_air);
+//      for (int l = 0; l < n_scalar; ++l) {
+//        sv(i, j, k, l) = farfield->sv[l];
+//      }
+//      if constexpr (TurbMethod<turb>::hasMut) {
+//        zone->mut(i, j, k) = farfield->mut;
+//      }
+//        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
+//
+//      for (int g = 1; g <= ngg; g++) {
+//        const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+//        const int ii{i - g * dir[0]}, ij{j - g * dir[1]}, ik{k - g * dir[2]};
+//
+//        real d2 = 2 * db - bv(ii, ij, ik, 0);
+//        real p2 = 2 * pb - bv(ii, ij, ik, 4);
+//        if (p2 < 0.1 * pb) p2 = pb;
+//
+//        bv(gi, gj, gk, 0) = (d2 <= 0.1 * db ? db : d2);
+//        bv(gi, gj, gk, 1) = 2 * ub - bv(ii, ij, ik, 1);
+//        bv(gi, gj, gk, 2) = 2 * vb - bv(ii, ij, ik, 2);
+//        bv(gi, gj, gk, 3) = 2 * wb - bv(ii, ij, ik, 3);
+//        bv(gi, gj, gk, 4) = p2;
+//        bv(gi, gj, gk, 5) = p2 / (d2 * R_u / mw_air);
+//        for (int l = 0; l < n_scalar; ++l) {
+//          sv(gi, gj, gk, l) = farfield->sv[l];
+//        }
+//        if constexpr (TurbMethod<turb>::hasMut) {
+//          zone->mut(gi, gj, gk) = farfield->mut;
+//        }
+//          compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+//      }
+//    }
+
     // subsonic inflow and outflow
 
     // The positive riemann invariant is in the same direction of the boundary normal, which points to the outside of the computational domain.
@@ -734,9 +769,7 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(i, j, k) = mut;
     }
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
 
     for (int g = 1; g <= ngg; g++) {
       const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
@@ -752,15 +785,13 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
       if constexpr (TurbMethod<turb>::hasMut) {
         zone->mut(gi, gj, gk) = mut;
       }
-      if constexpr (with_cv) {
-        compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-      }
+      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
     }
   }
 
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *rng_states_d_ptr) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
@@ -824,6 +855,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
   bv(i, j, k, 4) = p;
   bv(i, j, k, 5) = t_wall;
 
+  real v_blow{0};
   if (if_fluctuation == 1) {
     // Pirozzoli & Li fluctuations
     real phil[10] = {0.03, 0.47, 0.43, 0.73, 0.86, 0.36, 0.96, 0.47, 0.36, 0.61};
@@ -848,6 +880,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
 //      ht += wall->Tm[m] * sin((m + 1) * omega * t + 2.0 * pi * (m + 1) * phim[m]);
     }
     if (x > x0 && x < x1) {
+      v_blow = A0 * param->v_ref * fx * gz * ht;
       bv(i, j, k, 2) = A0 * param->v_ref * fx * gz * ht;
     }
   } else if (if_fluctuation == 3) {
@@ -898,9 +931,14 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     sv(i, j, k, i_fl + 1) = sv(idx[0], idx[1], idx[2], i_fl + 1);
   }
 
-  if constexpr (with_cv) {
-    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
+  if (param->n_ps > 0) {
+    const int i_ps{param->i_ps};
+    for (int l = 0; l < param->n_ps; l++) {
+      sv(i, j, k, i_ps + l) = sv(idx[0], idx[1], idx[2], i_ps + l);
+    }
   }
+
+  compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
 
   for (int g = 1; g <= ngg; ++g) {
     const int i_in[]{i - g * dir[0], j - g * dir[1], k - g * dir[2]};
@@ -922,6 +960,7 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
       const auto mwk = param->mw;
       mw = 0;
       for (int l = 0; l < param->n_spec; ++l) {
+        // The mass fraction is given by a symmetry condition, is this reasonable?
         sv(i_gh[0], i_gh[1], i_gh[2], l) = sv(i_in[0], i_in[1], i_in[2], l);
         mw += sv(i_gh[0], i_gh[1], i_gh[2], l) / mwk[l];
       }
@@ -931,11 +970,8 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     const real rho_g{p_i * mw / (t_g * cfd::R_u)};
     bv(i_gh[0], i_gh[1], i_gh[2], 0) = rho_g;
     bv(i_gh[0], i_gh[1], i_gh[2], 1) = -bv(i_in[0], i_in[1], i_in[2], 1);
-    bv(i_gh[0], i_gh[1], i_gh[2], 2) = -bv(i_in[0], i_in[1], i_in[2], 2);
+    bv(i_gh[0], i_gh[1], i_gh[2], 2) = v_blow * 2 - bv(i_in[0], i_in[1], i_in[2], 2);
     bv(i_gh[0], i_gh[1], i_gh[2], 3) = -bv(i_in[0], i_in[1], i_in[2], 3);
-//    bv(i_gh[0], i_gh[1], i_gh[2], 1) = 0;
-//    bv(i_gh[0], i_gh[1], i_gh[2], 2) = 0;
-//    bv(i_gh[0], i_gh[1], i_gh[2], 3) = 0;
     bv(i_gh[0], i_gh[1], i_gh[2], 4) = p_i;
     bv(i_gh[0], i_gh[1], i_gh[2], 5) = t_g;
 
@@ -953,13 +989,18 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
       sv(i_gh[0], i_gh[1], i_gh[2], param->i_fl + 1) = sv(i_in[0], i_in[1], i_in[2], param->i_fl + 1);
     }
 
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i_gh[0], i_gh[1], i_gh[2]);
+    if (param->n_ps > 0) {
+      const int i_ps{param->i_ps};
+      for (int l = 0; l < param->n_ps; l++) {
+        sv(i_gh[0], i_gh[1], i_gh[2], i_ps + l) = sv(i_in[0], i_in[1], i_in[2], i_ps + l);
+      }
     }
+
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i_gh[0], i_gh[1], i_gh[2]);
   }
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DParameter *param, int i_face) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
@@ -1037,13 +1078,11 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
     if constexpr (TurbMethod<turb>::hasMut)
       zone->mut(gi, gj, gk) = zone->mut(i, j, k);
 
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
   }
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DParameter *param, int i_face) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
@@ -1058,28 +1097,76 @@ __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DPa
   auto &bv = zone->bv;
   auto &sv = zone->sv;
 
-  for (int g = 1; g <= ngg; ++g) {
-    const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
-    for (int l = 0; l < 4; ++l) {
-      bv(gi, gj, gk, l) = bv(i, j, k, l);
+  // The multi-species type is not implemented.
+  real nx{zone->metric(i, j, k)(b.face + 1, 1)},
+      ny{zone->metric(i, j, k)(b.face + 1, 2)},
+      nz{zone->metric(i, j, k)(b.face + 1, 3)};
+  real grad_n_inv = b.direction / sqrt(nx * nx + ny * ny + nz * nz);
+  nx *= grad_n_inv;
+  ny *= grad_n_inv;
+  nz *= grad_n_inv;
+  real u_b{bv(i, j, k, 1)}, v_b{bv(i, j, k, 2)}, w_b{bv(i, j, k, 3)};
+  const real u_face{nx * u_b + ny * v_b + nz * w_b};
+  real p_b{bv(i, j, k, 4)}, rho_b{bv(i, j, k, 0)};
+  const real a_b{sqrt(gamma_air * p_b / rho_b)};
+  const real mach_b{abs(u_face / a_b)};
+
+  if (mach_b < 1) {
+    p_b = backPressure->pressure;
+    int i1 = i - dir[0], j1 = j - dir[1], k1 = k - dir[2];
+    real d1{bv(i1, j1, k1, 0)}, u1{bv(i1, j1, k1, 1)}, v1{bv(i1, j1, k1, 2)}, w1{bv(i1, j1, k1, 3)}, p1{
+        bv(i1, j1, k1, 4)};
+    real c1{sqrt(gamma_air * p1 / d1)};
+    rho_b = d1 + (p_b - p1) / (c1 * c1);
+    u_b = u1 + nx * (p1 - p_b) / (d1 * c1);
+    v_b = v1 + ny * (p1 - p_b) / (d1 * c1);
+    w_b = w1 + nz * (p1 - p_b) / (d1 * c1);
+
+    for (int g = 1; g <= ngg; ++g) {
+      const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+      const int ii{i - g * dir[0]}, ij{j - g * dir[1]}, ik{k - g * dir[2]};
+
+      real p_g{2 * p_b - bv(ii, ij, ik, 4)}, rho_g{2 * rho_b - bv(ii, ij, ik, 0)};
+      real u_g{2 * u_b - bv(ii, ij, ik, 1)}, v_g{2 * v_b - bv(ii, ij, ik, 2)}, w_g{2 * w_b - bv(ii, ij, ik, 3)};
+
+      bv(gi, gj, gk, 0) = rho_g;
+      bv(gi, gj, gk, 1) = u_g;
+      bv(gi, gj, gk, 2) = v_g;
+      bv(gi, gj, gk, 3) = w_g;
+      bv(gi, gj, gk, 4) = p_g;
+      bv(gi, gj, gk, 5) = p_g / (rho_g * R_u / mw_air);
+      for (int l = 0; l < param->n_scalar_transported; ++l) {
+        sv(gi, gj, gk, l) = sv(i, j, k, l);
+      }
+
+      if constexpr (TurbMethod<turb>::hasMut) {
+        zone->mut(gi, gj, gk) = zone->mut(i, j, k);
+      }
+      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
     }
-    bv(gi, gj, gk, 4) = backPressure->pressure;
-    // This should be modified later, as p is specified, temperature is extrapolated,
-    // the density should be acquired from EOS instead of extrapolation.
-    bv(gi, gj, gk, 5) = bv(i, j, k, 5);
-    for (int l = 0; l < param->n_scalar; ++l) {
-      sv(gi, gj, gk, l) = sv(i, j, k, l);
-    }
-    if constexpr (TurbMethod<turb>::hasMut) {
-      zone->mut(gi, gj, gk) = zone->mut(i, j, k);
-    }
-    if constexpr (with_cv) {
+  } else {
+    for (int g = 1; g <= ngg; ++g) {
+      const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+
+      bv(gi, gj, gk, 0) = rho_b;
+      bv(gi, gj, gk, 1) = u_b;
+      bv(gi, gj, gk, 2) = v_b;
+      bv(gi, gj, gk, 3) = w_b;
+      bv(gi, gj, gk, 4) = p_b;
+      bv(gi, gj, gk, 5) = p_b / (rho_b * R_u / mw_air);
+      for (int l = 0; l < param->n_scalar_transported; ++l) {
+        sv(gi, gj, gk, l) = sv(i, j, k, l);
+      }
+
+      if constexpr (TurbMethod<turb>::hasMut) {
+        zone->mut(gi, gj, gk) = zone->mut(i, j, k);
+      }
       compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
     }
   }
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void apply_periodic(DZone *zone, DParameter *param, int i_face) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
@@ -1119,14 +1206,12 @@ __global__ void apply_periodic(DZone *zone, DParameter *param, int i_face) {
     if constexpr (TurbMethod<turb>::hasMut) {
       zone->mut(gi, gj, gk) = zone->mut(ii, ij, ik);
     }
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
   }
 
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv>
+template<MixtureModel mix_model, class turb>
 void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DParameter *param) const {
   // Boundary conditions are applied in the order of priority, which with higher priority is applied later.
   // Finally, the communication between faces will be carried out after these bc applied
@@ -1149,7 +1234,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_farfield<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, &farfield[l], i_face, param);
+      apply_farfield<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &farfield[l], i_face, param);
     }
   }
 
@@ -1170,7 +1255,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_outflow<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, i_face, param);
+      apply_outflow<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, i_face, param);
     }
   }
   for (size_t l = 0; l < n_back_pressure; l++) {
@@ -1189,7 +1274,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_back_pressure<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, &back_pressure[l], param, i_face);
+      apply_back_pressure<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &back_pressure[l], param, i_face);
     }
   }
 
@@ -1210,8 +1295,8 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_inflow<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param,
-                                                            profile_dPtr_withGhost, rng_d_ptr, fluctuation_dPtr);
+      apply_inflow<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param,
+                                                   profile_dPtr_withGhost, rng_d_ptr, fluctuation_dPtr);
     }
   }
   // 7 - subsonic inflow
@@ -1231,7 +1316,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_subsonic_inflow<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, &subsonic_inflow[l], param, i_face);
+      apply_subsonic_inflow<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &subsonic_inflow[l], param, i_face);
     }
   }
 
@@ -1252,7 +1337,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_symmetry<mix_model, turb, with_cv> <<<BPG, TPB>>>(field.d_ptr, i_face, param);
+      apply_symmetry<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, i_face, param);
     }
   }
 
@@ -1273,7 +1358,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_wall<mix_model, turb, with_cv><<<BPG, TPB>>>(field.d_ptr, &wall[l], param, i_face, rng_d_ptr);
+      apply_wall<mix_model, turb><<<BPG, TPB>>>(field.d_ptr, &wall[l], param, i_face, rng_d_ptr);
     }
   }
 
@@ -1294,164 +1379,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_periodic<mix_model, turb, with_cv><<<BPG, TPB>>>(field.d_ptr, param, i_face);
-    }
-  }
-}
-
-template<MixtureModel mix_model, class turb>
-void DBoundCond::apply_boundary_conditions(const Mesh &mesh, std::vector<Field> &field, DParameter *param) const {
-  // Boundary conditions are applied in the order of priority, which with higher priority is applied later.
-  // Finally, the communication between faces will be carried out after these bc applied
-  // Priority: (-1 - inner faces >) 2-wall > 3-symmetry > 5-inflow = 7-subsonic inflow > 6-outflow = 9-back pressure > 4-farfield
-
-  // 4-farfield
-  for (size_t l = 0; l < n_farfield; ++l) {
-    const auto nb = farfield_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = farfield_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &h_f = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_farfield<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, &farfield[l], i_face, param);
-    }
-  }
-
-  // 6-outflow
-  for (size_t l = 0; l < n_outflow; l++) {
-    const auto nb = outflow_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = outflow_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &h_f = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_outflow<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, i_face, param);
-    }
-  }
-  for (size_t l = 0; l < n_back_pressure; l++) {
-    const auto nb = back_pressure_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = back_pressure_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &h_f = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_back_pressure<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, &back_pressure[l], param, i_face);
-    }
-  }
-
-  // 5-inflow
-  for (size_t l = 0; l < n_inflow; l++) {
-    const auto nb = inflow_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = inflow_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_inflow<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, &inflow[l], i_face, param);
-    }
-  }
-  // 7 - subsonic inflow
-  for (size_t l = 0; l < n_subsonic_inflow; l++) {
-    const auto nb = subsonic_inflow_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = subsonic_inflow_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_subsonic_inflow<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, &subsonic_inflow[l], param,
-                                                                  i_face);
-    }
-  }
-
-  // 3-symmetry
-  for (size_t l = 0; l < n_symmetry; l++) {
-    const auto nb = symmetry_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = symmetry_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &h_f = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_symmetry<mix_model, turb, true> <<<BPG, TPB>>>(field[i_zone].d_ptr, i_face, param);
-    }
-  }
-
-  // 2 - wall
-  for (size_t l = 0; l < n_wall; l++) {
-    const auto nb = wall_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = wall_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_wall<mix_model, turb, true><<<BPG, TPB>>>(field[i_zone].d_ptr, &wall[l], param, i_face);
-    }
-  }
-
-  // 8 - periodic
-  for (size_t l = 0; l < n_periodic; l++) {
-    const auto nb = periodic_info[l].n_boundary;
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = periodic_info[l].boundary[i];
-      auto &block = mesh[i_zone];
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3];
-      for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_periodic<mix_model, turb, true><<<BPG, TPB>>>(field[i_zone].d_ptr, param, i_face);
+      apply_periodic<mix_model, turb><<<BPG, TPB>>>(field.d_ptr, param, i_face);
     }
   }
 }

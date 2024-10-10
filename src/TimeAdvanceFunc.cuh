@@ -119,6 +119,8 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param) {
     }
   }
 
+  __syncthreads();
+
   if (unphysical) {
     // printf("Unphysical values appear in process %d, block %d, i = %d, j = %d, k = %d.\n", param->myid, blk_id, i, j, k);
 
@@ -155,6 +157,8 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param) {
       }
     }
 
+    __syncthreads();
+
     // Compute the average of the surrounding points
     if (kn > 0) {
       const real kn_inv{1.0 / kn};
@@ -188,6 +192,7 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param) {
 
     compute_cv_from_bv_1_point<mixture, turb_method>(zone, param, i, j, k);
   }
+  __syncthreads();
 
   // Limit the turbulent values
   if constexpr (TurbMethod<turb_method>::label == TurbMethodLabel::SST) {

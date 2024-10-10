@@ -5,6 +5,7 @@
 #include "Constants.h"
 #include <cmath>
 #include "SST.cuh"
+#include "Field.h"
 
 namespace cfd {
 
@@ -276,7 +277,8 @@ __device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DP
     const real rhoD{mul / param->Sc + mut / param->Sct};
     fv[i_fl_cv] = rhoD * (xi_x_div_jac * mixFrac_x + xi_y_div_jac * mixFrac_y + xi_z_div_jac * mixFrac_z);
 
-    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS) {
+    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS ||
+                  TurbMethod<turb_method>::type == TurbSimLevel::DES) {
       // For RANS / DES, we also solve the mixture fraction variance eqn.
       const real mixFracVar_xi = sv(i + 1, j, k, i_fl + 1) - sv(i, j, k, i_fl + 1);
       const real mixFracVar_eta = 0.25 * (sv(i, j + 1, k, i_fl + 1) - sv(i, j - 1, k, i_fl + 1) +
@@ -290,6 +292,27 @@ __device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DP
 
       fv[i_fl_cv + 1] =
           rhoD * (xi_x_div_jac * mixFracVar_x + xi_y_div_jac * mixFracVar_y + xi_z_div_jac * mixFracVar_z);
+    }
+  }
+
+  if (param->n_ps > 0) {
+    const auto &sv = zone->sv;
+
+    for (int l = 0; l < param->n_ps; ++l) {
+      const int ls = param->i_ps + l, lc = param->i_ps_cv + l;
+      // First, compute the passive scalar gradient
+      const real ps_xi = sv(i + 1, j, k, ls) - sv(i, j, k, ls);
+      const real ps_eta =
+          0.25 * (sv(i, j + 1, k, ls) - sv(i, j - 1, k, ls) + sv(i + 1, j + 1, k, ls) - sv(i + 1, j - 1, k, ls));
+      const real ps_zeta =
+          0.25 * (sv(i, j, k + 1, ls) - sv(i, j, k - 1, ls) + sv(i + 1, j, k + 1, ls) - sv(i + 1, j, k - 1, ls));
+
+      const real ps_x = ps_xi * xi_x + ps_eta * eta_x + ps_zeta * zeta_x;
+      const real ps_y = ps_xi * xi_y + ps_eta * eta_y + ps_zeta * zeta_y;
+      const real ps_z = ps_xi * xi_z + ps_eta * eta_z + ps_zeta * zeta_z;
+
+      const real rhoD{mul / param->sc_ps[l] + mut / param->sct_ps[l]};
+      fv[lc] = rhoD * (xi_x_div_jac * ps_x + xi_y_div_jac * ps_y + xi_z_div_jac * ps_z);
     }
   }
 }
@@ -552,7 +575,8 @@ __device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, cfd:
     const real rhoD{mul / param->Sc + mut / param->Sct};
     gv[i_fl_cv] = rhoD * (eta_x_div_jac * mixFrac_x + eta_y_div_jac * mixFrac_y + eta_z_div_jac * mixFrac_z);
 
-    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS) {
+    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS ||
+                  TurbMethod<turb_method>::type == TurbSimLevel::DES) {
       // For LES, we do not need to compute the variance of mixture fraction.
       const real mixFracVar_xi = 0.25 * (sv(i + 1, j, k, i_fl + 1) - sv(i - 1, j, k, i_fl + 1) +
                                          sv(i + 1, j + 1, k, i_fl + 1) - sv(i - 1, j + 1, k, i_fl + 1));
@@ -566,6 +590,27 @@ __device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, cfd:
 
       gv[i_fl_cv + 1] =
           rhoD * (eta_x_div_jac * mixFracVar_x + eta_y_div_jac * mixFracVar_y + eta_z_div_jac * mixFracVar_z);
+    }
+  }
+
+  if (param->n_ps > 0) {
+    const auto &sv = zone->sv;
+
+    for (int l = 0; l < param->n_ps; ++l) {
+      const int ls = param->i_ps + l, lc = param->i_ps_cv + l;
+      // First, compute the passive scalar gradient
+      const real ps_xi = 0.25 * (sv(i + 1, j, k, ls) - sv(i - 1, j, k, ls) + sv(i + 1, j + 1, k, ls) -
+                                 sv(i - 1, j + 1, k, ls));
+      const real ps_eta = sv(i, j + 1, k, ls) - sv(i, j, k, ls);
+      const real ps_zeta =
+          0.25 * (sv(i, j, k + 1, ls) - sv(i, j, k - 1, ls) + sv(i, j + 1, k + 1, ls) - sv(i, j + 1, k - 1, ls));
+
+      const real ps_x = ps_xi * xi_x + ps_eta * eta_x + ps_zeta * zeta_x;
+      const real ps_y = ps_xi * xi_y + ps_eta * eta_y + ps_zeta * zeta_y;
+      const real ps_z = ps_xi * xi_z + ps_eta * eta_z + ps_zeta * zeta_z;
+
+      const real rhoD{mul / param->sc_ps[l] + mut / param->sct_ps[l]};
+      gv[lc] = rhoD * (eta_x_div_jac * ps_x + eta_y_div_jac * ps_y + eta_z_div_jac * ps_z);
     }
   }
 }
@@ -823,7 +868,8 @@ __device__ void compute_hv_2nd_order(const int *idx, DZone *zone, real *hv, cfd:
     const real rhoD{mul / param->Sc + mut / param->Sct};
     hv[i_fl_cv] = rhoD * (zeta_x_div_jac * mixFrac_x + zeta_y_div_jac * mixFrac_y + zeta_z_div_jac * mixFrac_z);
 
-    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS) {
+    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS ||
+                  TurbMethod<turb_method>::type == TurbSimLevel::DES) {
       // For LES, we do not need to compute the variance of mixture fraction.
       const real mixFracVar_xi = 0.25 * (sv(i + 1, j, k, i_fl + 1) - sv(i - 1, j, k, i_fl + 1) +
                                          sv(i + 1, j, k + 1, i_fl + 1) - sv(i - 1, j, k + 1, i_fl + 1));
@@ -837,6 +883,27 @@ __device__ void compute_hv_2nd_order(const int *idx, DZone *zone, real *hv, cfd:
 
       hv[i_fl_cv + 1] =
           rhoD * (zeta_x_div_jac * mixFracVar_x + zeta_y_div_jac * mixFracVar_y + zeta_z_div_jac * mixFracVar_z);
+    }
+  }
+
+  if (param->n_ps > 0) {
+    const auto &sv = zone->sv;
+
+    for (int l = 0; l < param->n_ps; ++l) {
+      const int ls = param->i_ps + l, lc = param->i_ps_cv + l;
+      // First, compute the passive scalar gradient
+      const real ps_xi =
+          0.25 * (sv(i + 1, j, k, ls) - sv(i - 1, j, k, ls) + sv(i + 1, j, k + 1, ls) - sv(i - 1, j, k + 1, ls));
+      const real ps_eta =
+          0.25 * (sv(i, j + 1, k, ls) - sv(i, j - 1, k, ls) + sv(i, j + 1, k + 1, ls) - sv(i, j - 1, k + 1, ls));
+      const real ps_zeta = sv(i, j, k + 1, ls) - sv(i, j, k, ls);
+
+      const real ps_x = ps_xi * xi_x + ps_eta * eta_x + ps_zeta * zeta_x;
+      const real ps_y = ps_xi * xi_y + ps_eta * eta_y + ps_zeta * zeta_y;
+      const real ps_z = ps_xi * xi_z + ps_eta * eta_z + ps_zeta * zeta_z;
+
+      const real rhoD{mul / param->sc_ps[l] + mut / param->sct_ps[l]};
+      hv[lc] = rhoD * (zeta_x_div_jac * ps_x + zeta_y_div_jac * ps_y + zeta_z_div_jac * ps_z);
     }
   }
 }

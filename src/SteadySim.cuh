@@ -30,6 +30,9 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
   bool converged{false};
   int step{parameter.get_int("step")};
   int total_step{parameter.get_int("total_step") + step};
+  if (parameter.get_bool("steady_before_transient")) {
+    total_step = parameter.get_int("total_step_steady");
+  }
   const int n_block{mesh.n_block};
   const int n_var{parameter.get_int("n_var")};
   const int ngg{mesh[0].ngg};
@@ -65,10 +68,6 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
       break;
     }
 
-    if constexpr (mix_model == MixtureModel::FL) {
-      update_n_fl_step<<<1, 1>>>(param);
-    }
-
     // Start a single iteration
     // First, store the value of last step
     if (step % output_screen == 0) {
@@ -97,23 +96,24 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
 
       // limit unphysical values computed by the program
       //limit_unphysical_variables<mix_model, turb>(field[b].d_ptr, param, b, step, bpg[b], tpb);
-//      limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+      if (parameter.get_bool("limit_flow"))
+        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
       // Apply boundary conditions
       // Attention: "driver" is a template class, when a template class calls a member function of another template,
       // the compiler will not treat the called function as a template function,
       // so we need to explicitly specify the "template" keyword here.
       // If we call this function in the "driver" member function, we can omit the "template" keyword, as shown in Driver.cu, line 88.
-      driver.bound_cond.template apply_boundary_conditions<mix_model, turb, true>(mesh[b], field[b], param);
+      driver.bound_cond.template apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param);
     }
     // Third, transfer data between and within processes
-    data_communication<mix_model, turb, true>(mesh, field, parameter, step, param);
+    data_communication<mix_model, turb>(mesh, field, parameter, step, param);
 
     if (mesh.dimension == 2) {
       for (auto b = 0; b < n_block; ++b) {
         const auto mx{mesh[b].mx}, my{mesh[b].my};
         dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, 1};
-        eliminate_k_gradient<true><<<BPG, tpb>>>(field[b].d_ptr, param);
+        eliminate_k_gradient<<<BPG, tpb>>>(field[b].d_ptr, param);
       }
     }
 
@@ -134,11 +134,6 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
     }
     cudaDeviceSynchronize();
     if (step % output_file == 0 || converged) {
-      if constexpr (mix_model == MixtureModel::FL) {
-        int n_fl_step{0};
-        cudaMemcpy(&n_fl_step, &(param->n_fl_step), sizeof(int), cudaMemcpyDeviceToHost);
-        parameter.update_parameter("n_fl_step", n_fl_step);
-      }
       ioManager.print_field(step, parameter);
       post_process(driver);
     }

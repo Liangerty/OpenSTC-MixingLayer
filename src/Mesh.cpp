@@ -64,8 +64,8 @@ void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
     const int next_face{1 - face}, target_next_face{1 - target_face};
     range_start[next_face] = std::abs(range_start[next_face]) - 1;
     range_end[next_face] = std::abs(range_end[next_face]) - 1;
-    target_start[next_face] = std::abs(target_start[next_face]) - 1;
-    target_end[next_face] = std::abs(target_end[next_face]) - 1;
+    target_start[target_next_face] = std::abs(target_start[target_next_face]) - 1;
+    target_end[target_next_face] = std::abs(target_end[target_next_face]) - 1;
     src_tar[target_next_face] = gxl::sgn((target_end[target_next_face] - target_start[target_next_face]) *
                                          (range_end[next_face] - range_start[next_face])) * (next_face + 1);
     src_tar[2] = 3;
@@ -188,7 +188,7 @@ void cfd::ParallelFace::register_boundary(const int dim, int ngg) {
       range_start[i] -= 1;
       range_end[i] -= 1;
       loop_order[0] = i;
-      loop_dir[0] = 0;
+      loop_dir[i] = 0;
       break;
     }
   }
@@ -210,7 +210,7 @@ void cfd::ParallelFace::register_boundary(const int dim, int ngg) {
         range_start[i] = -range_start[i] - 1;
         range_end[i] = -range_end[i] - 1;
         loop_order[2] = i;
-        loop_dir[2] = range_start[i] < range_end[i] ? 1 : -1;
+        loop_dir[i] = range_start[i] < range_end[i] ? 1 : -1;
         break;
       }
     }
@@ -218,7 +218,7 @@ void cfd::ParallelFace::register_boundary(const int dim, int ngg) {
     range_start[next_face] -= 1;
     range_end[next_face] -= 1;
     loop_order[1] = next_face;
-    loop_dir[1] = range_start[next_face] < range_end[next_face] ? 1 : -1;
+    loop_dir[next_face] = range_start[next_face] < range_end[next_face] ? 1 : -1;
   }
   // Include the corner into the transfer
   // Commented
@@ -791,7 +791,7 @@ void cfd::Mesh::read_grid(const int myid, const Parameter &parameter) {
   if (myid == 0) {
     fmt::print("\t[[{}]] blocks in all, the block number in each process is:\n", n_block_total);
     for (int i = 0; i < n_proc; ++i) {
-      fmt::print("\t\t{}\n", n_block);
+      fmt::print("\t\t{}\n", nblk[i]);
     }
     fmt::print("\tThe dimension of the blocks are:\n");
     for (int i = 0; i < n_block_total; ++i) {
@@ -884,6 +884,7 @@ void cfd::Mesh::read_parallel_interface(const int myid/*, int ngg*/) {
     }
   }
   delete[]n_face;
+  MPI_Barrier(MPI_COMM_WORLD);
   if (myid == 0) fmt::print("\tFinish reading parallel communication faces.\n");
   grd.close();
 }
@@ -1160,12 +1161,12 @@ void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
                                                                                   Fc.range_end[2]};
       min_[0] = Fc.range_start[Fc.loop_order[0]] - Fc.direction;
       max_[0] = Fc.range_end[Fc.loop_order[0]] - Fc.direction * (ngg + 1);
-      min_[1] = Fc.range_start[Fc.loop_order[1]] - Fc.loop_dir[1] * (ngg + 1);
-      max_[1] = Fc.range_end[Fc.loop_order[1]] + Fc.loop_dir[1] * (ngg + 1);
-      min_[2] = Fc.range_start[Fc.loop_order[2]] - Fc.loop_dir[2] * (ngg + 1);
-      max_[2] = Fc.range_end[Fc.loop_order[2]] + Fc.loop_dir[2] * (ngg + 1);
-      const int di1 = -Fc.direction, dj1 = Fc.loop_dir[1];
-      int dk1 = Fc.loop_dir[2];
+      min_[1] = Fc.range_start[Fc.loop_order[1]] - Fc.loop_dir[Fc.loop_order[1]] * (ngg + 1);
+      max_[1] = Fc.range_end[Fc.loop_order[1]] + Fc.loop_dir[Fc.loop_order[1]] * (ngg + 1);
+      min_[2] = Fc.range_start[Fc.loop_order[2]] - Fc.loop_dir[Fc.loop_order[2]] * (ngg + 1);
+      max_[2] = Fc.range_end[Fc.loop_order[2]] + Fc.loop_dir[Fc.loop_order[2]] * (ngg + 1);
+      const int di1 = -Fc.direction, dj1 = Fc.loop_dir[Fc.loop_order[1]];
+      int dk1 = Fc.loop_dir[Fc.loop_order[2]];
       if (dimension == 2) {
         min_[2] = -3;
         max_[2] = 3;
@@ -1214,8 +1215,8 @@ void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
       max_[1] = fc.range_end[fc.loop_order[1]] + fc.loop_dir[fc.loop_order[1]] * (ngg + 1);
       min_[2] = fc.range_start[fc.loop_order[2]] - fc.loop_dir[fc.loop_order[2]] * (ngg + 1);
       max_[2] = fc.range_end[fc.loop_order[2]] + fc.loop_dir[fc.loop_order[2]] * (ngg + 1);
-      const int di1 = fc.direction, dj1 = fc.loop_dir[1];
-      int dk1 = fc.loop_dir[2];
+      const int di1 = fc.direction, dj1 = fc.loop_dir[fc.loop_order[1]];
+      int dk1 = fc.loop_dir[fc.loop_order[2]];
       int n{0};
       if (dimension == 2) {
         min_[2] = -3;

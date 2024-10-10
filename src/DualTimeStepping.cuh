@@ -78,6 +78,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
 
   IOManager<mix_model, turb> ioManager(driver.myid, mesh, field, parameter, driver.spec, 0);
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
+  int output_time_series = parameter.get_int("output_time_series");
 
   Monitor monitor(parameter, driver.spec, mesh);
   const int if_monitor{parameter.get_int("if_monitor")};
@@ -154,23 +155,24 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
         // update basic and conservative variables
         update_cv_and_bv<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
-//        limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
+        if (parameter.get_bool("limit_flow"))
+          limit_flow<mix_model, turb><<<bpg[b], tpb>>>(field[b].d_ptr, param);
 
         // Apply boundary conditions
         // Attention: "driver" is a template class, when a template class calls a member function of another template,
         // the compiler will not treat the called function as a template function,
         // so we need to explicitly specify the "template" keyword here.
         // If we call this function in the "driver" member function, we can omit the "template" keyword, as shown in Driver.cu, line 88.
-        driver.bound_cond.template apply_boundary_conditions<mix_model, turb, true>(mesh[b], field[b], param);
+        driver.bound_cond.template apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param);
       }
       // Third, transfer data between and within processes
-      data_communication<mix_model, turb, true>(mesh, field, parameter, step, param);
+      data_communication<mix_model, turb>(mesh, field, parameter, step, param);
 
       if (mesh.dimension == 2) {
         for (auto b = 0; b < n_block; ++b) {
           const auto mx{mesh[b].mx}, my{mesh[b].my};
           dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, 1};
-          eliminate_k_gradient<true><<<BPG, tpb>>>(field[b].d_ptr, param);
+          eliminate_k_gradient<<<BPG, tpb>>>(field[b].d_ptr, param);
         }
       }
 
@@ -214,12 +216,14 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
     }
     if (step % output_file == 0 || finished) {
       ioManager.print_field(step, parameter, physical_time);
-      timeSeriesIOManager.print_field(step, parameter, physical_time);
       if (if_collect_statistics && step > collect_statistics_iter_start)
         stat_collector.export_statistical_data(param, parameter.get_bool("perform_spanwise_average"));
       post_process(driver);
       if (if_monitor)
         monitor.output_data();
+    }
+    if (output_time_series > 0 && step % output_time_series == 0) {
+      timeSeriesIOManager.print_field(step, parameter, physical_time);
     }
     err = cudaGetLastError();
     if (err != cudaSuccess) {

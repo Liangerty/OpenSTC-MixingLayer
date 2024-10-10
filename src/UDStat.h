@@ -1,6 +1,8 @@
 #pragma once
 
-#define USER_DEFINE_STATISTICS ThermRMS,turbulent_dissipation_rate,H2AirMixingLayer
+#define USER_DEFINE_STATISTICS ThermRMS,turbulent_dissipation_rate
+
+//,H2AirMixingLayer
 
 #include <array>
 #include <string_view>

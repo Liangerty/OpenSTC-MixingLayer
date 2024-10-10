@@ -11,6 +11,7 @@ struct Species {
 
   int n_spec{0};  // number of species
   std::map<std::string, int> spec_list; // species list
+  std::vector<std::string> spec_name; // species name
 
   void compute_cp(real temp, real *cp) const &;
 
@@ -28,17 +29,13 @@ struct Species {
   gxl::MatrixDyn<real> high_temp_coeff, low_temp_coeff; // the cp/h/s polynomial coefficients
 #endif
   // Transport properties
+  std::vector<real> geometry; // if the species is monatomic(0), linear(1), or nonlinear(2)
   std::vector<real> LJ_potent_inv;  // the inverse of the Lennard-Jones potential
   std::vector<real> vis_coeff;  // the coefficient to compute viscosity
   gxl::MatrixDyn<real> WjDivWi_to_One4th, sqrt_WiDivWjPl1Mul8; // Some constant value to compute partition functions
   gxl::MatrixDyn<real> binary_diffusivity_coeff;
   gxl::MatrixDyn<real> kb_over_eps_jk; // Used to compute reduced temperature for diffusion coefficients
-// Temporary variables to compute transport properties, should not be accessed from other functions
-//  std::vector<real> x;
-//  std::vector<real> vis_spec;
-//  std::vector<real> lambda;
-//  gxl::MatrixDyn<real> partition_fun;
-
+  std::vector<real> ZRotF298; // the rotational relaxation collision number at 298 K.
 
 private:
   void set_nspec(int n_sp, int n_elem);

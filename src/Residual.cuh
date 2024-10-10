@@ -77,7 +77,7 @@ real compute_residual(Driver<mix_model, turb> &driver, int step) {
     compute_square_of_dbv<<<bpg, tpb>>>(field[b].d_ptr);
   }
 
-  constexpr int TPB{128};
+  constexpr int TPB{256};
   constexpr int n_res_var{4};
   real res_block[n_res_var];
   int num_sms, num_blocks_per_sm;

@@ -75,6 +75,7 @@ compute_convective_term_pv_1D(cfd::DZone *zone, int direction, int max_extent, D
   real *metric = &pv[n_point * n_reconstruct];
   real *jac = &metric[n_point * 3];
   real *fc = &jac[n_point];
+  memset(&fc[tid * n_var], 0, n_var * sizeof(real));
 
   const int i_shared = tid - 1 + ngg;
   for (auto l = 0; l < 5; ++l) { // 0-rho,1-u,2-v,3-w,4-p

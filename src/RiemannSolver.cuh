@@ -15,7 +15,7 @@ riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, in
   const real k1 = 0.5 * (jac_l * metric_l[0] + jac_r * metric_r[0]);
   const real k2 = 0.5 * (jac_l * metric_l[1] + jac_r * metric_r[1]);
   const real k3 = 0.5 * (jac_l * metric_l[2] + jac_r * metric_r[2]);
-  const real grad_k_div_jac = std::sqrt(k1 * k1 + k2 * k2 + k3 * k3);
+  const real grad_k_div_jac = sqrt(k1 * k1 + k2 * k2 + k3 * k3);
 
   const real ul = (k1 * pv_l[1] + k2 * pv_l[2] + k3 * pv_l[3]) / grad_k_div_jac;
   const real ur = (k1 * pv_r[1] + k2 * pv_r[2] + k3 * pv_r[3]) / grad_k_div_jac;
@@ -31,13 +31,13 @@ riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, in
     gam_l = pv_l[n_reconstruct + 1];
     gam_r = pv_r[n_reconstruct + 1];
   }
-  const real c = 0.5 * (std::sqrt(gam_l * pl / rho_l) + std::sqrt(gam_r * pr / rho_r));
+  const real c = 0.5 * (sqrt(gam_l * pl / rho_l) + sqrt(gam_r * pr / rho_r));
   const real mach_l = ul / c, mach_r = ur / c;
-  real mlp, mrn, plp, prn; // m for M, l/r for L/R, p/n for +/-. mlp=M_L^+
+  real mlp{0}, mrn{0}, plp{0}, prn{0}; // m for M, l/r for L/R, p/n for +/-. mlp=M_L^+
   constexpr static real alpha{3 / 16.0};
 
-  if (std::abs(mach_l) > 1) {
-    mlp = 0.5 * (mach_l + std::abs(mach_l));
+  if (abs(mach_l) > 1) {
+    mlp = 0.5 * (mach_l + abs(mach_l));
     plp = mlp / mach_l;
   } else {
     const real ml_plus1_squared_div4 = (mach_l + 1) * (mach_l + 1) * 0.25;
@@ -45,8 +45,8 @@ riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, in
     mlp = ml_plus1_squared_div4 + 0.125 * ml_squared_minus_1_squared;
     plp = ml_plus1_squared_div4 * (2 - mach_l) + alpha * mach_l * ml_squared_minus_1_squared;
   }
-  if (std::abs(mach_r) > 1) {
-    mrn = 0.5 * (mach_r - std::abs(mach_r));
+  if (abs(mach_r) > 1) {
+    mrn = 0.5 * (mach_r - abs(mach_r));
     prn = mrn / mach_r;
   } else {
     const real mr_minus1_squared_div4 = (mach_r - 1) * (mach_r - 1) * 0.25;
@@ -58,8 +58,8 @@ riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, in
   const real p_coeff = plp * pl + prn * pr;
 
   const real m_half = mlp + mrn;
-  const real mach_pos = 0.5 * (m_half + std::abs(m_half));
-  const real mach_neg = 0.5 * (m_half - std::abs(m_half));
+  const real mach_pos = 0.5 * (m_half + abs(m_half));
+  const real mach_neg = 0.5 * (m_half - abs(m_half));
   const real mass_flux_half = c * (rho_l * mach_pos + rho_r * mach_neg);
   const real coeff = mass_flux_half * grad_k_div_jac;
 

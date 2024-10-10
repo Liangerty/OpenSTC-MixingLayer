@@ -4,6 +4,7 @@
 #include "ChemData.h"
 #include "Constants.h"
 #include "Parallel.h"
+#include "Transport.cuh"
 
 namespace cfd {
 
@@ -34,10 +35,11 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
   real yk_upper[MAX_SPEC_NUMBER], yk_lower[MAX_SPEC_NUMBER];
   memset(yk_upper, 0, sizeof(real) * MAX_SPEC_NUMBER);
   memset(yk_lower, 0, sizeof(real) * MAX_SPEC_NUMBER);
+  real mu_upper{0}, mu_lower{0};
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.
     // Should be done after knowing the order of species.
-    for (const auto& [name, idx]: species.spec_list) {
+    for (const auto &[name, idx]: species.spec_list) {
       if (upper.find(name) != upper.cend()) {
         yk_upper[idx] = std::get<real>(upper.at(name));
       }
@@ -64,11 +66,15 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
     c_lower = std::sqrt(gamma_lower * R_u * mw_inv_lower * T_lower);
     rho_upper = p_upper / (R_u * mw_inv_upper * T_upper);
     rho_lower = p_lower / (R_u * mw_inv_lower * T_lower);
+    mu_upper = compute_viscosity(T_upper, 1 / mw_inv_upper, yk_upper, species);
+    mu_lower = compute_viscosity(T_lower, 1 / mw_inv_lower, yk_lower, species);
   } else {
     c_upper = std::sqrt(gamma_air * R_u / mw_air * T_upper);
     c_lower = std::sqrt(gamma_air * R_u / mw_air * T_lower);
     rho_upper = p_upper * mw_air / (R_u * T_upper);
     rho_lower = p_lower * mw_air / (R_u * T_lower);
+    mu_upper = Sutherland(T_upper);
+    mu_lower = Sutherland(T_lower);
   }
   if (ma_upper < 0 && ma_lower < 0) {
     printf("At least one of the mach number and the convective Mach number should be given.\n");
@@ -97,7 +103,10 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
   }
   real u_upper{ma_upper * c_upper}, u_lower{ma_lower * c_lower};
 
-  var_info.resize((7 + n_spec) * 2, 0);
+  // 7 : rho(0, 7+ns), u(1, 8+ns), v(2, 9+ns), w(3, 10+ns), p(4, 11+ns), T(5, 12+ns), mix_frac(6+ns, 13+2*ns);
+  // n_spec : yk(6:6+ns-1, 13+ns:13+2*ns-1)
+  // 2 : tke(13+2*ns+1, 13+2*ns+3), omega(13+2*ns+2, 13+2*ns+4)
+  var_info.resize((7 + n_spec + 2) * 2, 0);
   var_info[0] = rho_upper;
   var_info[1] = u_upper;
   var_info[2] = 0;
@@ -119,5 +128,51 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
     var_info[13 + n_spec + i] = yk_lower[i];
   }
   var_info[13 + 2 * n_spec] = mix_frac_lower;
+
+  int counter = 13 + 2 * n_spec;
+
+  if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
+    if (parameter.get_int("RANS_model") == 2) {
+      // SST model
+      real turb_intensity{0.01};
+      real mutMul{1};
+      if (upper.find("turb_viscosity_ratio") != upper.cend()) {
+        mutMul = std::get<real>(upper.at("turb_viscosity_ratio"));
+      }
+      if (upper.find("turbulence_intensity") != upper.cend()) {
+        turb_intensity = std::get<real>(upper.at("turbulence_intensity"));
+      }
+      real tke_upper = 1.5 * turb_intensity * turb_intensity * u_upper * u_upper;
+      real omega_upper = rho_upper * tke_upper / (mutMul * mu_upper);
+
+      turb_intensity = 0.01;
+      mutMul = 1;
+      if (lower.find("turb_viscosity_ratio") != lower.cend()) {
+        mutMul = std::get<real>(lower.at("turb_viscosity_ratio"));
+      }
+      if (lower.find("turbulence_intensity") != lower.cend()) {
+        turb_intensity = std::get<real>(lower.at("turbulence_intensity"));
+      }
+      real tke_lower = 1.5 * turb_intensity * turb_intensity * u_lower * u_lower;
+      real omega_lower = rho_lower * tke_lower / (mutMul * mu_lower);
+
+      var_info[counter + 1] = tke_upper;
+      var_info[counter + 2] = omega_upper;
+      var_info[counter + 3] = tke_lower;
+      var_info[counter + 4] = omega_lower;
+      counter += 4;
+    }
+  }
+
+  if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+    for (int i = 1; i <= n_ps; ++i) {
+      if (upper.find("ps" + std::to_string(i)) != upper.cend()) {
+        var_info.push_back(std::get<real>(upper.at("ps" + std::to_string(i))));
+      }
+      if (lower.find("ps" + std::to_string(i)) != lower.cend()) {
+        var_info.push_back(std::get<real>(lower.at("ps" + std::to_string(i))));
+      }
+    }
+  }
 }
 }

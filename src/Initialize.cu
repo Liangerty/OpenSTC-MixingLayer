@@ -238,8 +238,12 @@ void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector
     const int ngg{field[blk].block.ngg};
     dim3 bpg = {(field[blk].block.mx + 2 * ngg - 1) / tpb.x + 1, (field[blk].block.my + 2 * ngg - 1) / tpb.y + 1,
                 (field[blk].block.mz + 2 * ngg - 1) / tpb.z + 1};
+    int n_fl{0};
+    if ((species.n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2)
+      n_fl = 2;
     initialize_mixing_layer_with_info<<<bpg, tpb>>>(field[blk].d_ptr, var_info_dev, species.n_spec,
-                                                    parameter.get_real("delta_omega"));
+                                                    parameter.get_real("delta_omega"), parameter.get_int("n_turb"),
+                                                    n_fl, parameter.get_int("n_passive_scalar"));
     cudaMemcpy(field[blk].bv.data(), field[blk].h_ptr->bv.data(), sizeof(real) * field[blk].h_ptr->bv.size() * 6,
                cudaMemcpyDeviceToHost);
     cudaMemcpy(field[blk].sv.data(), field[blk].h_ptr->sv.data(),
@@ -247,7 +251,9 @@ void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector
   }
 }
 
-__global__ void initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec, real delta_omega) {
+__global__ void
+initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec, real delta_omega, int n_turb, int n_fl,
+                                  int n_ps) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
   int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
   int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
@@ -271,6 +277,20 @@ __global__ void initialize_mixing_layer_with_info(DZone *zone, const real *var_i
     for (int l = 0; l < n_spec; ++l) {
       sv(i, j, k, l) = var[6 + l];
     }
+    if (n_turb > 0) {
+      for (int l = 0; l < n_turb; ++l) {
+        sv(i, j, k, n_spec + l) = var[13 + 2 * n_spec + 1 + l];
+      }
+    }
+    if (n_fl > 0) {
+      sv(i, j, k, n_spec + n_turb) = var[6 + n_spec];
+      sv(i, j, k, n_spec + n_turb + 1) = 0;
+    }
+    if (n_ps > 0) {
+      for (int l = 0; l < n_ps; ++l) {
+        sv(i, j, k, n_spec + n_turb + n_fl + l) = var[14 + 2 * n_spec + 4 + 2 * l];
+      }
+    }
   } else {
     auto var = &var_info[7 + n_spec];
 
@@ -281,6 +301,20 @@ __global__ void initialize_mixing_layer_with_info(DZone *zone, const real *var_i
     bv(i, j, k, 5) = var[5];
     for (int l = 0; l < n_spec; ++l) {
       sv(i, j, k, l) = var[6 + l];
+    }
+    if (n_turb > 0) {
+      for (int l = 0; l < n_turb; ++l) {
+        sv(i, j, k, n_spec + l) = var[13 + 2 * n_spec + n_turb + 1 + l];
+      }
+    }
+    if (n_fl > 0) {
+      sv(i, j, k, n_spec + n_turb) = var[13 + n_spec + n_spec];
+      sv(i, j, k, n_spec + n_turb + 1) = 0;
+    }
+    if (n_ps > 0) {
+      for (int l = 0; l < n_ps; ++l) {
+        sv(i, j, k, n_spec + n_turb + n_fl + l) = var[14 + 2 * n_spec + 4 + 2 * l + 1];
+      }
     }
   }
 }

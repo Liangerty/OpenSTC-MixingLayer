@@ -7,25 +7,26 @@
 #include "Field.h"
 #include "DParameter.cuh"
 #include "FieldOperation.cuh"
+#include <cuda_runtime.h>
 
 namespace cfd {
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 void data_communication(const Mesh &mesh, std::vector<Field> &field, const Parameter &parameter, int step,
                         DParameter *param);
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DParameter *param);
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int step, const Parameter &parameter,
                             DParameter *param);
 
 __global__ void setup_data_to_be_sent(DZone *zone, int i_face, real *data, const DParameter *param);
 
-template<MixtureModel mix_model, class turb, bool with_cv = false>
+template<MixtureModel mix_model, class turb>
 __global__ void assign_data_received(DZone *zone, int i_face, const real *data, DParameter *param);
 
-template<MixtureModel mix_model, class turb, bool with_cv>
+template<MixtureModel mix_model, class turb>
 void data_communication(const Mesh &mesh, std::vector<Field> &field, const Parameter &parameter, int step,
                         DParameter *param) {
   // -1 - inner faces
@@ -46,17 +47,17 @@ void data_communication(const Mesh &mesh, std::vector<Field> &field, const Param
 
       // variables of the neighbor block
       auto nv = field[fc.target_block].d_ptr;
-      inner_communication<mix_model, turb, with_cv><<<BPG, TPB>>>(v, nv, l, param);
+      inner_communication<mix_model, turb><<<BPG, TPB>>>(v, nv, l, param);
     }
   }
 
   // Parallel communication via MPI
   if (parameter.get_bool("parallel")) {
-    parallel_communication<mix_model, turb, with_cv>(mesh, field, step, parameter, param);
+    parallel_communication<mix_model, turb>(mesh, field, step, parameter, param);
   }
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv>
+template<MixtureModel mix_model, class turb>
 __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DParameter *param) {
   const auto &f = zone->innerFace[i_face];
   uint n[3];
@@ -90,9 +91,6 @@ __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DP
       zone->sv(idx[0], idx[1], idx[2], l) = ave;
       tar_zone->sv(idx_tar[0], idx_tar[1], idx_tar[2], l) = ave;
     }
-    const real vel{std::sqrt(zone->bv(idx[0], idx[1], idx[2], 1) * zone->bv(idx[0], idx[1], idx[2], 1) +
-                             zone->bv(idx[0], idx[1], idx[2], 2) * zone->bv(idx[0], idx[1], idx[2], 2) +
-                             zone->bv(idx[0], idx[1], idx[2], 3) * zone->bv(idx[0], idx[1], idx[2], 3))};
   } else {
     // Else, get the inner value for this block's ghost grid
 #pragma unroll
@@ -103,12 +101,10 @@ __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DP
       zone->sv(idx[0], idx[1], idx[2], l) = tar_zone->sv(idx_tar[0], idx_tar[1], idx_tar[2], l);
     }
   }
-  if constexpr (with_cv) {
-    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, idx[0], idx[1], idx[2]);
-  }
+  compute_cv_from_bv_1_point<mix_model, turb>(zone, param, idx[0], idx[1], idx[2]);
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv>
+template<MixtureModel mix_model, class turb>
 void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int step, const Parameter &parameter,
                             DParameter *param) {
   const int n_block{mesh.n_block};
@@ -128,7 +124,6 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
   //Added with iterate through faces and will equal to the total face number when the loop ends
   int fc_num = 0;
   //Compute the array size of different faces and allocate them. Different for different faces.
-//  if (step == 0) {
   for (int blk = 0; blk < n_block; ++blk) {
     auto &B = mesh[blk];
     const int fc = static_cast<int>(B.parallel_face.size());
@@ -142,13 +137,9 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
       length[fc_num] = len;
       cudaMalloc(&(temp_s[fc_num]), len * sizeof(real));
       cudaMalloc(&(temp_r[fc_num]), len * sizeof(real));
-//        printf("Step %d, temp_s[%d][0] is allocated at %p\n", step, fc_num, &temp_s[fc_num][0]);
-//        printf("Step %d, temp_r[%d][0] is allocated at %p\n", step, fc_num, &temp_r[fc_num][0]);
-//        printf("Length[%d] = %d\n", fc_num, len);
       ++fc_num;
     }
   }
-//  }
 
   // Create array for MPI_ISEND/IRecv
   // MPI_REQUEST is an array representing whether the face sends/recvs successfully
@@ -199,7 +190,7 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
         bpg[j] = (fc.n_point[j] - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      assign_data_received<mix_model, turb, with_cv><<<BPG, TPB>>>(field[blk].d_ptr, f, &temp_r[fc_num][0], param);
+      assign_data_received<mix_model, turb><<<BPG, TPB>>>(field[blk].d_ptr, f, &temp_r[fc_num][0], param);
       cudaDeviceSynchronize();
       fc_num++;
     }
@@ -220,7 +211,7 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
 
 }
 
-template<MixtureModel mix_model, class turb, bool with_cv>
+template<MixtureModel mix_model, class turb>
 __global__ void assign_data_received(DZone *zone, int i_face, const real *data, DParameter *param) {
   const auto &f = zone->parFace[i_face];
   int n[3];
@@ -230,9 +221,12 @@ __global__ void assign_data_received(DZone *zone, int i_face, const real *data, 
   if (n[0] >= f.n_point[0] || n[1] >= f.n_point[1] || n[2] >= f.n_point[2]) return;
 
   int idx[3];
-  for (int ijk: f.loop_order) {
-    idx[ijk] = f.range_start[ijk] + n[ijk] * f.loop_dir[ijk];
-  }
+  idx[0] = f.range_start[0] + n[0] * f.loop_dir[0];
+  idx[1] = f.range_start[1] + n[1] * f.loop_dir[1];
+  idx[2] = f.range_start[2] + n[2] * f.loop_dir[2];
+//  for (int ijk: f.loop_order) {
+//    idx[ijk] = f.range_start[ijk] + n[ijk] * f.loop_dir[ijk];
+//  }
 
   const int n_var{param->n_scalar + 6}, ngg{zone->ngg};
   int bias = n_var * (ngg + 1) * (n[f.loop_order[1]] * f.n_point[f.loop_order[2]] + n[f.loop_order[2]]);
@@ -246,9 +240,7 @@ __global__ void assign_data_received(DZone *zone, int i_face, const real *data, 
   for (int l = 0; l < param->n_scalar; ++l) {
     sv(idx[0], idx[1], idx[2], l) = 0.5 * (sv(idx[0], idx[1], idx[2], l) + data[bias + 6 + l]);
   }
-  if constexpr (with_cv) {
-    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, idx[0], idx[1], idx[2]);
-  }
+  compute_cv_from_bv_1_point<mix_model, turb>(zone, param, idx[0], idx[1], idx[2]);
 
   for (int ig = 1; ig <= ngg; ++ig) {
     idx[f.face] += f.direction;
@@ -260,9 +252,7 @@ __global__ void assign_data_received(DZone *zone, int i_face, const real *data, 
     for (int l = 0; l < param->n_scalar; ++l) {
       sv(idx[0], idx[1], idx[2], l) = data[bias + 6 + l];
     }
-    if constexpr (with_cv) {
-      compute_cv_from_bv_1_point<mix_model, turb>(zone, param, idx[0], idx[1], idx[2]);
-    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, idx[0], idx[1], idx[2]);
   }
 
 }

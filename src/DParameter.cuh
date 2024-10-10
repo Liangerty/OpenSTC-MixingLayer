@@ -14,7 +14,7 @@ struct DParameter {
   DParameter() = default;
 
   explicit DParameter(cfd::Parameter &parameter, Species &species, Reaction *reaction,
-                      FlameletLib *flamelet_lib = nullptr);
+                      FlameletLib *flamelet_lib);
 
   int myid = 0;   // The process id of this process
   int dim = 3;    // The dimension of the problem
@@ -24,10 +24,15 @@ struct DParameter {
   int n_var = 0;                    // The number of variables in the conservative variable
   int n_scalar = 0;               // The number of scalar variables
   int n_scalar_transported = 0;   // The number of scalar variables in the conservative equation, this is only different from n_scalar when we use flamelet model
+  int n_ps = 0;                   // The number of passive scalars
   int n_spec = 0;                 // The number of species
   int i_fl = 0;                   // The index of flamelet variable in the scalar variable
   int i_fl_cv = 0;                // The index of flamelet variable in the conservative variable
   int i_turb_cv = 0;              // The index of turbulent variable in the conservative variable
+  int i_ps = 0;                   // The index of passive scalar in the scalar variable
+  int i_ps_cv = 0;                // The index of passive scalar in the conservative variable
+  real* sc_ps = nullptr;          // The Schmidt number of passive scalars
+  real* sct_ps = nullptr;         // The turbulent Schmidt number of passive scalars
 
   int inviscid_scheme = 0;  // The tag for inviscid scheme. 3 - AUSM+
   int reconstruction = 2; // The reconstruction method for inviscid flux computation
@@ -62,15 +67,17 @@ struct DParameter {
 #endif
 
   // Transport properties
+  real *geometry = nullptr;
   real *LJ_potent_inv = nullptr;
   real *vis_coeff = nullptr;
   ggxl::MatrixDyn<real> WjDivWi_to_One4th;
   ggxl::MatrixDyn<real> sqrt_WiDivWjPl1Mul8;
   ggxl::MatrixDyn<real> binary_diffusivity_coeff;
   ggxl::MatrixDyn<real> kb_over_eps_jk; // Used to compute reduced temperature for diffusion coefficients
+  real *ZRotF298 = nullptr;
   bool gradPInDiffusionFlux = false;
 
-  real Sc = 0.9;
+  real Sc = 0.5;
   real Prt = 0.9;
   real Sct = 0.9;
   int *reac_type = nullptr;
@@ -96,11 +103,41 @@ struct DParameter {
   real rho_ref = 1.0;
   real a_ref2 = 1.0;
   real v_ref = 1.0;
+  real T_ref = 1.0;
+  real p_ref = 1.0;
   real weno_eps_scale = 1.0;
+  real v_char = 1.0; // characteristic velocity
+
+  // Sponge layer info
+  bool sponge_layer = false;
+  int sponge_function = 0; // 0 - (Nektar++, CPC, 2024)
+  int sponge_iter = 0;
+  int *sponge_scalar_iter = nullptr;
+  real sponge_sigma0 = 0;
+  real sponge_sigma1 = 0;
+  real sponge_sigma2 = 0;
+  real sponge_sigma3 = 0;
+  real sponge_sigma4 = 0;
+  real sponge_sigma5 = 0;
+  int spongeX = 0; // 0 - no sponge; 1 - sponge layer at x-; 2 - sponge layer at x+; 3 - sponge layer at both x- and x+.
+  int spongeY = 0; // 0 - no sponge; 1 - sponge layer at y-; 2 - sponge layer at y+; 3 - sponge layer at both y- and y+.
+  int spongeZ = 0; // 0 - no sponge; 1 - sponge layer at z-; 2 - sponge layer at z+; 3 - sponge layer at both z- and z+.
+  real spongeXMinusStart = 0;
+  real spongeXMinusEnd = 0;
+  real spongeXPlusStart = 0;
+  real spongeXPlusEnd = 0;
+  real spongeYMinusStart = 0;
+  real spongeYMinusEnd = 0;
+  real spongeYPlusStart = 0;
+  real spongeYPlusEnd = 0;
+  real spongeZMinusStart = 0;
+  real spongeZMinusEnd = 0;
+  real spongeZPlusStart = 0;
+  real spongeZPlusEnd = 0;
 
   // For mixing layer computation, we need to collect statistical data of the mixture fraction.
-  real beta_diff_inv=0, beta_o=0;
-  real nuc_mwc_inv=0, nuh_mwh_inv=0, half_nuo_mwo_inv=0;
+  real beta_diff_inv = 0, beta_o = 0;
+  real nuc_mwc_inv = 0, nuh_mwh_inv = 0, half_nuo_mwo_inv = 0;
 
 private:
   struct LimitFlow {
@@ -117,5 +154,5 @@ public:
 //  ~DParameter();
 };
 
-__global__ void update_dt_global(DParameter* param, real dt);
+__global__ void update_dt_global(DParameter *param, real dt);
 }

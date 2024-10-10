@@ -6,7 +6,7 @@
 #include "UDIO.h"
 
 // First, which variables to output, we need the names of them.
-int cfd::add_other_variable_name(std::vector<std::string> &var_name) {
+int cfd::add_other_variable_name(std::vector<std::string> &var_name, const Parameter &parameter) {
   auto nv = (int) (var_name.size());
 
   /**********************************************************************************************/

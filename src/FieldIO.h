@@ -11,7 +11,7 @@
 
 namespace cfd {
 
-int add_other_variable_name(std::vector<std::string> &var_name);
+int add_other_variable_name(std::vector<std::string> &var_name, const Parameter &parameter);
 
 MPI_Offset write_static_max_min(MPI_Offset offset, const Field &field, int ngg, MPI_File &fp);
 
@@ -110,7 +110,7 @@ void FieldIO<mix_model, turb, output_time_choice>::write_header() {
     // 3. Number of variables in the datafile, for this file, n_var = 3(x,y,z)+7(density,u,v,w,p,t,Ma)+n_spec+n_scalar
     std::vector<std::string> var_name{"x", "y", "z", "density", "u", "v", "w", "pressure", "temperature", "mach"};
     n_var = acquire_variable_names(var_name);
-    n_var = add_other_variable_name(var_name);
+    n_var = add_other_variable_name(var_name, parameter);
     MPI_File_write_at(fp, offset, &n_var, 1, MPI_INT32_T, &status);
     offset += 4;
     // 4. Variable names.
@@ -131,7 +131,7 @@ void FieldIO<mix_model, turb, output_time_choice>::write_header() {
       MPI_File_write_at(fp, offset, &parent_zone, 1, MPI_INT32_T, &status);
       offset += 4;
       // 4. Strand ID. -2 = pending strand ID for assignment by Tecplot; -1 = static strand ID; >= 0 valid strand ID
-      constexpr int32_t strand_id{-1};
+      constexpr int32_t strand_id{-2};
       MPI_File_write_at(fp, offset, &strand_id, 1, MPI_INT32_T, &status);
       offset += 4;
       // 5. Solution time. For steady, the value is set 0. For unsteady, please create a new class
@@ -471,6 +471,12 @@ FieldIO<mix_model, turb, output_time_choice>::acquire_variable_names(std::vector
     var_name.emplace_back("MixtureFraction");
     var_name.emplace_back("MixtureFractionVariance");
   }
+  if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+    nv += n_ps;
+    for (int i = 0; i < n_ps; ++i) {
+      var_name.emplace_back("PS" + std::to_string(i + 1));
+    }
+  }
   if constexpr (TurbMethod<turb>::hasMut) {
     nv += 1; // mu_t
     var_name.emplace_back("mut");
@@ -697,6 +703,12 @@ int32_t FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::acquire_variable
     var_name.emplace_back("MixtureFraction");
     var_name.emplace_back("MixtureFractionVariance");
   }
+  if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+    nv += n_ps;
+    for (int i = 0; i < n_ps; ++i) {
+      var_name.emplace_back("PS" + std::to_string(i + 1));
+    }
+  }
   if constexpr (TurbMethod<turb>::hasMut) {
     nv += 1; // mu_t
     var_name.emplace_back("mut");
@@ -709,6 +721,9 @@ FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::FieldIO(int _myid, const
                                                                 std::vector<Field> &_field, const Parameter &_parameter,
                                                                 const Species &spec, int ngg_out):
     myid{_myid}, mesh{_mesh}, field(_field), parameter{_parameter}, species{spec}, ngg_output{ngg_out} {
+  if (parameter.get_int("output_time_series") == 0) {
+    return;
+  }
   const std::filesystem::path out_dir("output/time_series");
   if (!exists(out_dir)) {
     create_directories(out_dir);
@@ -788,7 +803,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_header() {
       MPI_File_write_at(fp, offset, &parent_zone, 1, MPI_INT32_T, &status);
       offset += 4;
       // 4. Strand ID. -2 = pending strand ID for assignment by Tecplot; -1 = static strand ID; >= 0 valid strand ID
-      constexpr int32_t strand_id{-1};
+      constexpr int32_t strand_id{-2};
       MPI_File_write_at(fp, offset, &strand_id, 1, MPI_INT32_T, &status);
       offset += 4;
       // 5. Solution time. For steady, the value is set 0. For unsteady, please create a new class

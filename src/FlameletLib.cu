@@ -4,6 +4,9 @@
 
 namespace cfd {
 FlameletLib::FlameletLib(const Parameter &parameter) : n_spec{parameter.get_int("n_spec")} {
+  if (n_spec == 0 || parameter.get_int("reaction") != 2) {
+    return;
+  }
   switch (parameter.get_int("flamelet_format")) {
     case 0:
       // ACANS format
@@ -18,11 +21,13 @@ FlameletLib::FlameletLib(const Parameter &parameter) : n_spec{parameter.get_int(
 
 void FlameletLib::read_ACANS_flamelet(const Parameter &parameter) {
   const auto flamelet_file_name{"input/" + parameter.get_string("flamelet_file_name")};
+  printf("\tReading flamelet file: %s\n", flamelet_file_name.c_str());
   std::ifstream file{flamelet_file_name};
   std::string input;
   std::istringstream line;
   gxl::getline_to_stream(file, input, line);
   line >> n_z >> n_zPrime >> n_chi;
+  printf("\tn_z=%d, n_zPrime=%d, n_chi=%d\n", n_z, n_zPrime, n_chi);
 
   z.resize(n_z + 1);
   zPrime.resize(n_zPrime + 1, n_z + 1);
@@ -124,6 +129,29 @@ __device__ void flamelet_source(cfd::DZone *zone, int i, int j, int k, DParamete
   zone->dq(i, j, k, param->i_fl_cv + 1) += zone->jac(i, j, k) * (prod_mixFrac - diss_mixFrac);
 }
 
+/// @brief Compute the mass fraction from the mixture fraction and scalar dissipation rate
+/// @param zone Pointer to the computational zone (DZone) containing field variables
+/// @param i Index in the x-direction
+/// @param j Index in the y-direction
+/// @param k Index in the z-direction
+/// @param param Pointer to simulation parameters
+/// @param yk_ave Array to store the computed average mass fractions
+///
+/// This device function calculates the mass fractions of chemical species based on the local
+/// mixture fraction and scalar dissipation rate. It uses a flamelet library approach, which
+/// involves interpolation in a pre-computed table of species mass fractions.
+///
+/// The function handles three cases:
+/// 1. Pure oxidizer stream (mixture fraction < 1e-6)
+/// 2. Pure fuel stream (mixture fraction > 1 - 1e-6)
+/// 3. Intermediate mixtures (requires interpolation)
+///
+/// For intermediate mixtures, it performs a triple linear interpolation based on:
+/// - Mixture fraction
+/// - Mixture fraction variance
+/// - Scalar dissipation rate
+///
+/// The interpolated mass fractions are stored in the yk_ave array.
 __device__ void
 compute_massFraction_from_MixtureFraction(cfd::DZone *zone, int i, int j, int k, DParameter *param, real *yk_ave) {
   const auto mixFrac_ave{zone->sv(i, j, k, param->i_fl)};

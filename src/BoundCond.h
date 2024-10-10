@@ -43,6 +43,7 @@ struct Inflow {
   real temperature = -1;
   real velocity = 0;
   real density = -1;
+  real aoa = -1000;
   real u = 1, v = 0, w = 0;
   real *sv = nullptr;
   real mw = mw_air;
@@ -57,6 +58,9 @@ struct Inflow {
   real density_lower = -1;
   real u_lower = 1, v_lower = 0, w_lower = 0;
   real *sv_lower = nullptr;
+  real mw_lower = mw_air;
+  real mu_lower = 0;
+  real mut_lower = 0;
   real mixture_fraction_lower = -1;
   // When inflow_type = 2, we need the initial vorticity thickness
   real delta_omega = -1;
@@ -118,7 +122,7 @@ struct Symmetry {
 };
 
 struct FarField {
-  explicit FarField(cfd::Species &spec, cfd::Parameter &parameter);
+  explicit FarField(const std::string &inflow_name, cfd::Species &spec, cfd::Parameter &parameter);
 
   void copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter &parameter);
 

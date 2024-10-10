@@ -114,7 +114,7 @@ __global__ void update_physical_properties(DZone *zone, DParameter *param) {
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   const real temperature{zone->bv(i, j, k, 5)};
-  auto V= sqrt(zone->bv(i, j, k, 1) * zone->bv(i, j, k, 1) + zone->bv(i, j, k, 2) * zone->bv(i, j, k, 2) +
+  auto V = sqrt(zone->bv(i, j, k, 1) * zone->bv(i, j, k, 1) + zone->bv(i, j, k, 2) * zone->bv(i, j, k, 2) +
                 zone->bv(i, j, k, 3) * zone->bv(i, j, k, 3));
   if constexpr (mix_model != MixtureModel::Air) {
     const int n_spec{param->n_spec};
@@ -376,34 +376,6 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param, real dt) {
   }
 }
 
-template<bool with_cv = false>
-__global__ void eliminate_k_gradient(cfd::DZone *zone, const DParameter *param) {
-  const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  if (i >= mx + ngg || j >= my + ngg) return;
-
-  auto &bv = zone->bv;
-  auto &sv = zone->sv;
-  const int n_scalar = param->n_scalar;
-
-  for (int k = 1; k <= ngg; ++k) {
-    for (int l = 0; l < 6; ++l) {
-      bv(i, j, k, l) = bv(i, j, 0, l);
-      bv(i, j, -k, l) = bv(i, j, 0, l);
-    }
-    for (int l = 0; l < n_scalar; ++l) {
-      sv(i, j, k, l) = sv(i, j, 0, l);
-      sv(i, j, -k, l) = sv(i, j, 0, l);
-    }
-    if constexpr (with_cv) {
-      auto &cv = zone->cv;
-      for (int l = 0; l < param->n_var; ++l) {
-        cv(i, j, k, l) = cv(i, j, 0, l);
-        cv(i, j, -k, l) = cv(i, j, 0, l);
-      }
-    }
-  }
-}
+__global__ void eliminate_k_gradient(cfd::DZone *zone, const DParameter *param);
 
 }

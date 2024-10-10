@@ -36,14 +36,14 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     velocity = std::sqrt(u * u + v * v + w * w);
     pressure = var_info[4];
     temperature = var_info[5];
-    sv = new real[n_spec];
-    mw = 0;
-    for (int i = 0; i < n_spec; ++i) {
-      sv[i] = var_info[6 + i];
-      mw += var_info[6 + i] / spec.mw[i];
-    }
-    mw = 1 / mw;
+    sv = new real[n_scalar];
     if (n_spec > 0) {
+      mw = 0;
+      for (int i = 0; i < n_spec; ++i) {
+        sv[i] = var_info[6 + i];
+        mw += var_info[6 + i] / spec.mw[i];
+      }
+      mw = 1 / mw;
       viscosity = compute_viscosity(temperature, mw, sv, spec);
     } else {
       viscosity = Sutherland(temperature);
@@ -67,9 +67,17 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     w_lower = var_info[10 + n_spec];
     p_lower = var_info[11 + n_spec];
     t_lower = var_info[12 + n_spec];
-    sv_lower = new real[n_spec];
+    sv_lower = new real[n_scalar];
     for (int i = 0; i < n_spec; ++i) {
       sv_lower[i] = var_info[13 + n_spec + i];
+    }
+    if (n_spec > 0) {
+      mw_lower = 0;
+      for (int i = 0; i < n_spec; ++i) mw_lower += sv_lower[i] / spec.mw[i];
+      mw_lower = 1 / mw_lower;
+      mu_lower = compute_viscosity(t_lower, mw_lower, sv_lower, spec);
+    } else {
+      mu_lower = Sutherland(t_lower);
     }
 
     if (n_spec > 0) {
@@ -81,6 +89,41 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       } else {
         // the upper stream is fuel
         acquire_mixture_fraction_expression(spec, sv, sv_lower, parameter);
+      }
+    }
+
+    if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
+      // RANS or DES simulation
+      if (parameter.get_int("RANS_model") == 2) {
+        // SST
+        real mutMul = std::get<real>(info.at("turb_viscosity_ratio"));
+        mut = mutMul * viscosity;
+        mut_lower = mutMul * mu_lower;
+        sv[n_spec] = var_info[13 + 2 * n_spec + 1];
+        sv[n_spec + 1] = var_info[13 + 2 * n_spec + 2];
+        sv_lower[n_spec] = var_info[13 + 2 * n_spec + 3];
+        sv_lower[n_spec + 1] = var_info[13 + 2 * n_spec + 4];
+      }
+    }
+
+    if ((n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2) {
+      // flamelet model or z and z prime are transported
+      if (parameter.get_int("turbulence_method") == 1) {
+        // RANS simulation
+        const auto i_fl{parameter.get_int("i_fl")};
+        sv[i_fl] = mixture_fraction;
+        sv[i_fl + 1] = 0;
+
+        sv_lower[i_fl] = mixture_fraction_lower;
+        sv_lower[i_fl + 1] = 0;
+      }
+    }
+
+    if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+      int i_ps = parameter.get_int("i_ps");
+      for (int i = 0; i < n_ps; ++i) {
+        sv[i_ps + i] = var_info[14 + 2 * n_spec + 4 + 2 * i];
+        sv_lower[i_ps + i] = var_info[14 + 2 * n_spec + 4 + 2 * i + 1];
       }
     }
   } else {
@@ -95,6 +138,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     if (info.find("temperature") != info.end()) temperature = std::get<real>(info.at("temperature"));
     if (info.find("velocity") != info.end()) velocity = std::get<real>(info.at("velocity"));
     if (info.find("density") != info.end()) density = std::get<real>(info.at("density"));
+    if (info.find("aoa") != info.end()) aoa = std::get<real>(info.at("aoa"));
     if (info.find("u") != info.end()) u = std::get<real>(info.at("u"));
     if (info.find("v") != info.end()) v = std::get<real>(info.at("v"));
     if (info.find("w") != info.end()) w = std::get<real>(info.at("w"));
@@ -148,9 +192,16 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       // The velocity magnitude is not given. The mach number should be given
       velocity = mach * c;
     }
-    u *= velocity;
-    v *= velocity;
-    w *= velocity;
+    // If both aoa and u/v/w are given, the aoa is used.
+    if (aoa > -1000) {
+      u = cos(aoa * pi / 180) * velocity;
+      v = sin(aoa * pi / 180) * velocity;
+      w = 0;
+    } else {
+      u *= velocity;
+      v *= velocity;
+      w *= velocity;
+    }
     if (density < 0) {
       // The density is not given
       if (pressure < 0) {
@@ -186,11 +237,18 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
 
     if ((n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2) {
       // flamelet model or z and z prime are transported
-      if (parameter.get_int("turbulence_method") == 1) {
-        // RANS simulation
+      if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
+        // RANS/DES simulation
         const auto i_fl{parameter.get_int("i_fl")};
         sv[i_fl] = std::get<real>(info.at("mixture_fraction"));
         sv[i_fl + 1] = 0;
+      }
+    }
+
+    if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+      int i_ps = parameter.get_int("i_ps");
+      for (int i = 0; i < n_ps; ++i) {
+        sv[i_ps] = std::get<real>(info.at("ps" + std::to_string(i + 1)));
       }
     }
 
@@ -216,6 +274,9 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     if (abs(velocity) < 1) {
       parameter.update_parameter("v_inf", c);
     }
+    parameter.update_parameter("ux_inf", u);
+    parameter.update_parameter("uy_inf", v);
+    parameter.update_parameter("uz_inf", w);
     parameter.update_parameter("p_inf", pressure);
     parameter.update_parameter("T_inf", temperature);
     parameter.update_parameter("M_inf", mach);
@@ -479,8 +540,8 @@ cfd::Outflow::Outflow(const std::string &inflow_name, cfd::Parameter &parameter)
   label = std::get<int>(info.at("label"));
 }
 
-cfd::FarField::FarField(cfd::Species &spec, cfd::Parameter &parameter) {
-  auto &info = parameter.get_struct("farfield");
+cfd::FarField::FarField(const std::string &inflow_name, cfd::Species &spec, cfd::Parameter &parameter) {
+  auto &info = parameter.get_struct(inflow_name);
   label = std::get<int>(info.at("label"));
 
   // In default, the mach number, pressure and temperature should be given.

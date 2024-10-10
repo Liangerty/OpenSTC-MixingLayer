@@ -23,9 +23,18 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     Prt(parameter.get_real("turbulent_prandtl_number")), Sct(parameter.get_real("turbulent_schmidt_number")),
     c_chi{parameter.get_real("c_chi")}, rho_ref{parameter.get_real("rho_inf")},
     a_ref2{parameter.get_real("speed_of_sound") * parameter.get_real("speed_of_sound")},
-    v_ref{parameter.get_real("v_inf")}, weno_eps_scale{
+    v_ref{parameter.get_real("v_inf")}, T_ref{parameter.get_real("T_inf")},
+    p_ref{parameter.get_real("p_inf")}, weno_eps_scale{
     parameter.get_real("rho_inf") * parameter.get_real("v_inf") * parameter.get_real("rho_inf") *
-    parameter.get_real("v_inf")} {
+    parameter.get_real("v_inf")}, sponge_layer{parameter.get_bool("sponge_layer")},
+    sponge_function{parameter.get_int("sponge_function")},
+    sponge_iter{parameter.get_int("sponge_iter")}, spongeXPlusStart{parameter.get_real("spongeXPlusStart")},
+    spongeXPlusEnd{parameter.get_real("spongeXPlusEnd")}, spongeXMinusStart{parameter.get_real("spongeXMinusStart")},
+    spongeXMinusEnd{parameter.get_real("spongeXMinusEnd")}, spongeYPlusStart{parameter.get_real("spongeYPlusStart")},
+    spongeYPlusEnd{parameter.get_real("spongeYPlusEnd")}, spongeYMinusStart{parameter.get_real("spongeYMinusStart")},
+    spongeYMinusEnd{parameter.get_real("spongeYMinusEnd")}, spongeZPlusStart{parameter.get_real("spongeZPlusStart")},
+    spongeZPlusEnd{parameter.get_real("spongeZPlusEnd")}, spongeZMinusStart{parameter.get_real("spongeZMinusStart")},
+    spongeZMinusEnd{parameter.get_real("spongeZMinusEnd")} {
   if (myid == 0) {
     if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 71 || inviscid_scheme == 72)
       printf("\t->-> %-20e : WENO scale factor\n", weno_eps_scale);
@@ -40,6 +49,17 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   n_scalar = parameter.get_int("n_scalar");
   if (reaction != nullptr) {
     n_reac = reaction->n_reac;
+  }
+  n_ps = parameter.get_int("n_passive_scalar");
+  i_ps = parameter.get_int("i_ps");
+  i_ps_cv = parameter.get_int("i_ps_cv");
+  if (n_ps > 0) {
+    cudaMalloc(&sc_ps, n_ps * sizeof(real));
+    cudaMemcpy(sc_ps, parameter.get_real_array("sc_passive_scalar").data(), n_ps * sizeof(real),
+               cudaMemcpyHostToDevice);
+    cudaMalloc(&sct_ps, n_ps * sizeof(real));
+    cudaMemcpy(sct_ps, parameter.get_real_array("sct_passive_scalar").data(), n_ps * sizeof(real),
+               cudaMemcpyHostToDevice);
   }
 
   // species info
@@ -73,6 +93,8 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   cudaMemcpy(t_mid, spec.t_mid.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMemcpy(t_high, spec.t_high.data(), mem_sz, cudaMemcpyHostToDevice);
 #endif
+  cudaMalloc(&geometry, mem_sz);
+  cudaMemcpy(geometry, spec.geometry.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMalloc(&LJ_potent_inv, mem_sz);
   cudaMemcpy(LJ_potent_inv, spec.LJ_potent_inv.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMalloc(&vis_coeff, mem_sz);
@@ -89,6 +111,8 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   kb_over_eps_jk.init_with_size(n_spec, n_spec);
   cudaMemcpy(kb_over_eps_jk.data(), spec.kb_over_eps_jk.data(),
              kb_over_eps_jk.size() * sizeof(real), cudaMemcpyHostToDevice);
+  cudaMalloc(&ZRotF298, mem_sz);
+  cudaMemcpy(ZRotF298, spec.ZRotF298.data(), mem_sz, cudaMemcpyHostToDevice);
   Sc = parameter.get_real("schmidt_number");
 
   // reactions info
@@ -155,15 +179,6 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     yk_lib.allocate_memory(n_spec, n_chi, n_zPrime + 1, n_z + 1, 0);
     cudaMemcpy(yk_lib.data(), flamelet_lib->yk.data(), sizeof(real) * yk_lib.size() * (n_z + 1),
                cudaMemcpyHostToDevice);
-
-    // See if we have computed n_fl_step previously
-    if (std::filesystem::exists("output/message/flamelet_step.txt")) {
-      std::ifstream fin("output/message/flamelet_step.txt");
-      fin >> n_fl_step;
-      fin.close();
-    } else {
-      n_fl_step = 0;
-    }
   }
 
   // If mixing layer and multi-component, we need the mixture fraction info.
@@ -173,6 +188,17 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     nuc_mwc_inv = parameter.get_real("nuc_mwc_inv");
     nuh_mwh_inv = parameter.get_real("nuh_mwh_inv");
     half_nuo_mwo_inv = parameter.get_real("half_nuo_mwo_inv");
+  }
+
+  // the following parameters have been computed in "write_reference_state".
+  if (problem_type == 1) {
+    if (int i = parameter.get_int("characteristic_velocity_ml");i == 0) {
+      v_char = parameter.get_real("convective_velocity");
+    } else {
+      v_char = parameter.get_real("DeltaU");
+    }
+  } else {
+    v_char = parameter.get_real("v_inf");
   }
 
   memset(limit_flow.ll, 0, sizeof(real) * LimitFlow::max_n_var);
@@ -200,6 +226,41 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   auto &sv_inf{parameter.get_real_array("sv_inf")};
   for (int l = 0; l < n_scalar; ++l) {
     limit_flow.sv_inf[l] = sv_inf[l];
+  }
+
+  if (parameter.get_bool("sponge_layer")) {
+    spongeX = parameter.get_int("spongeX");
+    spongeY = parameter.get_int("spongeY");
+    spongeZ = parameter.get_int("spongeZ");
+    if (parameter.get_int("n_scalar") > 0) {
+      cudaMalloc(&sponge_scalar_iter, n_scalar * sizeof(int));
+      cudaMemcpy(sponge_scalar_iter, parameter.get_int_array("sponge_scalar_iter").data(), n_scalar * sizeof(int),
+                 cudaMemcpyHostToDevice);
+    }
+    if (spongeX == 1 || spongeX == 3) {
+      sponge_sigma0 = parameter.get_real("spongeCoefficient") * v_char / (spongeXMinusStart - spongeXMinusEnd);
+      printf("sponge_sigma0=%e\n", sponge_sigma0);
+    }
+    if (spongeX == 2 || spongeX == 3) {
+      sponge_sigma1 = parameter.get_real("spongeCoefficient") * v_char / (spongeXPlusEnd - spongeXPlusStart);
+      printf("sponge_sigma1=%e\n", sponge_sigma1);
+    }
+    if (spongeY == 1 || spongeY == 3) {
+      sponge_sigma2 = parameter.get_real("spongeCoefficient") * v_char / (spongeYMinusStart - spongeYMinusEnd);
+      printf("sponge_sigma2=%e\n", sponge_sigma2);
+    }
+    if (spongeY == 2 || spongeY == 3) {
+      sponge_sigma3 = parameter.get_real("spongeCoefficient") * v_char / (spongeYPlusEnd - spongeYPlusStart);
+      printf("sponge_sigma3=%e\n", sponge_sigma3);
+    }
+    if (spongeZ == 1 || spongeZ == 3) {
+      sponge_sigma4 = parameter.get_real("spongeCoefficient") * v_char / (spongeZMinusStart - spongeZMinusEnd);
+      printf("sponge_sigma4=%e\n", sponge_sigma4);
+    }
+    if (spongeZ == 2 || spongeZ == 3) {
+      sponge_sigma5 = parameter.get_real("spongeCoefficient") * v_char / (spongeZPlusEnd - spongeZPlusStart);
+      printf("sponge_sigma5=%e\n", sponge_sigma5);
+    }
   }
 }
 

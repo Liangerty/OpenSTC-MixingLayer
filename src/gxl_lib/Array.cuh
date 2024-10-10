@@ -313,6 +313,7 @@ public:
 
 //  auto data() { return data_.data(); }
   auto size() { return sz; }
+  auto size() const { return sz; }
 
   /**
    * \brief Get the l-th variable at position (i,j,k)

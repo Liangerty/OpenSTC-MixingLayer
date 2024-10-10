@@ -4,7 +4,8 @@
 #include <filesystem>
 #include "gxl_lib/MyString.h"
 #include <fmt/format.h>
-#include "kernels.cuh"
+#include "kernels.h"
+#include "ChemData.h"
 
 cfd::Parameter::Parameter(int *argc, char ***argv) {
   int myid, n_proc;
@@ -300,6 +301,139 @@ void cfd::Parameter::deduce_known_info() {
     update_parameter("RANS_model", 0);
   }
   update_parameter("n_scalar", n_scalar);
+
+  // sponge layer info
+  if (bool_parameters["sponge_layer"]) {
+    auto dirs = int_array["sponge_layer_direction"];
+    real scale = real_parameters["gridScale"];
+    int spongeX = 0, spongeY = 0, spongeZ = 0;
+    for (auto dir: dirs) {
+      if (dir == 0) {
+        real x0 = real_parameters["spongeXMinusStart"];
+        real x1 = real_parameters["spongeXMinusEnd"];
+        if (abs(x0 - x1) < 1e-10) {
+          fmt::print("The sponge layer in x- direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // x inflow, x0 should be larger than x1
+        if (x0 < x1) {
+          real temp = x0;
+          x0 = x1;
+          x1 = temp;
+        }
+        real_parameters["spongeXMinusStart"] = x0 * scale;
+        real_parameters["spongeXMinusEnd"] = x1 * scale;
+        if (spongeX == 0) {
+          spongeX = 1;
+        } else if (spongeX == 2) {
+          spongeX = 3;
+        }
+      } else if (dir == 1) {
+        real x0 = real_parameters["spongeXPlusStart"];
+        real x1 = real_parameters["spongeXPlusEnd"];
+        if (abs(x0 - x1) < 1e-10) {
+          fmt::print("The sponge layer in x+ direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // x outflow, x0 should be smaller
+        if (x0 > x1) {
+          real temp = x0;
+          x0 = x1;
+          x1 = temp;
+        }
+        real_parameters["spongeXPlusStart"] = x0 * scale;
+        real_parameters["spongeXPlusEnd"] = x1 * scale;
+        if (spongeX == 0) {
+          spongeX = 2;
+        } else if (spongeX == 1) {
+          spongeX = 3;
+        }
+      } else if (dir == 2) {
+        real y0 = real_parameters["spongeYMinusStart"];
+        real y1 = real_parameters["spongeYMinusEnd"];
+        if (abs(y0 - y1) < 1e-10) {
+          fmt::print("The sponge layer in y- direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // y0 should be larger than y1
+        if (y0 < y1) {
+          real temp = y0;
+          y0 = y1;
+          y1 = temp;
+        }
+        real_parameters["spongeYMinusStart"] = y0 * scale;
+        real_parameters["spongeYMinusEnd"] = y1 * scale;
+        if (spongeY == 0) {
+          spongeY = 1;
+        } else if (spongeY == 2) {
+          spongeY = 3;
+        }
+      } else if (dir == 3) {
+        real y0 = real_parameters["spongeYPlusStart"];
+        real y1 = real_parameters["spongeYPlusEnd"];
+        if (abs(y0 - y1) < 1e-10) {
+          fmt::print("The sponge layer in y+ direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // y0 should be smaller than y1
+        if (y0 > y1) {
+          real temp = y0;
+          y0 = y1;
+          y1 = temp;
+        }
+        real_parameters["spongeYPlusStart"] = y0 * scale;
+        real_parameters["spongeYPlusEnd"] = y1 * scale;
+        if (spongeY == 0) {
+          spongeY = 2;
+        } else if (spongeY == 1) {
+          spongeY = 3;
+        }
+      } else if (dir == 4) {
+        real z0 = real_parameters["spongeZMinusStart"];
+        real z1 = real_parameters["spongeZMinusEnd"];
+        if (abs(z0 - z1) < 1e-10) {
+          fmt::print("The sponge layer in z- direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // z0 should be larger than z1
+        if (z0 < z1) {
+          real temp = z0;
+          z0 = z1;
+          z1 = temp;
+        }
+        real_parameters["spongeZMinusStart"] = z0 * scale;
+        real_parameters["spongeZMinusEnd"] = z1 * scale;
+        if (spongeZ == 0) {
+          spongeZ = 1;
+        } else if (spongeZ == 2) {
+          spongeZ = 3;
+        }
+      } else if (dir == 5) {
+        real z0 = real_parameters["spongeZPlusStart"];
+        real z1 = real_parameters["spongeZPlusEnd"];
+        if (abs(z0 - z1) < 1e-10) {
+          fmt::print("The sponge layer in z+ direction is not correctly defined.\n");
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        // z0 should be smaller than z1
+        if (z0 > z1) {
+          real temp = z0;
+          z0 = z1;
+          z1 = temp;
+        }
+        real_parameters["spongeZPlusStart"] = z0 * scale;
+        real_parameters["spongeZPlusEnd"] = z1 * scale;
+        if (spongeZ == 0) {
+          spongeZ = 2;
+        } else if (spongeZ == 1) {
+          spongeZ = 3;
+        }
+      }
+    }
+    update_parameter("spongeX", spongeX);
+    update_parameter("spongeY", spongeY);
+    update_parameter("spongeZ", spongeZ);
+  }
 }
 
 void cfd::Parameter::setup_default_settings() {
@@ -319,6 +453,12 @@ void cfd::Parameter::setup_default_settings() {
   // If we conduct transient simulations, the following parameters are used by default.
   int_parameters["temporal_scheme"] = 3; // RK3 is used by default
   bool_parameters["fixed_time_step"] = false; // The time step is computed with CFL condition.
+  real_parameters["n_flowThroughTime"] = -1;
+  real_parameters["domain_length"] = 1.0;
+  real_parameters["characteristic_velocity"] = -1;
+  real_parameters["set_current_physical_time"] = -1;
+
+  bool_parameters["steady_before_transient"] = false; // Whether to conduct a steady simulation before transient simulation.
 
   // If dual-time stepping is used, the following parameters are needed.
   int_parameters["inner_iteration"] = 20;
@@ -350,6 +490,8 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["compressibility_correction"] = 0; // No compressibility correction is added by default
   int_parameters["des_scale_method"] = 0; // How to compute the grid scale in DES simulations. 0 - cubic root of cell volume, 1 - max of cell dimension
 
+  int_parameters["n_passive_scalar"] = 0;
+
   int_parameters["n_profile"] = 0;
 
   int_parameters["groups_init"] = 1;
@@ -365,6 +507,7 @@ void cfd::Parameter::setup_default_settings() {
   bool_parameters["if_continue_collect_statistics"] = false;
   int_parameters["start_collect_statistics_iter"] = 0;
   bool_parameters["perform_spanwise_average"] = false;
+  bool_parameters["output_statistics_plt"] = true;
 
   int_array["post_process"] = {};
   int_array["output_bc"] = {};
@@ -380,6 +523,36 @@ void cfd::Parameter::setup_default_settings() {
   string_array["fluctuation_profile_related_bc_name"] = {};
   bool_parameters["perform_spanwise_average"] = false;
   bool_parameters["positive_preserving"] = false;
+
+  bool_parameters["sponge_layer"] = false;
+  int_parameters["sponge_function"] = 0; // 0 - (Nektar++, CPC, 2024)
+  int_array["sponge_layer_direction"] = {};
+  int_parameters["sponge_iter"] = 0;
+  int_array["sponge_scalar_iter"] = {};
+  real_parameters["spongeXMinusStart"] = 0;
+  real_parameters["spongeXMinusEnd"] = 0;
+  real_parameters["spongeXPlusStart"] = 0;
+  real_parameters["spongeXPlusEnd"] = 0;
+  real_parameters["spongeYMinusStart"] = 0;
+  real_parameters["spongeYMinusEnd"] = 0;
+  real_parameters["spongeYPlusStart"] = 0;
+  real_parameters["spongeYPlusEnd"] = 0;
+  real_parameters["spongeZMinusStart"] = 0;
+  real_parameters["spongeZMinusEnd"] = 0;
+  real_parameters["spongeZPlusStart"] = 0;
+  real_parameters["spongeZPlusEnd"] = 0;
+
+  int_parameters["characteristic_velocity_ml"] = 1;
+
+  int_parameters["output_time_series"] = 0;
+  bool_parameters["limit_flow"] = false;
+
+  // flamelet model
+  int_parameters["flamelet_format"] = 0;
+  string_parameters["flamelet_file_name"] = "flamelet-lib-zzprimx.txt";
+
+  // output control
+  struct_array["other_output_variables"] = {};
 }
 
 void cfd::Parameter::diagnose_parallel_info() {
@@ -405,39 +578,43 @@ void cfd::Parameter::diagnose_parallel_info() {
   MPI_Barrier(MPI_COMM_WORLD);
 }
 
-void cfd::Parameter::deduce_sim_info() {
+void cfd::Parameter::deduce_sim_info(const Species &spec) {
   int n_var = 5, n_scalar = 0, n_scalar_transported = 0, n_other_var = 1;
   int i_turb_cv = 5, i_fl_cv = 0;
+  int i_ps = 0, i_ps_cv = 5; // ps - passive scalar
 
   if (get_int("species") == 1) {
     n_scalar += get_int("n_spec");
+    i_ps += get_int("n_spec");
     if (get_int("reaction") != 2) {
       // Mixture / Finite rate chemistry
       n_scalar_transported += get_int("n_spec");
       i_turb_cv += get_int("n_spec");
+      i_ps_cv += get_int("n_spec");
     } else {
       // Flamelet model
       n_scalar_transported += 2; // the mixture fraction and the variance of mixture fraction
       n_scalar += 2;
       i_fl_cv = 5 + get_int("n_turb");
+      i_ps_cv = i_fl_cv + 2;
       ++n_other_var; // scalar dissipation rate
     }
   } else if (get_int("species") == 2) {
-    n_scalar += get_int("n_spec");
+    n_scalar += get_int("n_spec") + 2;
+    i_ps += get_int("n_spec");
     if (get_int("reaction") != 2) {
       // Mixture with mixture fraction and variance solved.
       n_scalar_transported += get_int("n_spec") + 2;
-      n_scalar += 2;
       i_turb_cv += get_int("n_spec");
       i_fl_cv = i_turb_cv + get_int("n_turb");
       ++n_other_var; // scalar dissipation rate
     } else {
       // Flamelet model
       n_scalar_transported += 2; // the mixture fraction and the variance of mixture fraction
-      n_scalar += 2;
       i_fl_cv = 5 + get_int("n_turb");
       ++n_other_var; // scalar dissipation rate
     }
+    i_ps_cv = i_fl_cv + 2;
   }
   if (get_bool("turbulence")) {
     // turbulence simulation
@@ -445,13 +622,22 @@ void cfd::Parameter::deduce_sim_info() {
       // RANS
       n_scalar_transported += get_int("n_turb");
       n_scalar += get_int("n_turb");
+      i_ps += get_int("n_turb");
+      i_ps_cv += get_int("n_turb");
       ++n_other_var; // mut
     } else if (turb_method == 2) {
       // DES type
       n_scalar_transported += get_int("n_turb");
       n_scalar += get_int("n_turb");
+      i_ps += get_int("n_turb");
+      i_ps_cv += get_int("n_turb");
       ++n_other_var; // mut
     }
+  }
+  if (get_int("n_passive_scalar")) {
+    // Some passive scalar is transported
+    n_scalar_transported += get_int("n_passive_scalar");
+    n_scalar += get_int("n_passive_scalar");
   }
   n_var += n_scalar_transported;
   update_parameter("n_var", n_var);
@@ -460,13 +646,20 @@ void cfd::Parameter::deduce_sim_info() {
   update_parameter("i_turb_cv", i_turb_cv);
   update_parameter("i_fl", get_int("n_turb") + get_int("n_spec"));
   update_parameter("i_fl_cv", i_fl_cv);
+  update_parameter("i_ps", i_ps);
+  update_parameter("i_ps_cv", i_ps_cv);
   update_parameter("n_other_var", n_other_var);
+
+  get_variable_names(spec);
 
   int myid = get_int("myid");
   if (myid == 0) {
     fmt::print("\n{:*^80}\n", "Simulation Details");
     printf("\t->-> %-20d : number of equations to solve\n", n_var);
     printf("\t->-> %-20d : number of scalar variables\n", n_scalar);
+    if (auto n_ps = get_int("n_passive_scalar");n_ps > 0) {
+      printf("\t->-> %-20d : number of passive scalar variables\n", n_ps);
+    }
 
     if (get_bool("steady")) {
       // steady
@@ -537,5 +730,103 @@ void cfd::Parameter::deduce_sim_info() {
           fmt::print("\t\t->-> {:<20} : compressibility correction\n", cc_method);
       }
     }
+
+    if (get_bool("sponge_layer")) {
+      fmt::print("\n\t->-> {:<20} : sponge layer\n", "With");
+      auto dirs = int_array["sponge_layer_direction"];
+      for (auto dir: dirs) {
+        if (dir == 0) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "x-");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeXMinusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeXMinusEnd"));
+        } else if (dir == 1) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "x+");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeXPlusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeXPlusEnd"));
+        } else if (dir == 2) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "y-");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeYMinusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeYMinusEnd"));
+        } else if (dir == 3) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "y+");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeYPlusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeYPlusEnd"));
+        } else if (dir == 4) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "z-");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeZMinusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeZMinusEnd"));
+        } else if (dir == 5) {
+          fmt::print("\t\t->-> {:<20} : direction\n", "z+");
+          fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeZPlusStart"));
+          fmt::print("\t\t\t->-> {:<20} : end\n", get_real("spongeZPlusEnd"));
+        }
+      }
+    }
   }
+}
+
+void cfd::Parameter::get_variable_names(const Species &spec) {
+  // First, basic variables.
+  std::vector<std::string> var_name{"density", "u", "v", "w", "pressure", "temperature"};
+  int nv = (int) var_name.size();
+  if (get_int("species") != 0) {
+    int ns = spec.n_spec;
+    var_name.resize(nv + ns);
+    auto &names = spec.spec_list;
+    for (auto &[name, ind]: names) {
+      var_name[ind + nv] = name;
+    }
+    nv += ns;
+  }
+  if (get_bool("turbulence")) {
+    if (auto turb_method = get_int("turbulence_method");turb_method == 1 || turb_method == 2) {
+      // RAS/DDES
+      // Currently, only SST is implemented, so there is no condition branch here.
+      nv += 2;
+      var_name.emplace_back("tke");
+      var_name.emplace_back("omega");
+
+      // The flamelet model must be used with RANS or DES, thus the if is contained in this branch.
+      if (get_int("species") != 0 && get_int("reaction") == 2) {
+        // Flamelet model
+        nv += 2;
+        var_name.emplace_back("MixtureFraction");
+        var_name.emplace_back("MixtureFractionVariance");
+      }
+    }
+  }
+  if (int n_ps = get_int("n_passive_scalar");n_ps > 0) {
+    nv += n_ps;
+    for (int i = 0; i < n_ps; ++i) {
+      var_name.emplace_back("PS" + std::to_string(i + 1));
+    }
+  }
+
+  // Next, additional variables with assigned memory.
+  var_name.emplace_back("mach");
+  ++nv;
+  if (auto turb_method = get_int("turbulence_method");turb_method == 1 || turb_method == 2) {
+    // RAS/DDES
+    var_name.emplace_back("mut");
+    ++nv;
+    if (turb_method == 2) {
+      var_name.emplace_back("fd");
+      ++nv;
+    }
+    if (get_int("species") != 0 && get_int("reaction") == 2) {
+      // Flamelet model
+      var_name.emplace_back("ScalarDissipationRate");
+      ++nv;
+    }
+  }
+
+  // Last, variables to be computed by choice.
+  auto ovs = struct_array["other_output_variables"];
+  if (ovs.find("laminar_viscosity") != ovs.end()) {
+    var_name.emplace_back("laminar_viscosity");
+    update_parameter("output_mul", true);
+    ++nv;
+  }
+
+  update_parameter("var_name", var_name);
 }
