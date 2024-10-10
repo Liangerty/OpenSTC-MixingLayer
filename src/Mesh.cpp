@@ -64,8 +64,8 @@ void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
     const int next_face{1 - face}, target_next_face{1 - target_face};
     range_start[next_face] = std::abs(range_start[next_face]) - 1;
     range_end[next_face] = std::abs(range_end[next_face]) - 1;
-    target_start[next_face] = std::abs(target_start[next_face]) - 1;
-    target_end[next_face] = std::abs(target_end[next_face]) - 1;
+    target_start[target_next_face] = std::abs(target_start[target_next_face]) - 1;
+    target_end[target_next_face] = std::abs(target_end[target_next_face]) - 1;
     src_tar[target_next_face] = gxl::sgn((target_end[target_next_face] - target_start[target_next_face]) *
                                          (range_end[next_face] - range_start[next_face])) * (next_face + 1);
     src_tar[2] = 3;
