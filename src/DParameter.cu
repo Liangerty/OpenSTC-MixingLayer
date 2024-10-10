@@ -153,7 +153,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     cudaMemcpy(troe_t2, reaction->troe_t2.data(), mem_sz, cudaMemcpyHostToDevice);
   }
 
-  if (flamelet_lib != nullptr) {
+  if (flamelet_lib->n_z != 0) {
     n_z = flamelet_lib->n_z;
     n_zPrime = flamelet_lib->n_zPrime;
     n_chi = flamelet_lib->n_chi;
