@@ -392,13 +392,6 @@ std::vector<std::string> Monitor::setup_labels_to_monitor(const Parameter &param
       bv_idx.push_back(5);
       var_name_found.emplace_back("Temperature");
       ++n_found;
-    } else if (n_spec > 0) {
-      auto it = spec_list.find(name);
-      if (it != spec_list.end()) {
-        sv_idx.push_back(it->second);
-        var_name_found.emplace_back(name);
-        ++n_found;
-      }
     } else if (name == "TKE") {
       sv_idx.push_back(n_spec);
       var_name_found.emplace_back("TKE");
@@ -409,12 +402,23 @@ std::vector<std::string> Monitor::setup_labels_to_monitor(const Parameter &param
       ++n_found;
     } else if (name == "MIXTUREFRACTION" || name == "Z") {
       sv_idx.push_back(n_spec + 2);
-      var_name_found.emplace_back("Mixture fraction");
+      var_name_found.emplace_back("MixtureFraction");
       ++n_found;
     } else if (name == "MIXTUREFRACTIONVARIANCE") {
       sv_idx.push_back(n_spec + 3);
-      var_name_found.emplace_back("Mixture fraction variance");
+      var_name_found.emplace_back("MixtureFractionVariance");
       ++n_found;
+    } else if (n_spec > 0) {
+      auto it = spec_list.find(name);
+      if (it != spec_list.end()) {
+        sv_idx.push_back(it->second);
+        var_name_found.emplace_back(name);
+        ++n_found;
+      } else {
+        if (parameter.get_int("myid") == 0) {
+          printf("The variable %s is not found in the variable list.\n", name.c_str());
+        }
+      }
     } else {
       if (parameter.get_int("myid") == 0) {
         printf("The variable %s is not found in the variable list.\n", name.c_str());

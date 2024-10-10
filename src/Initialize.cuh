@@ -8,6 +8,7 @@
 #include <mpi.h>
 #include "gxl_lib/MyString.h"
 #include "TurbMethod.hpp"
+#include <vector>
 
 namespace cfd {
 template<MixtureModel mix_model, class turb>
@@ -17,6 +18,21 @@ void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<F
 
 template<MixtureModel mix_model, class turb>
 void read_flowfield(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
+
+template<MixtureModel mix_model, class turb>
+void read_flowfield_with_same_block(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
+                                    const std::vector<int> &blk_order, MPI_Offset offset_data,
+                                    const std::vector<int> &mx, const std::vector<int> &my, const std::vector<int> &mz,
+                                    int n_var_old, const std::vector<int> &index_order, MPI_File &fp,
+                                    std::array<int, 2> &old_data_info);
+
+template<MixtureModel mix_model, class turb>
+void read_flowfield_by_0Order_interpolation(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
+                                            Species &species, const std::vector<int> &blk_order, MPI_Offset offset_data,
+                                            const std::vector<int> &mx, const std::vector<int> &my,
+                                            const std::vector<int> &mz, int n_var_old,
+                                            const std::vector<int> &index_order, MPI_File &fp,
+                                            std::array<int, 2> &old_data_info);
 
 template<MixtureModel mix_model, class turb>
 void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
@@ -107,11 +123,14 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
   const int n_spec{species.n_spec};
   const int n_turb{parameter.get_int("n_turb")};
 
-  auto *mx = new int[mesh.n_block_total], *my = new int[mesh.n_block_total], *mz = new int[mesh.n_block_total];
+  std::vector<int> mx, my, mz;
+  int n_zone{0};
   real solution_time{0};
-  for (int b = 0; b < mesh.n_block_total; ++b) {
-    // 1. Zone marker. Value = 299.0, indicates a V112 header.
-    offset += 4;
+  float marker{299.0f};
+  MPI_File_read_at(fp, offset, &marker, 1, MPI_FLOAT, &status);
+  offset += 4;
+  while (abs(marker - 299.0f) < 1e-3) {
+    ++n_zone;
     // 2. Zone name.
     gxl::read_str_from_binary_MPI_ver(fp, offset);
     // Jump through the following info which is not relevant to the current process.
@@ -122,150 +141,204 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
     // Jump through the following info which is not relevant to the current process.
     offset += 20;
     // For ordered zone, specify IMax, JMax, KMax
-    MPI_File_read_at(fp, offset, &mx[b], 1, MPI_INT, &status);
+    int mx1, my1, mz1;
+    MPI_File_read_at(fp, offset, &mx1, 1, MPI_INT, &status);
     offset += 4;
-    MPI_File_read_at(fp, offset, &my[b], 1, MPI_INT, &status);
+    MPI_File_read_at(fp, offset, &my1, 1, MPI_INT, &status);
     offset += 4;
-    MPI_File_read_at(fp, offset, &mz[b], 1, MPI_INT, &status);
+    MPI_File_read_at(fp, offset, &mz1, 1, MPI_INT, &status);
     offset += 4;
+    mx.emplace_back(mx1);
+    my.emplace_back(my1);
+    mz.emplace_back(mz1);
     // 11. For all zone types (repeat for each Auxiliary data name/value pair), no more data
+    offset += 4;
+    // Next zone marker
+    MPI_File_read_at(fp, offset, &marker, 1, MPI_FLOAT, &status);
     offset += 4;
   }
   parameter.update_parameter("solution_time", solution_time);
-  // Read the EOHMARKER
-  offset += 4;
 
-  std::vector<std::string> zone_name;
-  // Next, data section
-  // Jump the front part for process 0 ~ myid-1
-  int n_jump_blk{0};
-  for (int i = 0; i < parameter.get_int("myid"); ++i) {
-    n_jump_blk += mesh.nblk[i];
+  // Next, see if the blocks are exactly the same as the current mesh
+  bool same_mesh{false};
+  if (n_zone == mesh.n_block_total) {
+    same_mesh = true;
+    for (size_t i = 0; i < n_zone; ++i) {
+      if (mx[i] != mesh.mx_blk[i] || my[i] != mesh.my_blk[i] || mz[i] != mesh.mz_blk[i]) {
+        same_mesh = false;
+        break;
+      }
+    }
   }
-  int i_blk{0};
-  for (int b = 0; b < n_jump_blk; ++b) {
-    offset += 16 + 20 * n_var_old;
-    const int64_t N = mx[b] * my[b] * mz[b];
-    // We always write double precision out
-    offset += n_var_old * N * 8;
-    ++i_blk;
-  }
-  // Read data of current process
-  int n_ps = parameter.get_int("n_passive_scalar");
-  for (size_t blk = 0; blk < mesh.n_block; ++blk) {
-    // 1. Zone marker. Value = 299.0, indicates a V112 header.
-    offset += 4;
-    // 2. Variable data format, 2 for double by default
-    offset += 4 * n_var_old;
-    // 3. Has passive variables: 0 = no, 1 = yes.
-    offset += 4;
-    // 4. Has variable sharing 0 = no, 1 = yes.
-    offset += 4;
-    // 5. Zero based zone number to share connectivity list with (-1 = no sharing).
-    offset += 4;
-    // 6. Compressed list of min/max pairs for each non-shared and non-passive variable.
-    offset += 8 * 2 * n_var_old;
-    // zone data
-    // First, the coordinates x, y and z.
-    const int64_t N = mx[i_blk] * my[i_blk] * mz[i_blk];
-    offset += 3 * N * 8;
-    // Other variables
-    const auto &b = mesh[blk];
-    MPI_Datatype ty;
-    int lsize[3]{mx[i_blk], my[i_blk], mz[i_blk]};
-    const int64_t memsz = lsize[0] * lsize[1] * lsize[2] * 8;
-    int memsize[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
-    const int ngg_file{(mx[i_blk] - b.mx) / 2};
-    int start_idx[3]{b.ngg - ngg_file, b.ngg - ngg_file, b.ngg - ngg_file};
-    MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
-    MPI_Type_commit(&ty);
-    for (size_t l = 3; l < n_var_old; ++l) {
-      auto index = index_order[l];
-      if (index < 6) {
-        // basic variables
-        auto bv = field[blk].bv[index];
-        MPI_File_read_at(fp, offset, bv, 1, ty, &status);
-        offset += memsz;
-      } else if (index < 6 + n_spec) {
-        // If air, n_spec=0;
-        // species variables
-        index -= 6;
-        auto sv = field[blk].sv[index];
-        MPI_File_read_at(fp, offset, sv, 1, ty, &status);
-        offset += memsz;
-      } else if (index < 6 + n_spec + n_turb) {
-        // If laminar, n_turb=0
-        // turbulent variables
-        index -= 6;
-        if (n_turb == old_data_info[1]) {
-          // SA from SA or SST from SST
+  if (!same_mesh) {
+    // Next, see if the blocks are exactly the same as the current mesh, while only the block order is different
+    bool same_block = true;
+    std::vector<int> blk_order(n_zone, -1);
+    if (n_zone == mesh.n_block_total) {
+      for (int i = 0; i < n_zone; ++i) {
+        int find{0};
+        for (int j = 0; j < n_zone; ++j) {
+          if (mesh.mx_blk[i]==mx[j] && mesh.my_blk[i]==my[j] && mesh.mz_blk[i]==mz[j]) {
+            ++find;
+            blk_order[i] = j;
+            if (find > 1) {
+              same_block = false;
+              break;
+            }
+          }
+        }
+        if (blk_order[i] == -1) {
+          same_block = false;
+          break;
+        }
+      }
+    } else {
+      same_block = false;
+    }
+
+    if (same_block) {
+      // Read the data in the order of the current mesh
+      read_flowfield_with_same_block<mix_model, turb>(parameter, mesh, field, species, blk_order, offset,
+                                                      mx, my, mz, n_var_old, index_order, fp, old_data_info);
+    } else {
+      // The mesh is different, we need to interpolate the data to the current mesh
+    }
+  } else {
+    std::vector<std::string> zone_name;
+    // Next, data section
+    // Jump the front part for process 0 ~ myid-1
+    int n_jump_blk{0};
+    for (int i = 0; i < parameter.get_int("myid"); ++i) {
+      n_jump_blk += mesh.nblk[i];
+    }
+    int i_blk{0};
+    for (int b = 0; b < n_jump_blk; ++b) {
+      offset += 16 + 20 * n_var_old;
+      const int64_t N = mx[b] * my[b] * mz[b];
+      // We always write double precision out
+      offset += n_var_old * N * 8;
+      ++i_blk;
+    }
+    // Read data of current process
+    int n_ps = parameter.get_int("n_passive_scalar");
+    for (size_t blk = 0; blk < mesh.n_block; ++blk) {
+      // 1. Zone marker. Value = 299.0, indicates a V112 header.
+      offset += 4;
+      // 2. Variable data format, 2 for double by default
+      offset += 4 * n_var_old;
+      // 3. Has passive variables: 0 = no, 1 = yes.
+      offset += 4;
+      // 4. Has variable sharing 0 = no, 1 = yes.
+      offset += 4;
+      // 5. Zero based zone number to share connectivity list with (-1 = no sharing).
+      offset += 4;
+      // 6. Compressed list of min/max pairs for each non-shared and non-passive variable.
+      offset += 8 * 2 * n_var_old;
+      // zone data
+      // First, the coordinates x, y and z.
+      const int64_t N = mx[i_blk] * my[i_blk] * mz[i_blk];
+      offset += 3 * N * 8;
+      // Other variables
+      const auto &b = mesh[blk];
+      MPI_Datatype ty;
+      int lsize[3]{mx[i_blk], my[i_blk], mz[i_blk]};
+      const int64_t memsz = lsize[0] * lsize[1] * lsize[2] * 8;
+      int memsize[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
+      const int ngg_file{(mx[i_blk] - b.mx) / 2};
+      int start_idx[3]{b.ngg - ngg_file, b.ngg - ngg_file, b.ngg - ngg_file};
+      MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+      MPI_Type_commit(&ty);
+      for (size_t l = 3; l < n_var_old; ++l) {
+        auto index = index_order[l];
+        if (index < 6) {
+          // basic variables
+          auto bv = field[blk].bv[index];
+          MPI_File_read_at(fp, offset, bv, 1, ty, &status);
+          offset += memsz;
+        } else if (index < 6 + n_spec) {
+          // If air, n_spec=0;
+          // species variables
+          index -= 6;
           auto sv = field[blk].sv[index];
           MPI_File_read_at(fp, offset, sv, 1, ty, &status);
           offset += memsz;
-        } else if (n_turb == 1 && old_data_info[1] == 2) {
-          // SA from SST. Currently, just use freestream value to initialize. Modify this later when I write SA
-          old_data_info[1] = 0;
-        } else if (n_turb == 2 && old_data_info[1] == 1) {
-          // SST from SA. As ACANS has done, the turbulent variables are initialized from freestream value
-          old_data_info[1] = 0;
+        } else if ((parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) &&
+                   index < 6 + n_spec + n_turb) {
+          // RANS/DDES
+          // If laminar, n_turb=0
+          // turbulent variables
+          index -= 6;
+          if (n_turb == old_data_info[1]) {
+            // SA from SA or SST from SST
+            auto sv = field[blk].sv[index];
+            MPI_File_read_at(fp, offset, sv, 1, ty, &status);
+            offset += memsz;
+          } else if (n_turb == 1 && old_data_info[1] == 2) {
+            // SA from SST. Currently, just use freestream value to initialize. Modify this later when I write SA
+            old_data_info[1] = 0;
+          } else if (n_turb == 2 && old_data_info[1] == 1) {
+            // SST from SA. As ACANS has done, the turbulent variables are initialized from freestream value
+            old_data_info[1] = 0;
+          }
+        } else if ((parameter.get_int("species") == 2 || parameter.get_int("reaction") == 2) &&
+                   index < 6 + n_spec + n_turb + 2) {
+          // If flamelet model is used, we need to read the flamelet info
+          index -= 6;
+          auto sv = field[blk].sv[index];
+          MPI_File_read_at(fp, offset, sv, 1, ty, &status);
+          offset += memsz;
+        } else if (n_ps > 0 && index < 6 + parameter.get_int("i_ps") + n_ps) {
+          // Passive scalar
+          index -= 6;
+          auto sv = field[blk].sv[index];
+          MPI_File_read_at(fp, offset, sv, 1, ty, &status);
+          offset += memsz;
+        } else {
+          // No matched label, just ignore
+          offset += memsz;
         }
-      } else if (index < 6 + n_spec + n_turb + 2) {
-        // Flamelet info
-        index -= 6;
-        auto sv = field[blk].sv[index];
-        MPI_File_read_at(fp, offset, sv, 1, ty, &status);
-        offset += memsz;
-      } else if (index < 6 + parameter.get_int("i_ps") + n_ps) {
-        // Passive scalar
-        index -= 6;
-        auto sv = field[blk].sv[index];
-        MPI_File_read_at(fp, offset, sv, 1, ty, &status);
-        offset += memsz;
-      } else {
-        // No matched label, just ignore
-        offset += memsz;
+      }
+      ++i_blk;
+    }
+    MPI_File_close(&fp);
+
+    // Next, if the previous simulation does not contain some of the variables used in the current simulation,
+    // then we initialize them here
+    if constexpr (mix_model != MixtureModel::Air) {
+      if (old_data_info[0] == 0) {
+        initialize_spec_from_inflow(parameter, mesh, field, species);
+        old_data_info[0] = 1;
       }
     }
-    ++i_blk;
-  }
-  MPI_File_close(&fp);
-
-  // Next, if the previous simulation does not contain some of the variables used in the current simulation,
-  // then we initialize them here
-  if constexpr (mix_model != MixtureModel::Air) {
-    if (old_data_info[0] == 0) {
-      initialize_spec_from_inflow(parameter, mesh, field, species);
-      old_data_info[0] = 1;
+    if constexpr (TurbMethod<turb>::type == TurbSimLevel::RANS) {
+      if (old_data_info[1] == 0) {
+        initialize_turb_from_inflow(parameter, mesh, field, species);
+      }
     }
-  }
-  if constexpr (TurbMethod<turb>::type == TurbSimLevel::RANS) {
-    if (old_data_info[1] == 0) {
-      initialize_turb_from_inflow(parameter, mesh, field, species);
+    if constexpr ((mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) &&
+                  (TurbMethod<turb>::type == TurbSimLevel::RANS || TurbMethod<turb>::type == TurbSimLevel::DES ||
+                   TurbMethod<turb>::type == TurbSimLevel::LES)) {
+      if (old_data_info[0] == 1) {
+        // From species field to mixture fraction field
+        initialize_mixture_fraction_from_species(parameter, mesh, field, species);
+      }
     }
-  }
-  if constexpr ((mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) &&
-                (TurbMethod<turb>::type == TurbSimLevel::RANS || TurbMethod<turb>::type == TurbSimLevel::DES ||
-                 TurbMethod<turb>::type == TurbSimLevel::LES)) {
-    if (old_data_info[0] == 1) {
-      // From species field to mixture fraction field
-      initialize_mixture_fraction_from_species(parameter, mesh, field, species);
+
+      for (auto &f: field) {
+      cudaMemcpy(f.h_ptr->bv.data(), f.bv.data(), f.h_ptr->bv.size() * sizeof(real) * 6, cudaMemcpyHostToDevice);
+      cudaMemcpy(f.h_ptr->sv.data(), f.sv.data(), f.h_ptr->sv.size() * sizeof(real) * parameter.get_int("n_scalar"),
+                 cudaMemcpyHostToDevice);
     }
-  }
 
-  for (auto &f: field) {
-    cudaMemcpy(f.h_ptr->bv.data(), f.bv.data(), f.h_ptr->bv.size() * sizeof(real) * 6, cudaMemcpyHostToDevice);
-    cudaMemcpy(f.h_ptr->sv.data(), f.sv.data(), f.h_ptr->sv.size() * sizeof(real) * parameter.get_int("n_scalar"),
-               cudaMemcpyHostToDevice);
-  }
+    std::ifstream step_file{"output/message/step.txt"};
+    int step{0};
+    step_file >> step;
+    step_file.close();
+    parameter.update_parameter("step", step);
 
-  std::ifstream step_file{"output/message/step.txt"};
-  int step{0};
-  step_file >> step;
-  step_file.close();
-  parameter.update_parameter("step", step);
-
-  if (parameter.get_int("myid") == 0) {
-    printf("\t->-> %-25s : initialization method.\n", "From previous results");
+    if (parameter.get_int("myid") == 0) {
+      printf("\t->-> %-25s : initialization method.\n", "From previous results");
+    }
   }
 }
 
@@ -508,10 +581,9 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
       initialize_turb_from_inflow(parameter, mesh, field, species);
     }
   }
-  if constexpr ((mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) &&
-                (TurbMethod<turb>::type == TurbSimLevel::RANS ||
-                 TurbMethod<turb>::type == TurbSimLevel::LES)) {
-    if (old_data_info[0] == 1) {
+  if constexpr (TurbMethod<turb>::type == TurbSimLevel::RANS || TurbMethod<turb>::type == TurbSimLevel::DES ||
+                TurbMethod<turb>::type == TurbSimLevel::LES) {
+    if (n_spec > 0 && parameter.get_int("reaction") == 2 && old_data_info[0] == 1) {
       // From species field to mixture fraction field
       initialize_mixture_fraction_from_species(parameter, mesh, field, species);
     }
@@ -535,6 +607,196 @@ void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &
   if (parameter.get_int("myid") == 0) {
     printf(
         "Flowfield is initialized from previous 2D simulation results, the span-wise is copied from the 2D profile.\n");
+  }
+}
+
+template<MixtureModel mix_model, class turb>
+void
+read_flowfield_with_same_block(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
+                               const std::vector<int> &blk_order, MPI_Offset offset_data,
+                               const std::vector<int> &mx, const std::vector<int> &my, const std::vector<int> &mz,
+                               int n_var_old, const std::vector<int> &index_order, MPI_File &fp,
+                               std::array<int, 2> &old_data_info) {
+  int blk_start = 0;
+  const int myid = parameter.get_int("myid");
+  for (int i = 0; i < myid; ++i) {
+    blk_start += mesh.nblk[i];
+  }
+
+  std::vector<std::string> zone_name;
+  // Next, data section
+  int n_spec = species.n_spec;
+  int n_turb = parameter.get_int("n_turb");
+  int n_ps = parameter.get_int("n_passive_scalar");
+  MPI_Status status;
+  for (size_t blk = 0; blk < mesh.n_block; ++blk) {
+    // Get the offset of the corresponding block
+    MPI_Offset offset = offset_data;
+    const int i_blk_read{blk_order[blk_start + blk]};
+    printf("\tProcess %d, block %d is read from block %d in the previous simulation.\n", myid, blk, i_blk_read);
+    for (int counter = 0; counter < i_blk_read; ++counter) {
+      offset += 16 + 20 * n_var_old;
+      const int64_t N = mx[counter] * my[counter] * mz[counter];
+      // We always write double precision out
+      offset += n_var_old * N * 8;
+    }
+    // 1. Zone marker. Value = 299.0, indicates a V112 header.
+    offset += 4;
+    // 2. Variable data format, 2 for double by default
+    offset += 4 * n_var_old;
+    // 3. Has passive variables: 0 = no, 1 = yes.
+    offset += 4;
+    // 4. Has variable sharing 0 = no, 1 = yes.
+    offset += 4;
+    // 5. Zero based zone number to share connectivity list with (-1 = no sharing).
+    offset += 4;
+    // 6. Compressed list of min/max pairs for each non-shared and non-passive variable.
+    offset += 8 * 2 * n_var_old;
+    // zone data
+    // First, the coordinates x, y and z.
+    const int64_t N = mx[i_blk_read] * my[i_blk_read] * mz[i_blk_read];
+    offset += 3 * N * 8;
+    // Other variables
+    const auto &b = mesh[blk];
+    MPI_Datatype ty;
+    int lsize[3]{mx[i_blk_read], my[i_blk_read], mz[i_blk_read]};
+    const int64_t memsz = lsize[0] * lsize[1] * lsize[2] * 8;
+    int memsize[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
+    const int ngg_file{(mx[i_blk_read] - b.mx) / 2};
+    int start_idx[3]{b.ngg - ngg_file, b.ngg - ngg_file, b.ngg - ngg_file};
+    MPI_Type_create_subarray(3, memsize, lsize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+    MPI_Type_commit(&ty);
+    for (size_t l = 3; l < n_var_old; ++l) {
+      auto index = index_order[l];
+      if (index < 6) {
+        // basic variables
+        auto bv = field[blk].bv[index];
+        MPI_File_read_at(fp, offset, bv, 1, ty, &status);
+        offset += memsz;
+      } else if (index < 6 + n_spec) {
+        // If air, n_spec=0;
+        // species variables
+        index -= 6;
+        auto sv = field[blk].sv[index];
+        MPI_File_read_at(fp, offset, sv, 1, ty, &status);
+        offset += memsz;
+      } else if ((parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) &&
+                 index < 6 + n_spec + n_turb) {
+        // RANS/DDES
+        // If laminar, n_turb=0
+        // turbulent variables
+        index -= 6;
+        if (n_turb == old_data_info[1]) {
+          // SA from SA or SST from SST
+          auto sv = field[blk].sv[index];
+          MPI_File_read_at(fp, offset, sv, 1, ty, &status);
+          offset += memsz;
+        } else if (n_turb == 1 && old_data_info[1] == 2) {
+          // SA from SST. Currently, just use freestream value to initialize. Modify this later when I write SA
+          old_data_info[1] = 0;
+        } else if (n_turb == 2 && old_data_info[1] == 1) {
+          // SST from SA. As ACANS has done, the turbulent variables are initialized from freestream value
+          old_data_info[1] = 0;
+        }
+      } else if ((parameter.get_int("species") == 2 || parameter.get_int("reaction") == 2) &&
+                 index < 6 + n_spec + n_turb + 2) {
+        // If flamelet model is used, we need to read the flamelet info
+        index -= 6;
+        auto sv = field[blk].sv[index];
+        MPI_File_read_at(fp, offset, sv, 1, ty, &status);
+        offset += memsz;
+      } else if (n_ps > 0 && index < 6 + parameter.get_int("i_ps") + n_ps) {
+        // Passive scalar
+        index -= 6;
+        auto sv = field[blk].sv[index];
+        MPI_File_read_at(fp, offset, sv, 1, ty, &status);
+        offset += memsz;
+      } else {
+        // No matched label, just ignore
+        offset += memsz;
+      }
+    }
+  }
+  MPI_File_close(&fp);
+
+  // Next, if the previous simulation does not contain some of the variables used in the current simulation,
+  // then we initialize them here
+  if constexpr (mix_model != MixtureModel::Air) {
+    if (old_data_info[0] == 0) {
+      initialize_spec_from_inflow(parameter, mesh, field, species);
+      old_data_info[0] = 1;
+    }
+  }
+  if constexpr (TurbMethod<turb>::type == TurbSimLevel::RANS) {
+    if (old_data_info[1] == 0) {
+      initialize_turb_from_inflow(parameter, mesh, field, species);
+    }
+  }
+  if constexpr ((mix_model == MixtureModel::FL || mix_model == MixtureModel::MixtureFraction) &&
+                (TurbMethod<turb>::type == TurbSimLevel::RANS || TurbMethod<turb>::type == TurbSimLevel::DES ||
+                 TurbMethod<turb>::type == TurbSimLevel::LES)) {
+    if (old_data_info[0] == 1) {
+      // From species field to mixture fraction field
+      initialize_mixture_fraction_from_species(parameter, mesh, field, species);
+    }
+  }
+
+  for (auto &f: field) {
+    cudaMemcpy(f.h_ptr->bv.data(), f.bv.data(), f.h_ptr->bv.size() * sizeof(real) * 6, cudaMemcpyHostToDevice);
+    cudaMemcpy(f.h_ptr->sv.data(), f.sv.data(), f.h_ptr->sv.size() * sizeof(real) * parameter.get_int("n_scalar"),
+               cudaMemcpyHostToDevice);
+  }
+
+  std::ifstream step_file{"output/message/step.txt"};
+  int step{0};
+  step_file >> step;
+  step_file.close();
+  parameter.update_parameter("step", step);
+
+  if (parameter.get_int("myid") == 0) {
+    printf("\t->-> %-25s : initialization method.\n", "From previous results");
+  }
+}
+
+
+template<MixtureModel mix_model, class turb>
+void read_flowfield_by_0Order_interpolation(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
+                                            Species &species, const std::vector<int> &blk_order, MPI_Offset offset_data,
+                                            const std::vector<int> &mx, const std::vector<int> &my,
+                                            const std::vector<int> &mz, int n_var_old,
+                                            const std::vector<int> &index_order, MPI_File &fp,
+                                            std::array<int, 2> &old_data_info) {
+  // First, get the max and min coordinates of the current mesh
+  const int n_block = mesh.n_block;
+  std::vector<real> x_min(n_block, 1e10), x_max(n_block, -1e10), y_min(n_block, 1e10), y_max(n_block, -1e10),
+      z_min(n_block, 1e10), z_max(n_block, -1e10);
+  for (int blk = 0; blk < n_block; ++blk) {
+    const auto &b = mesh[blk];
+    int mx1 = b.mx, my1 = b.my, mz1 = b.mz;
+    for (int k = 0; k < mz1; ++k) {
+      for (int j = 0; j < my1; ++j) {
+        for (int i = 0; i < mx1; ++i) {
+          x_min[blk] = std::min(x_min[blk], b.x(i, j, k));
+          x_max[blk] = std::max(x_max[blk], b.x(i, j, k));
+          y_min[blk] = std::min(y_min[blk], b.y(i, j, k));
+          y_max[blk] = std::max(y_max[blk], b.y(i, j, k));
+          z_min[blk] = std::min(z_min[blk], b.z(i, j, k));
+          z_max[blk] = std::max(z_max[blk], b.z(i, j, k));
+        }
+      }
+    }
+  }
+
+  // Next, find the max block of previous simulation
+  int max_blk_idx{0};
+  int n_block_read{(int)(mx.size())};
+  int64_t max_N{mx[1]*my[1]*mz[1]};
+  for (int b=1;b<n_block_read;++b){
+    int64_t N=mx[b]*my[b]*mz[b];
+    if (N>max_N){
+      max_N=N;
+      max_blk_idx=b;
+    }
   }
 }
 }

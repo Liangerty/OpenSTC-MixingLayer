@@ -11,7 +11,7 @@
 
 namespace cfd {
 
-int add_other_variable_name(std::vector<std::string> &var_name);
+int add_other_variable_name(std::vector<std::string> &var_name, const Parameter &parameter);
 
 MPI_Offset write_static_max_min(MPI_Offset offset, const Field &field, int ngg, MPI_File &fp);
 
@@ -110,7 +110,7 @@ void FieldIO<mix_model, turb, output_time_choice>::write_header() {
     // 3. Number of variables in the datafile, for this file, n_var = 3(x,y,z)+7(density,u,v,w,p,t,Ma)+n_spec+n_scalar
     std::vector<std::string> var_name{"x", "y", "z", "density", "u", "v", "w", "pressure", "temperature", "mach"};
     n_var = acquire_variable_names(var_name);
-    n_var = add_other_variable_name(var_name);
+    n_var = add_other_variable_name(var_name, parameter);
     MPI_File_write_at(fp, offset, &n_var, 1, MPI_INT32_T, &status);
     offset += 4;
     // 4. Variable names.

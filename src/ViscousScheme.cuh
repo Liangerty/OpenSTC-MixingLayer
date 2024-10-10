@@ -5,6 +5,7 @@
 #include "Constants.h"
 #include <cmath>
 #include "SST.cuh"
+#include "Field.h"
 
 namespace cfd {
 
@@ -276,7 +277,8 @@ __device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DP
     const real rhoD{mul / param->Sc + mut / param->Sct};
     fv[i_fl_cv] = rhoD * (xi_x_div_jac * mixFrac_x + xi_y_div_jac * mixFrac_y + xi_z_div_jac * mixFrac_z);
 
-    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS) {
+    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS ||
+                  TurbMethod<turb_method>::type == TurbSimLevel::DES) {
       // For RANS / DES, we also solve the mixture fraction variance eqn.
       const real mixFracVar_xi = sv(i + 1, j, k, i_fl + 1) - sv(i, j, k, i_fl + 1);
       const real mixFracVar_eta = 0.25 * (sv(i, j + 1, k, i_fl + 1) - sv(i, j - 1, k, i_fl + 1) +
@@ -573,7 +575,8 @@ __device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, cfd:
     const real rhoD{mul / param->Sc + mut / param->Sct};
     gv[i_fl_cv] = rhoD * (eta_x_div_jac * mixFrac_x + eta_y_div_jac * mixFrac_y + eta_z_div_jac * mixFrac_z);
 
-    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS) {
+    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS ||
+                  TurbMethod<turb_method>::type == TurbSimLevel::DES) {
       // For LES, we do not need to compute the variance of mixture fraction.
       const real mixFracVar_xi = 0.25 * (sv(i + 1, j, k, i_fl + 1) - sv(i - 1, j, k, i_fl + 1) +
                                          sv(i + 1, j + 1, k, i_fl + 1) - sv(i - 1, j + 1, k, i_fl + 1));
@@ -865,7 +868,8 @@ __device__ void compute_hv_2nd_order(const int *idx, DZone *zone, real *hv, cfd:
     const real rhoD{mul / param->Sc + mut / param->Sct};
     hv[i_fl_cv] = rhoD * (zeta_x_div_jac * mixFrac_x + zeta_y_div_jac * mixFrac_y + zeta_z_div_jac * mixFrac_z);
 
-    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS) {
+    if constexpr (TurbMethod<turb_method>::type == TurbSimLevel::RANS ||
+                  TurbMethod<turb_method>::type == TurbSimLevel::DES) {
       // For LES, we do not need to compute the variance of mixture fraction.
       const real mixFracVar_xi = 0.25 * (sv(i + 1, j, k, i_fl + 1) - sv(i - 1, j, k, i_fl + 1) +
                                          sv(i + 1, j, k + 1, i_fl + 1) - sv(i - 1, j, k + 1, i_fl + 1));

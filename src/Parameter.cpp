@@ -5,6 +5,7 @@
 #include "gxl_lib/MyString.h"
 #include <fmt/format.h>
 #include "kernels.h"
+#include "ChemData.h"
 
 cfd::Parameter::Parameter(int *argc, char ***argv) {
   int myid, n_proc;
@@ -452,10 +453,12 @@ void cfd::Parameter::setup_default_settings() {
   // If we conduct transient simulations, the following parameters are used by default.
   int_parameters["temporal_scheme"] = 3; // RK3 is used by default
   bool_parameters["fixed_time_step"] = false; // The time step is computed with CFL condition.
-  real_parameters["n_flowThroughTime"] = 1;
+  real_parameters["n_flowThroughTime"] = -1;
   real_parameters["domain_length"] = 1.0;
   real_parameters["characteristic_velocity"] = -1;
   real_parameters["set_current_physical_time"] = -1;
+
+  bool_parameters["steady_before_transient"] = false; // Whether to conduct a steady simulation before transient simulation.
 
   // If dual-time stepping is used, the following parameters are needed.
   int_parameters["inner_iteration"] = 20;
@@ -543,6 +546,13 @@ void cfd::Parameter::setup_default_settings() {
 
   int_parameters["output_time_series"] = 0;
   bool_parameters["limit_flow"] = false;
+
+  // flamelet model
+  int_parameters["flamelet_format"] = 0;
+  string_parameters["flamelet_file_name"] = "flamelet-lib-zzprimx.txt";
+
+  // output control
+  struct_array["other_output_variables"] = {};
 }
 
 void cfd::Parameter::diagnose_parallel_info() {
@@ -568,7 +578,7 @@ void cfd::Parameter::diagnose_parallel_info() {
   MPI_Barrier(MPI_COMM_WORLD);
 }
 
-void cfd::Parameter::deduce_sim_info() {
+void cfd::Parameter::deduce_sim_info(const Species &spec) {
   int n_var = 5, n_scalar = 0, n_scalar_transported = 0, n_other_var = 1;
   int i_turb_cv = 5, i_fl_cv = 0;
   int i_ps = 0, i_ps_cv = 5; // ps - passive scalar
@@ -639,6 +649,8 @@ void cfd::Parameter::deduce_sim_info() {
   update_parameter("i_ps", i_ps);
   update_parameter("i_ps_cv", i_ps_cv);
   update_parameter("n_other_var", n_other_var);
+
+  get_variable_names(spec);
 
   int myid = get_int("myid");
   if (myid == 0) {
@@ -751,4 +763,70 @@ void cfd::Parameter::deduce_sim_info() {
       }
     }
   }
+}
+
+void cfd::Parameter::get_variable_names(const Species &spec) {
+  // First, basic variables.
+  std::vector<std::string> var_name{"density", "u", "v", "w", "pressure", "temperature"};
+  int nv = (int) var_name.size();
+  if (get_int("species") != 0) {
+    int ns = spec.n_spec;
+    var_name.resize(nv + ns);
+    auto &names = spec.spec_list;
+    for (auto &[name, ind]: names) {
+      var_name[ind + nv] = name;
+    }
+    nv += ns;
+  }
+  if (get_bool("turbulence")) {
+    if (auto turb_method = get_int("turbulence_method");turb_method == 1 || turb_method == 2) {
+      // RAS/DDES
+      // Currently, only SST is implemented, so there is no condition branch here.
+      nv += 2;
+      var_name.emplace_back("tke");
+      var_name.emplace_back("omega");
+
+      // The flamelet model must be used with RANS or DES, thus the if is contained in this branch.
+      if (get_int("species") != 0 && get_int("reaction") == 2) {
+        // Flamelet model
+        nv += 2;
+        var_name.emplace_back("MixtureFraction");
+        var_name.emplace_back("MixtureFractionVariance");
+      }
+    }
+  }
+  if (int n_ps = get_int("n_passive_scalar");n_ps > 0) {
+    nv += n_ps;
+    for (int i = 0; i < n_ps; ++i) {
+      var_name.emplace_back("PS" + std::to_string(i + 1));
+    }
+  }
+
+  // Next, additional variables with assigned memory.
+  var_name.emplace_back("mach");
+  ++nv;
+  if (auto turb_method = get_int("turbulence_method");turb_method == 1 || turb_method == 2) {
+    // RAS/DDES
+    var_name.emplace_back("mut");
+    ++nv;
+    if (turb_method == 2) {
+      var_name.emplace_back("fd");
+      ++nv;
+    }
+    if (get_int("species") != 0 && get_int("reaction") == 2) {
+      // Flamelet model
+      var_name.emplace_back("ScalarDissipationRate");
+      ++nv;
+    }
+  }
+
+  // Last, variables to be computed by choice.
+  auto ovs = struct_array["other_output_variables"];
+  if (ovs.find("laminar_viscosity") != ovs.end()) {
+    var_name.emplace_back("laminar_viscosity");
+    update_parameter("output_mul", true);
+    ++nv;
+  }
+
+  update_parameter("var_name", var_name);
 }

@@ -179,15 +179,6 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     yk_lib.allocate_memory(n_spec, n_chi, n_zPrime + 1, n_z + 1, 0);
     cudaMemcpy(yk_lib.data(), flamelet_lib->yk.data(), sizeof(real) * yk_lib.size() * (n_z + 1),
                cudaMemcpyHostToDevice);
-
-    // See if we have computed n_fl_step previously
-    if (std::filesystem::exists("output/message/flamelet_step.txt")) {
-      std::ifstream fin("output/message/flamelet_step.txt");
-      fin >> n_fl_step;
-      fin.close();
-    } else {
-      n_fl_step = 0;
-    }
   }
 
   // If mixing layer and multi-component, we need the mixture fraction info.

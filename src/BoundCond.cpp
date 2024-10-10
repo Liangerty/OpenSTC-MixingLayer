@@ -138,6 +138,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     if (info.find("temperature") != info.end()) temperature = std::get<real>(info.at("temperature"));
     if (info.find("velocity") != info.end()) velocity = std::get<real>(info.at("velocity"));
     if (info.find("density") != info.end()) density = std::get<real>(info.at("density"));
+    if (info.find("aoa") != info.end()) aoa = std::get<real>(info.at("aoa"));
     if (info.find("u") != info.end()) u = std::get<real>(info.at("u"));
     if (info.find("v") != info.end()) v = std::get<real>(info.at("v"));
     if (info.find("w") != info.end()) w = std::get<real>(info.at("w"));
@@ -191,9 +192,16 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       // The velocity magnitude is not given. The mach number should be given
       velocity = mach * c;
     }
-    u *= velocity;
-    v *= velocity;
-    w *= velocity;
+    // If both aoa and u/v/w are given, the aoa is used.
+    if (aoa > -1000) {
+      u = cos(aoa * pi / 180) * velocity;
+      v = sin(aoa * pi / 180) * velocity;
+      w = 0;
+    } else {
+      u *= velocity;
+      v *= velocity;
+      w *= velocity;
+    }
     if (density < 0) {
       // The density is not given
       if (pressure < 0) {
@@ -229,8 +237,8 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
 
     if ((n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2) {
       // flamelet model or z and z prime are transported
-      if (parameter.get_int("turbulence_method") == 1) {
-        // RANS simulation
+      if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
+        // RANS/DES simulation
         const auto i_fl{parameter.get_int("i_fl")};
         sv[i_fl] = std::get<real>(info.at("mixture_fraction"));
         sv[i_fl + 1] = 0;
@@ -266,6 +274,9 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
     if (abs(velocity) < 1) {
       parameter.update_parameter("v_inf", c);
     }
+    parameter.update_parameter("ux_inf", u);
+    parameter.update_parameter("uy_inf", v);
+    parameter.update_parameter("uz_inf", w);
     parameter.update_parameter("p_inf", pressure);
     parameter.update_parameter("T_inf", temperature);
     parameter.update_parameter("M_inf", mach);

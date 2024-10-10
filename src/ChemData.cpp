@@ -621,6 +621,7 @@ real cfd::Species::compute_reduced_dipole_moment(int i, real *dipole_moment, con
 cfd::Reaction::Reaction(Parameter &parameter, const Species &species) {
   parameter.update_parameter("n_reac", 0);
   if (!parameter.get_int("species")) {
+    parameter.update_parameter("reaction", 0);
     return;
   }
   if (parameter.get_int("reaction") != 1) {

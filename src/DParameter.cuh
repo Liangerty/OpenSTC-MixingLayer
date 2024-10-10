@@ -14,7 +14,7 @@ struct DParameter {
   DParameter() = default;
 
   explicit DParameter(cfd::Parameter &parameter, Species &species, Reaction *reaction,
-                      FlameletLib *flamelet_lib = nullptr);
+                      FlameletLib *flamelet_lib);
 
   int myid = 0;   // The process id of this process
   int dim = 3;    // The dimension of the problem
@@ -77,7 +77,7 @@ struct DParameter {
   real *ZRotF298 = nullptr;
   bool gradPInDiffusionFlux = false;
 
-  real Sc = 0.9;
+  real Sc = 0.5;
   real Prt = 0.9;
   real Sct = 0.9;
   int *reac_type = nullptr;

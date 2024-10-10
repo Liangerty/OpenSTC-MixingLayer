@@ -16,6 +16,8 @@ struct Range {
   T xs, xe, ys, ye, zs, ze;
 };
 
+struct Species;
+
 class Parameter {
   std::unordered_map<std::string, int> int_parameters{};
   std::unordered_map<std::string, real> real_parameters{};
@@ -85,7 +87,11 @@ public:
   void update_parameter(const std::string &name,
                         const std::vector<std::string> &new_value) { string_array[name] = new_value; }
 
-  void deduce_sim_info();
+  /**
+ * \brief Deduces simulation information based on the current parameters.
+   * This function is called on driver initialization, when the species and reactions info has been read.
+ */
+  void deduce_sim_info(const cfd::Species &spec);
 
   ~Parameter() = default;
 
@@ -107,6 +113,8 @@ private:
 
   template<typename T>
   static std::unordered_map<std::string, Range<T>> read_range(std::ifstream &file);
+
+  void get_variable_names(const Species &spec);
 
   void setup_default_settings();
 

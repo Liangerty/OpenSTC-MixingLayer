@@ -11,9 +11,9 @@ namespace cfd {
 template<MixtureModel mix_model, class turb>
 Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     myid(parameter.get_int("myid")), time(), mesh(mesh_), parameter(parameter),
-    spec(parameter), reac(parameter, spec), stat_collector(parameter, mesh, field) {
+    spec(parameter), reac(parameter, spec), flameletLib(parameter), stat_collector(parameter, mesh, field) {
   // Allocate the memory for every block
-  parameter.deduce_sim_info();
+  parameter.deduce_sim_info(spec);
 
   if (myid == 0)
     printf("\n*****************************Driver initialization******************************\n");
@@ -44,7 +44,7 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
 
   write_reference_state(parameter, spec);
 
-  DParameter d_param(parameter, spec, &reac);
+  DParameter d_param(parameter, spec, &reac, &flameletLib);
   cudaMalloc(&param, sizeof(DParameter));
   cudaMemcpy(param, &d_param, sizeof(DParameter), cudaMemcpyHostToDevice);
 
@@ -279,6 +279,8 @@ void write_reference_state(Parameter &parameter, const Species &species) {
     } else {
       printf("\t\t->-> %-16.10e : density(kg/m3)\n", parameter.get_real("rho_inf"));
       printf("\t\t->-> %-16.10e : velocity(m/s)\n", parameter.get_real("v_inf"));
+      printf("\t\t->-> %-16.10e : u(m/s)\n", parameter.get_real("ux_inf"));
+      printf("\t\t->-> %-16.10e : v(m/s)\n", parameter.get_real("uy_inf"));
       printf("\t\t->-> %-16.10e : pressure(Pa)\n", parameter.get_real("p_inf"));
       printf("\t\t->-> %-16.10e : temperature(K)\n", parameter.get_real("T_inf"));
       auto &sv_ref = parameter.get_real_array("sv_inf");
@@ -333,5 +335,11 @@ template
 struct Driver<MixtureModel::MixtureFraction, Laminar>;
 template
 struct Driver<MixtureModel::MixtureFraction, SST<TurbSimLevel::RANS>>;
+template
+struct Driver<MixtureModel::MixtureFraction, SST<TurbSimLevel::DES>>;
+template
+struct Driver<MixtureModel::FL, SST<TurbSimLevel::RANS>>;
+template
+struct Driver<MixtureModel::FL, SST<TurbSimLevel::DES>>;
 
 } // cfd

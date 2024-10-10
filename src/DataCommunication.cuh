@@ -7,6 +7,7 @@
 #include "Field.h"
 #include "DParameter.cuh"
 #include "FieldOperation.cuh"
+#include <cuda_runtime.h>
 
 namespace cfd {
 template<MixtureModel mix_model, class turb>
@@ -220,9 +221,12 @@ __global__ void assign_data_received(DZone *zone, int i_face, const real *data, 
   if (n[0] >= f.n_point[0] || n[1] >= f.n_point[1] || n[2] >= f.n_point[2]) return;
 
   int idx[3];
-  for (int ijk: f.loop_order) {
-    idx[ijk] = f.range_start[ijk] + n[ijk] * f.loop_dir[ijk];
-  }
+  idx[0] = f.range_start[0] + n[0] * f.loop_dir[0];
+  idx[1] = f.range_start[1] + n[1] * f.loop_dir[1];
+  idx[2] = f.range_start[2] + n[2] * f.loop_dir[2];
+//  for (int ijk: f.loop_order) {
+//    idx[ijk] = f.range_start[ijk] + n[ijk] * f.loop_dir[ijk];
+//  }
 
   const int n_var{param->n_scalar + 6}, ngg{zone->ngg};
   int bias = n_var * (ngg + 1) * (n[f.loop_order[1]] * f.n_point[f.loop_order[2]] + n[f.loop_order[2]]);

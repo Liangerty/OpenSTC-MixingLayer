@@ -68,10 +68,6 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
       break;
     }
 
-    if constexpr (mix_model == MixtureModel::FL) {
-      update_n_fl_step<<<1, 1>>>(param);
-    }
-
     // Start a single iteration
     // First, store the value of last step
     if (step % output_screen == 0) {
@@ -138,11 +134,6 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
     }
     cudaDeviceSynchronize();
     if (step % output_file == 0 || converged) {
-      if constexpr (mix_model == MixtureModel::FL) {
-        int n_fl_step{0};
-        cudaMemcpy(&n_fl_step, &(param->n_fl_step), sizeof(int), cudaMemcpyDeviceToHost);
-        parameter.update_parameter("n_fl_step", n_fl_step);
-      }
       ioManager.print_field(step, parameter);
       post_process(driver);
     }

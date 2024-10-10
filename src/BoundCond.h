@@ -43,6 +43,7 @@ struct Inflow {
   real temperature = -1;
   real velocity = 0;
   real density = -1;
+  real aoa = -1000;
   real u = 1, v = 0, w = 0;
   real *sv = nullptr;
   real mw = mw_air;

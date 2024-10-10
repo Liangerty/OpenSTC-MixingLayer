@@ -972,9 +972,6 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
     bv(i_gh[0], i_gh[1], i_gh[2], 1) = -bv(i_in[0], i_in[1], i_in[2], 1);
     bv(i_gh[0], i_gh[1], i_gh[2], 2) = v_blow * 2 - bv(i_in[0], i_in[1], i_in[2], 2);
     bv(i_gh[0], i_gh[1], i_gh[2], 3) = -bv(i_in[0], i_in[1], i_in[2], 3);
-//    bv(i_gh[0], i_gh[1], i_gh[2], 1) = 0;
-//    bv(i_gh[0], i_gh[1], i_gh[2], 2) = 0;
-//    bv(i_gh[0], i_gh[1], i_gh[2], 3) = 0;
     bv(i_gh[0], i_gh[1], i_gh[2], 4) = p_i;
     bv(i_gh[0], i_gh[1], i_gh[2], 5) = t_g;
 
