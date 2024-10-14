@@ -11,7 +11,7 @@ namespace cfd {
 template<MixtureModel mix_model, class turb>
 Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     myid(parameter.get_int("myid")), time(), mesh(mesh_), parameter(parameter),
-    spec(parameter), reac(parameter, spec), flameletLib(parameter), stat_collector(parameter, mesh, field) {
+    spec(parameter), reac(parameter, spec), flameletLib(parameter), stat_collector(parameter, mesh, field, spec) {
   // Allocate the memory for every block
   parameter.deduce_sim_info(spec);
 
@@ -49,7 +49,8 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
   cudaMemcpy(param, &d_param, sizeof(DParameter), cudaMemcpyHostToDevice);
 
   if (parameter.get_bool("steady") == 0 && parameter.get_bool("if_collect_statistics")) {
-    stat_collector.initialize_statistics_collector<mix_model, turb>(spec);
+//    stat_collector.initialize_statistics_collector<mix_model, turb>(spec);
+    stat_collector.initialize_statistics_collector(spec);
   }
 }
 

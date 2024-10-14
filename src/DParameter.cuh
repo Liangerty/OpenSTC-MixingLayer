@@ -108,6 +108,11 @@ struct DParameter {
   real weno_eps_scale = 1.0;
   real v_char = 1.0; // characteristic velocity
 
+  // stat data info
+  int n_reyAve = 0;
+  int* reyAveVarIndex = nullptr;
+  bool rho_p_correlation = false;
+
   // Sponge layer info
   bool sponge_layer = false;
   int sponge_function = 0; // 0 - (Nektar++, CPC, 2024)

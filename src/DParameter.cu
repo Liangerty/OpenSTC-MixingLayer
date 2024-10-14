@@ -35,7 +35,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     spongeYMinusEnd{parameter.get_real("spongeYMinusEnd")}, spongeZPlusStart{parameter.get_real("spongeZPlusStart")},
     spongeZPlusEnd{parameter.get_real("spongeZPlusEnd")}, spongeZMinusStart{parameter.get_real("spongeZMinusStart")},
     spongeZMinusEnd{parameter.get_real("spongeZMinusEnd")} {
-  if (myid == 0) {
+  if (parameter.get_int("myid") == 0) {
     if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 71 || inviscid_scheme == 72)
       printf("\t->-> %-20e : WENO scale factor\n", weno_eps_scale);
   }
@@ -179,6 +179,14 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     yk_lib.allocate_memory(n_spec, n_chi, n_zPrime + 1, n_z + 1, 0);
     cudaMemcpy(yk_lib.data(), flamelet_lib->yk.data(), sizeof(real) * yk_lib.size() * (n_z + 1),
                cudaMemcpyHostToDevice);
+  }
+
+  if (parameter.get_bool("if_collect_statistics")) {
+    n_reyAve = (int) parameter.get_int_array("reyAveVarIndex").size();
+    cudaMalloc(&reyAveVarIndex, n_reyAve * sizeof(int));
+    cudaMemcpy(reyAveVarIndex, parameter.get_int_array("reyAveVarIndex").data(), n_reyAve * sizeof(int),
+               cudaMemcpyHostToDevice);
+    rho_p_correlation = parameter.get_bool("rho_p_correlation");
   }
 
   // If mixing layer and multi-component, we need the mixture fraction info.

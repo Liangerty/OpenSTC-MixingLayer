@@ -7,7 +7,8 @@
 #include "Field.h"
 #include "BoundCond.cuh"
 #include "FlameletLib.cuh"
-#include "StatisticsCollector.cuh"
+//#include "StatisticsCollector.cuh"
+#include "SinglePointStat.cuh"
 
 namespace cfd {
 
@@ -33,7 +34,8 @@ public:
   std::array<real, 4> res{1, 1, 1, 1};
   std::array<real, 4> res_scale{1, 1, 1, 1};
   // Statistical data
-  StatisticsCollector stat_collector;
+  SinglePointStat stat_collector;
+//  StatisticsCollector stat_collector;
 };
 
 template<MixtureModel mix_model, class turb>

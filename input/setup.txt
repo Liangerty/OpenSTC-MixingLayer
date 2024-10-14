@@ -14,10 +14,10 @@ range real coreRegion = {  // The core region of computation. Only grids in core
 }
 
 // controls
-int initial = 0     // 0 - new case, 1 - continue from a previous case.
-int total_step = 100000  // total number of steps
-int output_file = 500  // frequency of output files
-int output_screen = 100 // frequency of screen output
+int initial = 1     // 0 - new case, 1 - continue from a previous case.
+int total_step = 50  // total number of steps
+int output_file = 25  // frequency of output files
+int output_screen = 10 // frequency of screen output
 int output_time_series = 0 // frequency of output time series data. 0 - Not output, else - output every output_time_series steps.
 bool limit_flow = 0     // 0 - no limit, 1 - limit the flow field.
 
@@ -92,7 +92,7 @@ int     turb_implicit   =   1           // If we use RANS, choose whether the so
 
 // bc info
 array string boundary_conditions {
- freestream outflow
+ freestream outflow periodic
 }
 string  reference_state =   freestream  // Specify the reference state for the simulation. The reference state is used to calculate the stagnation enthalpy and the stagnation pressure.
 struct  freestream {
@@ -122,6 +122,18 @@ array real sct_passive_scalar {
     1 1 1 1
 }
 
+// statistics control
+bool if_collect_statistics = 1
+bool if_continue_collect_statistics = 0
+bool perform_spanwise_average = 1
+bool output_statistics_plt = 0
+// stat choice
+array string stat_rey_1st {
+    u v w T
+}
+bool rho_p_correlation = 1
+bool tke_budget = 1
+
 // sponge layer info
 bool sponge_layer = 0
 int sponge_function = 0 // 0 - (Nektar++, CPC, 2024)
@@ -137,12 +149,6 @@ real spongeYMinusEnd = -180
 real spongeYPlusStart = 60
 real spongeYPlusEnd = 180
 real spongeCoefficient = 1e-8 // The coefficient for Uc/Dx.
-
-// statistical choice
-bool if_collect_statistics = 0
-bool if_continue_collect_statistics = 0
-bool perform_spanwise_average = 1
-bool output_statistics_plt = 0
 
 // monitor info
 int if_monitor = 0 // Monitor some points

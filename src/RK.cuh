@@ -199,7 +199,8 @@ void RK3(Driver<mix_model, turb> &driver) {
       }
     }
     if (if_collect_statistics && step > collect_statistics_iter_start) {
-      statistics_collector.template collect_data<mix_model, turb>(param);
+//      statistics_collector.template collect_data<mix_model, turb>(param);
+      statistics_collector.collect_data(param);
     }
     if (step % output_file == 0 || finished) {
       ioManager.print_field(step, parameter, physical_time);

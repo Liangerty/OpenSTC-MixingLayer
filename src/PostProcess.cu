@@ -151,9 +151,10 @@ cfd::wall_friction_heatFlux_3d(cfd::DZone *zone, ggxl::VectorField2D<real> *cfQw
     u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
     rho_w = pv(i, 0, k, 0);
   } else {
-    auto &pv = zone->mean_value;
-    u = pv(i, j, k, 1), v = pv(i, j, k, 2), w = pv(i, j, k, 3);
-    rho_w = pv(i, 0, k, 0);
+//    auto &pv = zone->mean_value;
+    auto &pv = zone->stat_favre_1st;
+    u = pv(i, j, k, 0), v = pv(i, j, k, 1), w = pv(i, j, k, 2);
+    rho_w = zone->stat_reynolds_1st(i, 0, k, 0);
   }
   const real rho_ref = param->rho_ref, v_ref = param->v_ref;
   gxl::Matrix<real, 3, 3, 1> bdjin;

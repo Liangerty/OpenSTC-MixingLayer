@@ -212,7 +212,8 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
       }
     }
     if (if_collect_statistics && step > collect_statistics_iter_start) {
-      stat_collector.template collect_data<mix_model, turb>(param);
+//      stat_collector.template collect_data<mix_model, turb>(param);
+      stat_collector.collect_data(param);
     }
     if (step % output_file == 0 || finished) {
       ioManager.print_field(step, parameter, physical_time);
