@@ -123,7 +123,58 @@ std::vector<int> cfd::read_tke_budget_file(cfd::Parameter &parameter, const cfd:
 }
 
 __device__ void cfd::collect_tke_budget(cfd::DZone *zone, cfd::DParameter *param, int i, int j, int k) {
+  auto &coll = zone->collect_tke_budget;
+  auto &bv = zone->bv;
 
+  const auto &m = zone->metric(i, j, k);
+  const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
+  const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
+  const real zeta_x{m(3, 1)}, zeta_y{m(3, 2)}, zeta_z{m(3, 3)};
+  const real u_x = 0.5 * (xi_x * (bv(i + 1, j, k, 1) - bv(i - 1, j, k, 1)) +
+                          eta_x * (bv(i, j + 1, k, 1) - bv(i, j - 1, k, 1)) +
+                          zeta_x * (bv(i, j, k + 1, 1) - bv(i, j, k - 1, 1)));
+  const real u_y = 0.5 * (xi_y * (bv(i + 1, j, k, 1) - bv(i - 1, j, k, 1)) +
+                          eta_y * (bv(i, j + 1, k, 1) - bv(i, j - 1, k, 1)) +
+                          zeta_y * (bv(i, j, k + 1, 1) - bv(i, j, k - 1, 1)));
+  const real u_z = 0.5 * (xi_z * (bv(i + 1, j, k, 1) - bv(i - 1, j, k, 1)) +
+                          eta_z * (bv(i, j + 1, k, 1) - bv(i, j - 1, k, 1)) +
+                          zeta_z * (bv(i, j, k + 1, 1) - bv(i, j, k - 1, 1)));
+  const real v_x = 0.5 * (xi_x * (bv(i + 1, j, k, 2) - bv(i - 1, j, k, 2)) +
+                          eta_x * (bv(i, j + 1, k, 2) - bv(i, j - 1, k, 2)) +
+                          zeta_x * (bv(i, j, k + 1, 2) - bv(i, j, k - 1, 2)));
+  const real v_y = 0.5 * (xi_y * (bv(i + 1, j, k, 2) - bv(i - 1, j, k, 2)) +
+                          eta_y * (bv(i, j + 1, k, 2) - bv(i, j - 1, k, 2)) +
+                          zeta_y * (bv(i, j, k + 1, 2) - bv(i, j, k - 1, 2)));
+  const real v_z = 0.5 * (xi_z * (bv(i + 1, j, k, 2) - bv(i - 1, j, k, 2)) +
+                          eta_z * (bv(i, j + 1, k, 2) - bv(i, j - 1, k, 2)) +
+                          zeta_z * (bv(i, j, k + 1, 2) - bv(i, j, k - 1, 2)));
+  const real w_x = 0.5 * (xi_x * (bv(i + 1, j, k, 3) - bv(i - 1, j, k, 3)) +
+                          eta_x * (bv(i, j + 1, k, 3) - bv(i, j - 1, k, 3)) +
+                          zeta_x * (bv(i, j, k + 1, 3) - bv(i, j, k - 1, 3)));
+  const real w_y = 0.5 * (xi_y * (bv(i + 1, j, k, 3) - bv(i - 1, j, k, 3)) +
+                          eta_y * (bv(i, j + 1, k, 3) - bv(i, j - 1, k, 3)) +
+                          zeta_y * (bv(i, j, k + 1, 3) - bv(i, j, k - 1, 3)));
+  const real w_z = 0.5 * (xi_z * (bv(i + 1, j, k, 3) - bv(i - 1, j, k, 3)) +
+                          eta_z * (bv(i, j + 1, k, 3) - bv(i, j - 1, k, 3)) +
+                          zeta_z * (bv(i, j, k + 1, 3) - bv(i, j, k - 1, 3)));
+
+  const real mu = zone->mul(i, j, k);
+  const real tau11 = mu * (4.0 * u_x - 2 * v_y - 2 * w_z) / 3.0;
+  const real tau12 = mu * (u_y + v_x);
+  const real tau13 = mu * (u_z + w_x);
+  const real tau22 = mu * (4.0 * v_y - 2 * u_x - 2 * w_z) / 3.0;
+  const real tau23 = mu * (v_z + w_y);
+  const real tau33 = mu * (4.0 * w_z - 2 * u_x - 2 * v_y) / 3.0;
+
+  coll(i, j, k, 0) += tau11;
+  coll(i, j, k, 1) += tau12;
+  coll(i, j, k, 2) += tau13;
+  coll(i, j, k, 3) += tau22;
+  coll(i, j, k, 4) += tau23;
+  coll(i, j, k, 5) += tau33;
+  coll(i, j, k, 6) += tau11 * u_x + tau12 * u_y + tau13 * u_z
+                      + tau12 * v_x + tau22 * v_y + tau23 * v_z
+                      + tau13 * w_x + tau23 * w_y + tau33 * w_z;
 }
 
 void

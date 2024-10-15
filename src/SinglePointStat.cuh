@@ -26,13 +26,13 @@ private:
   std::vector<int> reyAveVarIndex = {0, 4};
   std::vector<int> counter_rey1st;
   int n_favAve = 4;
-  std::vector<std::string> favAveVar = {"u", "v", "w", "T"};
+  std::vector<std::string> favAveVar = {"rhoU", "rhoV", "rhoW", "rhoT"};
   std::vector<int> counter_fav1st;
   int n_rey2nd = 2;
   std::vector<std::string> rey2ndVar = {"RhoRho", "pp"};
   std::vector<int> counter_rey2nd;
   int n_fav2nd = 7;
-  std::vector<std::string> fav2ndVar = {"uu", "vv", "ww", "uv", "uw", "vw", "TT"};
+  std::vector<std::string> fav2ndVar = {"rhoUU", "rhoVV", "rhoWW", "rhoUV", "rhoUW", "rhoVW", "rhoTT"};
   std::vector<int> counter_fav2nd;
 
   // available statistics

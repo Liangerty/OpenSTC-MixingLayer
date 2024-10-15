@@ -34,6 +34,9 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
 
   // other statistics
   tke_budget = parameter.get_bool("stat_tke_budget");
+  if (tke_budget){
+    counter_tke_budget.resize(TkeBudget::n_collect, 0);
+  }
 }
 
 void SinglePointStat::init_stat_name(const Species &species) {
@@ -44,16 +47,16 @@ void SinglePointStat::init_stat_name(const Species &species) {
     n_favAve += n_spec;
     n_fav2nd += n_spec;
     for (int l = 0; l < n_spec; ++l) {
-      favAveVar.push_back(species.spec_name[l]);
-      fav2ndVar.push_back(species.spec_name[l]);
+      favAveVar.push_back("rho" + species.spec_name[l]);
+      fav2ndVar.push_back("rho" + species.spec_name[l] + species.spec_name[l]);
     }
   }
   if (int n_ps = parameter.get_int("n_passive_scalar"); n_ps > 0) {
     n_favAve += n_ps;
     n_fav2nd += n_ps;
     for (int l = 0; l < n_ps; ++l) {
-      favAveVar.push_back("ps" + std::to_string(l + 1));
-      fav2ndVar.push_back("ps" + std::to_string(l + 1));
+      favAveVar.push_back("rhoPs" + std::to_string(l + 1));
+      fav2ndVar.push_back("rhoPs" + std::to_string(l + 1) + "Ps" + std::to_string(l + 1));
     }
   }
 
