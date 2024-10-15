@@ -34,6 +34,12 @@ private:
   int n_fav2nd = 7;
   std::vector<std::string> fav2ndVar = {"uu", "vv", "ww", "uv", "uw", "vw", "TT"};
   std::vector<int> counter_fav2nd;
+
+  // available statistics
+  bool tke_budget = false;
+  std::vector<int> counter_tke_budget;
+  MPI_Offset offset_tke_budget{0};
+
   int myid{0};
   // Data to be bundled
   Parameter &parameter;
@@ -42,9 +48,7 @@ private:
 
   int ngg = 1;
   MPI_Offset offset_unit[4]={0, 0, 0, 0};
-
-  bool favre_average = true;
-  bool tke_budget = false;
+  std::vector<MPI_Datatype> ty_1gg, ty_0gg;
 
 private:
   void init_stat_name(const Species &species);

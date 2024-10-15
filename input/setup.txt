@@ -132,7 +132,7 @@ array string stat_rey_1st {
     u v w T
 }
 bool rho_p_correlation = 1
-bool tke_budget = 1
+bool stat_tke_budget = 1
 
 // sponge layer info
 bool sponge_layer = 0

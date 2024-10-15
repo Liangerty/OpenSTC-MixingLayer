@@ -55,6 +55,7 @@ inline cudaError_t Array3D<T, major>::allocate_memory(int dim1, int dim2, int di
   dispt = (disp1 + disp2 + 1) * ng;
   sz = (n1 + 2 * ng) * (n2 + 2 * ng) * (n3 + 2 * ng);
   cudaError_t err = cudaMalloc(&val, sz * sizeof(T));
+  cudaMemset(val, 0, sz * sizeof(T));
   return err;
 }
 
@@ -111,6 +112,9 @@ inline cudaError_t Array3DHost<T, major>::allocate_memory(int dim1, int dim2, in
     printf(
         "The VectorField3DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
     val = (real *) malloc(sz * sizeof(T));
+    memset(val, 0, sz * sizeof(T));
+  } else {
+    cudaMemset(val, 0, sz * sizeof(T));
   }
 //  cudaError_t err = cudaMalloc(&val, sz * sizeof(T));
   return err;
@@ -184,6 +188,7 @@ VectorField3D<T, major>::allocate_memory(int dim1, int dim2, int dim3, int dim4,
   }
   sz = (n1 + 2 * ng) * (n2 + 2 * ng) * (n3 + 2 * ng);
   cudaError_t err = cudaMalloc(&val, sz * n4 * sizeof(T));
+  cudaMemset(val, 0, sz * n4 * sizeof(T));
   return err;
 }
 
@@ -235,6 +240,7 @@ inline cudaError_t VectorField2D<T>::allocate_memory(int dim1, int dim2, int dim
   dispt = (disp1 + 1) * ng;
   sz = (n1 + 2 * ng) * (n2 + 2 * ng);
   cudaError_t err = cudaMalloc(&val, sz * n3 * sizeof(T));
+  cudaMemset(val, 0, sz * n3 * sizeof(T));
   return err;
 }
 
@@ -293,6 +299,9 @@ inline cudaError_t VectorField2DHost<T>::allocate_memory(int dim1, int dim2, int
     printf(
         "The VectorField2DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
     val = (real *) malloc(sz * n3 * sizeof(T));
+    memset(val, 0, sz * n3 * sizeof(T));
+  } else {
+    cudaMemset(val, 0, sz * n3 * sizeof(T));
   }
   return err;
 }
@@ -313,6 +322,7 @@ public:
 
 //  auto data() { return data_.data(); }
   auto size() { return sz; }
+
   auto size() const { return sz; }
 
   /**
@@ -385,7 +395,6 @@ void VectorField3DHost<T, major>::resize(int ni, int nj, int nk, int nl, int ngg
     data_ = (real *) malloc(sz * n4 * sizeof(T));
   }
   cudaMemset(data_, 0, sz * n4 * sizeof(T));
-//  data_.resize(n1 * n2 * n3 * n4, t);
   n1 = ni;
   n2 = nj;
   n3 = nk;

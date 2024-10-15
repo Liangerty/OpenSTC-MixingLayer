@@ -187,6 +187,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     cudaMemcpy(reyAveVarIndex, parameter.get_int_array("reyAveVarIndex").data(), n_reyAve * sizeof(int),
                cudaMemcpyHostToDevice);
     rho_p_correlation = parameter.get_bool("rho_p_correlation");
+    stat_tke_budget = parameter.get_bool("stat_tke_budget");
   }
 
   // If mixing layer and multi-component, we need the mixture fraction info.

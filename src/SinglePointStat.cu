@@ -2,6 +2,7 @@
 #include <filesystem>
 #include "gxl_lib/MyString.h"
 #include "DParameter.cuh"
+#include "stat_lib/TkeBudget.cuh"
 
 namespace cfd {
 SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::vector<Field> &_field,
@@ -16,6 +17,9 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
     create_directories(out_dir);
   }
 
+  ty_1gg.resize(mesh.n_block);
+  ty_0gg.resize(mesh.n_block);
+
   init_stat_name(species);
   // update the variables in parameter, these are used to initialize the memory in the field.
   counter_rey1st.resize(n_reyAve, 0);
@@ -27,6 +31,9 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
   counter_fav2nd.resize(n_fav2nd, 0);
   parameter.update_parameter("n_stat_favre_2nd", n_fav2nd);
   parameter.update_parameter("reyAveVarIndex", reyAveVarIndex);
+
+  // other statistics
+  tke_budget = parameter.get_bool("stat_tke_budget");
 }
 
 void SinglePointStat::init_stat_name(const Species &species) {
@@ -38,7 +45,7 @@ void SinglePointStat::init_stat_name(const Species &species) {
     n_fav2nd += n_spec;
     for (int l = 0; l < n_spec; ++l) {
       favAveVar.push_back(species.spec_name[l]);
-      fav2ndVar.push_back(species.spec_name[l] + species.spec_name[l]);
+      fav2ndVar.push_back(species.spec_name[l]);
     }
   }
   if (int n_ps = parameter.get_int("n_passive_scalar"); n_ps > 0) {
@@ -46,7 +53,7 @@ void SinglePointStat::init_stat_name(const Species &species) {
     n_fav2nd += n_ps;
     for (int l = 0; l < n_ps; ++l) {
       favAveVar.push_back("ps" + std::to_string(l + 1));
-      fav2ndVar.push_back("ps" + std::to_string(l + 1) + "ps" + std::to_string(l + 1));
+      fav2ndVar.push_back("ps" + std::to_string(l + 1));
     }
   }
 
@@ -82,120 +89,12 @@ void SinglePointStat::init_stat_name(const Species &species) {
   }
 }
 
-void SinglePointStat::collect_data(DParameter *param) {
-  for (auto &c: counter_rey1st) {
-    ++c;
-  }
-  for (auto &c: counter_fav1st) {
-    ++c;
-  }
-  for (auto &c: counter_rey2nd) {
-    ++c;
-  }
-  for (auto &c: counter_fav2nd) {
-    ++c;
-  }
-  dim3 tpb{8, 8, 4};
-  if (mesh.dimension == 2) {
-    tpb = {16, 16, 1};
-  }
-
-  for (int b = 0; b < mesh.n_block; ++b) {
-    const auto mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
-    dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
-    collect_single_point_statistics<<<bpg, tpb>>>(field[b].d_ptr, param);
-  }
-
-}
-
-void SinglePointStat::export_statistical_data(DParameter *param, bool perform_spanwise_average) {
-  const std::filesystem::path out_dir("output/stat");
-  MPI_File fp_rey1, fp_fav1, fp_rey2, fp_fav2;
-  MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_rey_1st.bin").c_str(),
-                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_rey1);
-  MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_fav_1st.bin").c_str(),
-                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_fav1);
-  MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_rey_2nd.bin").c_str(),
-                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_rey2);
-  MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_fav_2nd.bin").c_str(),
-                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_fav2);
-  MPI_Status status;
-
-  MPI_Offset offset[4]{0, 0, 0, 0};
-  memcpy(offset, offset_unit, sizeof(offset_unit));
-  if (myid == 0) {
-    MPI_File_write_at(fp_rey1, offset[0], counter_rey1st.data(), n_reyAve, MPI_INT32_T, &status);
-    offset[0] += 4 * n_reyAve;
-  }
-  for (int b = 0; b < mesh.n_block; ++b) {
-    auto &zone = field[b].h_ptr;
-    const int mx = mesh[b].mx, my = mesh[b].my, mz = mesh[b].mz;
-    const int64_t N = (int64_t) mx * my * mz;
-    const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
-
-    cudaMemcpy(field[b].collect_reynolds_1st.data(), zone->collect_reynolds_1st.data(), sz * n_reyAve,
-               cudaMemcpyDeviceToHost);
-    cudaMemcpy(field[b].collect_favre_1st.data(), zone->collect_favre_1st.data(), sz * n_favAve,
-               cudaMemcpyDeviceToHost);
-    cudaMemcpy(field[b].collect_reynolds_2nd.data(), zone->collect_reynolds_2nd.data(), sz * n_rey2nd,
-               cudaMemcpyDeviceToHost);
-    cudaMemcpy(field[b].collect_favre_2nd.data(), zone->collect_favre_2nd.data(), sz * n_fav2nd,
-               cudaMemcpyDeviceToHost);
-
-    // We create this datatype because in the original MPI_File_write_at, the number of elements is a 64-bit integer.
-    // However, the nx*ny*nz may be larger than 2^31, so we need to use MPI_Type_create_subarray to create a datatype
-    MPI_Datatype ty;
-    int lSize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
-    int start_idx[3]{0, 0, 0};
-    MPI_Type_create_subarray(3, lSize, lSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
-    MPI_Type_commit(&ty);
-
-    MPI_File_write_at(fp_rey1, offset[0], &mx, 1, MPI_INT32_T, &status);
-    offset[0] += 4;
-    MPI_File_write_at(fp_rey1, offset[0], &my, 1, MPI_INT32_T, &status);
-    offset[0] += 4;
-    MPI_File_write_at(fp_rey1, offset[0], &mz, 1, MPI_INT32_T, &status);
-    offset[0] += 4;
-    MPI_File_write_at(fp_rey1, offset[0], field[b].collect_reynolds_1st.data(), n_reyAve, ty, &status);
-    offset[0] += sz * n_reyAve;
-
-    MPI_File_write_at(fp_fav1, offset[1], &mx, 1, MPI_INT32_T, &status);
-    offset[1] += 4;
-    MPI_File_write_at(fp_fav1, offset[1], &my, 1, MPI_INT32_T, &status);
-    offset[1] += 4;
-    MPI_File_write_at(fp_fav1, offset[1], &mz, 1, MPI_INT32_T, &status);
-    offset[1] += 4;
-    MPI_File_write_at(fp_fav1, offset[1], field[b].collect_favre_1st.data(), n_favAve, ty, &status);
-    offset[1] += sz * n_favAve;
-
-    MPI_File_write_at(fp_rey2, offset[2], &mx, 1, MPI_INT32_T, &status);
-    offset[2] += 4;
-    MPI_File_write_at(fp_rey2, offset[2], &my, 1, MPI_INT32_T, &status);
-    offset[2] += 4;
-    MPI_File_write_at(fp_rey2, offset[2], &mz, 1, MPI_INT32_T, &status);
-    offset[2] += 4;
-    MPI_File_write_at(fp_rey2, offset[2], field[b].collect_reynolds_2nd.data(), n_rey2nd, ty, &status);
-    offset[2] += sz * n_rey2nd;
-
-    MPI_File_write_at(fp_fav2, offset[3], &mx, 1, MPI_INT32_T, &status);
-    offset[3] += 4;
-    MPI_File_write_at(fp_fav2, offset[3], &my, 1, MPI_INT32_T, &status);
-    offset[3] += 4;
-    MPI_File_write_at(fp_fav2, offset[3], &mz, 1, MPI_INT32_T, &status);
-    offset[3] += 4;
-    MPI_File_write_at(fp_fav2, offset[3], field[b].collect_favre_2nd.data(), n_fav2nd, ty, &status);
-    offset[3] += sz * n_fav2nd;
-
-    MPI_Type_free(&ty);
-  }
-}
-
 void SinglePointStat::initialize_statistics_collector(const Species &species) {
-  compute_offset_for_export_data();
-
   if (parameter.get_bool("if_continue_collect_statistics")) {
     read_previous_statistical_data();
   }
+
+  compute_offset_for_export_data();
 
 //  if (parameter.get_bool("output_statistics_plt"))
 //    prepare_for_statistical_data_plot<mix_model, turb>(species);
@@ -230,8 +129,6 @@ void SinglePointStat::compute_offset_for_export_data() {
     for (const auto &var: reyAveVar) {
       gxl::write_str(var.c_str(), fp_rey1, offset[0]);
     }
-//    MPI_File_write_at(fp_rey1, offset[0], counter_rey1st.data(), n_stat_reynolds_1st, MPI_INT32_T, &status);
-//    offset[0] += 4 * n_stat_reynolds_1st;
 
     // collect favre 1st order statistics
     MPI_File_write_at(fp_fav1, 0, &n_block, 1, MPI_INT32_T, &status);
@@ -262,29 +159,65 @@ void SinglePointStat::compute_offset_for_export_data() {
   }
   MPI_Bcast(offset, 4, MPI_OFFSET, 0, MPI_COMM_WORLD);
 
-  int n_block = 0;
+  if (myid != 0) {
+    offset_unit[0] = offset[0] + 4 * n_stat_reynolds_1st;
+    offset_unit[1] = offset[1] + 4 * n_stat_favre_1st;
+    offset_unit[2] = offset[2] + 4 * n_stat_reynolds_2nd;
+    offset_unit[3] = offset[3] + 4 * n_stat_favre_2nd;
+  } else {
+    // Process 0 needs to write the counter of every variable.
+    offset_unit[0] = offset[0];
+    offset_unit[1] = offset[1];
+    offset_unit[2] = offset[2];
+    offset_unit[3] = offset[3];
+  }
+
+  int n_block_ahead = 0;
   for (int p = 0; p < parameter.get_int("myid"); ++p) {
-    n_block += mesh.nblk[p];
+    n_block_ahead += mesh.nblk[p];
   }
-  offset_unit[0] = offset[0];
-  offset_unit[1] = offset[1];
-  offset_unit[2] = offset[2];
-  offset_unit[3] = offset[3];
-  if (myid == 0) {
-    offset_unit[0] += 4 * n_stat_reynolds_1st;
-  }
-  for (int b = 0; b < n_block; ++b) {
+  for (int b = 0; b < n_block_ahead; ++b) {
     MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
     offset_unit[0] += sz * n_stat_reynolds_1st + 4 * 3;
     offset_unit[1] += sz * n_stat_favre_1st + 4 * 3;
     offset_unit[2] += sz * n_stat_reynolds_2nd + 4 * 3;
     offset_unit[3] += sz * n_stat_favre_2nd + 4 * 3;
   }
+
+  for (int b = 0; b < mesh.n_block; ++b) {
+    const int mx = mesh[b].mx, my = mesh[b].my, mz = mesh[b].mz;
+    const int nx = mx + 2 * ngg, ny = my + 2 * ngg, nz = mz + 2 * ngg;
+
+    MPI_Datatype ty1, ty0;
+    int lSize[3]{nx, ny, nz};
+    int start_idx[3]{0, 0, 0};
+    MPI_Type_create_subarray(3, lSize, lSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty1);
+    MPI_Type_commit(&ty1);
+    ty_1gg[b] = ty1;
+
+    int sSize[3]{mx, my, mz};
+    MPI_Type_create_subarray(3, sSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty0);
+    MPI_Type_commit(&ty0);
+    ty_0gg[b] = ty0;
+  }
+
+  if (tke_budget) {
+    offset_tke_budget = cfd::create_tke_budget_file(parameter, mesh, n_block_ahead);
+  }
 }
 
 void SinglePointStat::read_previous_statistical_data() {
   const std::filesystem::path out_dir("output/stat");
   MPI_File fp_rey1, fp_fav1, fp_rey2, fp_fav2;
+  // see if the file exists
+  if (!(std::filesystem::exists(out_dir.string() + "/coll_rey_1st.bin") &&
+        std::filesystem::exists(out_dir.string() + "/coll_fav_1st.bin") &&
+        std::filesystem::exists(out_dir.string() + "/coll_rey_2nd.bin") &&
+        std::filesystem::exists(out_dir.string() + "/coll_fav_2nd.bin"))) {
+    printf("Previous stat files do not exist, please change the parameter [[if_continue_collect_statistics]] to 0 or "
+           "provide previous stat files!\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_rey_1st.bin").c_str(),
                 MPI_MODE_RDONLY, MPI_INFO_NULL, &fp_rey1);
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_fav_1st.bin").c_str(),
@@ -465,7 +398,7 @@ void SinglePointStat::read_previous_statistical_data() {
       }
       offset_read[0] += sz;
     }
-    cudaMemcpy(field[b].d_ptr->collect_reynolds_1st.data(), field[b].collect_reynolds_1st.data(), sz * n_reyAve,
+    cudaMemcpy(field[b].h_ptr->collect_reynolds_1st.data(), field[b].collect_reynolds_1st.data(), sz * n_reyAve,
                cudaMemcpyHostToDevice);
     for (int l = 0; l < n_read_fav1; ++l) {
       int i = read_fav1_index[l];
@@ -474,7 +407,7 @@ void SinglePointStat::read_previous_statistical_data() {
       }
       offset_read[1] += sz;
     }
-    cudaMemcpy(field[b].d_ptr->collect_favre_1st.data(), field[b].collect_favre_1st.data(), sz * n_favAve,
+    cudaMemcpy(field[b].h_ptr->collect_favre_1st.data(), field[b].collect_favre_1st.data(), sz * n_favAve,
                cudaMemcpyHostToDevice);
     for (int l = 0; l < n_read_rey2; ++l) {
       int i = read_rey2_index[l];
@@ -483,7 +416,7 @@ void SinglePointStat::read_previous_statistical_data() {
       }
       offset_read[2] += sz;
     }
-    cudaMemcpy(field[b].d_ptr->collect_reynolds_2nd.data(), field[b].collect_reynolds_2nd.data(), sz * n_rey2nd,
+    cudaMemcpy(field[b].h_ptr->collect_reynolds_2nd.data(), field[b].collect_reynolds_2nd.data(), sz * n_rey2nd,
                cudaMemcpyHostToDevice);
     for (int l = 0; l < n_read_fav2; ++l) {
       int i = read_fav2_index[l];
@@ -492,8 +425,132 @@ void SinglePointStat::read_previous_statistical_data() {
       }
       offset_read[3] += sz;
     }
-    cudaMemcpy(field[b].d_ptr->collect_favre_2nd.data(), field[b].collect_favre_2nd.data(), sz * n_fav2nd,
+    cudaMemcpy(field[b].h_ptr->collect_favre_2nd.data(), field[b].collect_favre_2nd.data(), sz * n_fav2nd,
                cudaMemcpyHostToDevice);
+  }
+
+  if (tke_budget) {
+    counter_tke_budget = cfd::read_tke_budget_file(parameter, mesh, n_block_ahead, field);
+  }
+}
+
+void SinglePointStat::collect_data(DParameter *param) {
+  for (auto &c: counter_rey1st) {
+    ++c;
+  }
+  for (auto &c: counter_fav1st) {
+    ++c;
+  }
+  for (auto &c: counter_rey2nd) {
+    ++c;
+  }
+  for (auto &c: counter_fav2nd) {
+    ++c;
+  }
+  for (auto &c: counter_tke_budget) {
+    ++c;
+  }
+  dim3 tpb{8, 8, 4};
+  if (mesh.dimension == 2) {
+    tpb = {16, 16, 1};
+  }
+
+  for (int b = 0; b < mesh.n_block; ++b) {
+    const auto mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
+    dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
+    collect_single_point_statistics<<<bpg, tpb>>>(field[b].d_ptr, param);
+  }
+}
+
+void SinglePointStat::export_statistical_data(DParameter *param, bool perform_spanwise_average) {
+  const std::filesystem::path out_dir("output/stat");
+  MPI_File fp_rey1, fp_fav1, fp_rey2, fp_fav2;
+  MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_rey_1st.bin").c_str(),
+                MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_rey1);
+  MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_fav_1st.bin").c_str(),
+                MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_fav1);
+  MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_rey_2nd.bin").c_str(),
+                MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_rey2);
+  MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_fav_2nd.bin").c_str(),
+                MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_fav2);
+  MPI_Status status;
+
+  MPI_Offset offset[4]{0, 0, 0, 0};
+  memcpy(offset, offset_unit, sizeof(offset_unit));
+  if (myid == 0) {
+    MPI_File_write_at(fp_rey1, offset[0], counter_rey1st.data(), n_reyAve, MPI_INT32_T, &status);
+    offset[0] += 4 * n_reyAve;
+    MPI_File_write_at(fp_fav1, offset[1], counter_fav1st.data(), n_favAve, MPI_INT32_T, &status);
+    offset[1] += 4 * n_favAve;
+    MPI_File_write_at(fp_rey2, offset[2], counter_rey2nd.data(), n_rey2nd, MPI_INT32_T, &status);
+    offset[2] += 4 * n_rey2nd;
+    MPI_File_write_at(fp_fav2, offset[3], counter_fav2nd.data(), n_fav2nd, MPI_INT32_T, &status);
+    offset[3] += 4 * n_fav2nd;
+  }
+  for (int b = 0; b < mesh.n_block; ++b) {
+    auto &zone = field[b].h_ptr;
+    const int mx = mesh[b].mx, my = mesh[b].my, mz = mesh[b].mz;
+    const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
+
+    cudaMemcpy(field[b].collect_reynolds_1st.data(), zone->collect_reynolds_1st.data(), sz * n_reyAve,
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(field[b].collect_favre_1st.data(), zone->collect_favre_1st.data(), sz * n_favAve,
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(field[b].collect_reynolds_2nd.data(), zone->collect_reynolds_2nd.data(), sz * n_rey2nd,
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(field[b].collect_favre_2nd.data(), zone->collect_favre_2nd.data(), sz * n_fav2nd,
+               cudaMemcpyDeviceToHost);
+
+    // We create this datatype because in the original MPI_File_write_at, the number of elements is a 64-bit integer.
+    // However, the nx*ny*nz may be larger than 2^31, so we need to use MPI_Type_create_subarray to create a datatype
+    auto ty = ty_1gg[b];
+
+    MPI_File_write_at(fp_rey1, offset[0], &mx, 1, MPI_INT32_T, &status);
+    offset[0] += 4;
+    MPI_File_write_at(fp_rey1, offset[0], &my, 1, MPI_INT32_T, &status);
+    offset[0] += 4;
+    MPI_File_write_at(fp_rey1, offset[0], &mz, 1, MPI_INT32_T, &status);
+    offset[0] += 4;
+    MPI_File_write_at(fp_rey1, offset[0], field[b].collect_reynolds_1st.data(), n_reyAve, ty, &status);
+    offset[0] += sz * n_reyAve;
+
+    MPI_File_write_at(fp_fav1, offset[1], &mx, 1, MPI_INT32_T, &status);
+    offset[1] += 4;
+    MPI_File_write_at(fp_fav1, offset[1], &my, 1, MPI_INT32_T, &status);
+    offset[1] += 4;
+    MPI_File_write_at(fp_fav1, offset[1], &mz, 1, MPI_INT32_T, &status);
+    offset[1] += 4;
+    MPI_File_write_at(fp_fav1, offset[1], field[b].collect_favre_1st.data(), n_favAve, ty, &status);
+    offset[1] += sz * n_favAve;
+
+    MPI_File_write_at(fp_rey2, offset[2], &mx, 1, MPI_INT32_T, &status);
+    offset[2] += 4;
+    MPI_File_write_at(fp_rey2, offset[2], &my, 1, MPI_INT32_T, &status);
+    offset[2] += 4;
+    MPI_File_write_at(fp_rey2, offset[2], &mz, 1, MPI_INT32_T, &status);
+    offset[2] += 4;
+    MPI_File_write_at(fp_rey2, offset[2], field[b].collect_reynolds_2nd.data(), n_rey2nd, ty, &status);
+    offset[2] += sz * n_rey2nd;
+
+    MPI_File_write_at(fp_fav2, offset[3], &mx, 1, MPI_INT32_T, &status);
+    offset[3] += 4;
+    MPI_File_write_at(fp_fav2, offset[3], &my, 1, MPI_INT32_T, &status);
+    offset[3] += 4;
+    MPI_File_write_at(fp_fav2, offset[3], &mz, 1, MPI_INT32_T, &status);
+    offset[3] += 4;
+    MPI_File_write_at(fp_fav2, offset[3], field[b].collect_favre_2nd.data(), n_fav2nd, ty, &status);
+    offset[3] += sz * n_fav2nd;
+  }
+
+  MPI_File_close(&fp_rey1);
+  MPI_File_close(&fp_fav1);
+  MPI_File_close(&fp_rey2);
+  MPI_File_close(&fp_fav2);
+
+  // Any other stats that need no ghost layer
+// other files
+  if (tke_budget) {
+    export_tke_budget_file(parameter, mesh, field, offset_tke_budget, counter_tke_budget, ty_0gg);
   }
 }
 
@@ -544,5 +601,9 @@ __global__ void collect_single_point_statistics(DZone *zone, DParameter *param) 
   fav2nd(i, j, k, 4) += rho * u * w; // rho*u*w
   fav2nd(i, j, k, 5) += rho * v * w; // rho*v*w
   fav2nd(i, j, k, 6) += rho * T * T; // rho*T*T
+
+  if (param->stat_tke_budget) {
+    collect_tke_budget(zone, param, i, j, k);
+  }
 }
 } // cfd

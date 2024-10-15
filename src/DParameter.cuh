@@ -112,6 +112,7 @@ struct DParameter {
   int n_reyAve = 0;
   int* reyAveVarIndex = nullptr;
   bool rho_p_correlation = false;
+  bool stat_tke_budget = false;
 
   // Sponge layer info
   bool sponge_layer = false;
