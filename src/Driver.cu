@@ -50,7 +50,7 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
 
   if (parameter.get_bool("steady") == 0 && parameter.get_bool("if_collect_statistics")) {
 //    stat_collector.initialize_statistics_collector<mix_model, turb>(spec);
-    stat_collector.initialize_statistics_collector(spec);
+    stat_collector.initialize_statistics_collector();
   }
 }
 

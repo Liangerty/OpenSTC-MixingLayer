@@ -188,6 +188,14 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
                cudaMemcpyHostToDevice);
     rho_p_correlation = parameter.get_bool("rho_p_correlation");
     stat_tke_budget = parameter.get_bool("stat_tke_budget");
+    if (n_spec > 0) {
+      stat_species_dissipation_rate = parameter.get_bool("stat_species_dissipation_rate");
+      stat_species_velocity_correlation = parameter.get_bool("stat_species_velocity_correlation");
+      n_species_stat = parameter.get_int("n_species_stat");
+      cudaMalloc(&specStatIndex, n_species_stat * sizeof(int));
+      cudaMemcpy(specStatIndex, parameter.get_int_array("species_stat_index").data(), n_species_stat * sizeof(int),
+                 cudaMemcpyHostToDevice);
+    }
   }
 
   // If mixing layer and multi-component, we need the mixture fraction info.

@@ -20,13 +20,13 @@ list(APPEND src_file
     Parallel.h Parallel.cpp Parameter.h Parameter.cpp PostProcess.h PostProcess.cu
     Reconstruction.cu Reconstruction.cuh Residual.cu Residual.cuh RK.cuh RiemannSolver.cuh
     SchemeSelector.cuh SourceTerm.cuh SST.cuh SST.cu SteadySim.cuh Simulate.cuh
-    StatisticsCollector.cu StatisticsCollector.cuh SpongeLayer.cu SpongeLayer.cuh SinglePointStat.cu SinglePointStat.cuh
+    SpongeLayer.cu SpongeLayer.cuh SinglePointStat.cu SinglePointStat.cuh
     Transport.cuh Transport.cu TimeAdvanceFunc.cu TimeAdvanceFunc.cuh Thermo.cuh Thermo.cu TurbMethod.hpp
-    UDIO.h UDIO.cu UDStat.h UDStat.cu
+    UDIO.h UDIO.cu
     ViscousScheme.cuh
     WallDistance.cuh WENO.cu
 
-    stat_lib/TkeBudget.cu stat_lib/TkeBudget.cuh
+    stat_lib/TkeBudget.cu stat_lib/TkeBudget.cuh stat_lib/SpeciesStat.cu stat_lib/SpeciesStat.cuh
 
     gxl_lib/Array.hpp gxl_lib/Array.cuh
     gxl_lib/MyString.cpp gxl_lib/MyAlgorithm.cpp gxl_lib/MyAlgorithm.h

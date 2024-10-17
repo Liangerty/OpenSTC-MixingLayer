@@ -101,6 +101,8 @@ struct DZone {
 
   // other statistical variables
   ggxl::VectorField3D<real> collect_tke_budget;
+  ggxl::VectorField3D<real> collect_spec_diss_rate;
+  ggxl::VectorField3D<real> collect_spec_vel_correlation;
 
   // sponge layer related mean conservative variables
   ggxl::VectorField3D<real> sponge_mean_cv;
@@ -147,6 +149,8 @@ struct Field {
 
   // other statistical variables
   ggxl::VectorField3DHost<real> collect_tke_budget;
+  ggxl::VectorField3DHost<real> collect_spec_diss_rate;
+  ggxl::VectorField3DHost<real> collect_spec_vel_correlation;
 
   // sponge layer related mean conservative variables
   ggxl::VectorField3DHost<real> sponge_mean_cv;

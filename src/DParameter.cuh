@@ -31,17 +31,16 @@ struct DParameter {
   int i_turb_cv = 0;              // The index of turbulent variable in the conservative variable
   int i_ps = 0;                   // The index of passive scalar in the scalar variable
   int i_ps_cv = 0;                // The index of passive scalar in the conservative variable
-  real* sc_ps = nullptr;          // The Schmidt number of passive scalars
-  real* sct_ps = nullptr;         // The turbulent Schmidt number of passive scalars
+  real *sc_ps = nullptr;          // The Schmidt number of passive scalars
+  real *sct_ps = nullptr;         // The turbulent Schmidt number of passive scalars
 
   int inviscid_scheme = 0;  // The tag for inviscid scheme. 3 - AUSM+
   int reconstruction = 2; // The reconstruction method for inviscid flux computation
   int limiter = 0;  // The tag for limiter method
-  bool positive_preserving = false; // If we want to use positive preserving limiter
-  real entropy_fix_factor = 0; // The factor for entropy fix
   int viscous_scheme = 0; // The tag for viscous scheme. 0 - Inviscid, 2 - 2nd order central discretization
-
-  bool perform_spanwise_average = false; // If we want to perform spanwise average
+  bool positive_preserving = false; // If we want to use positive preserving limiter
+  bool gradPInDiffusionFlux = false;
+  real entropy_fix_factor = 0; // The factor for entropy fix
 
   real dt = -1; // The global time step. If -1, we use the local time step.
   real physical_time = 0; // The physical time of the simulation
@@ -75,7 +74,6 @@ struct DParameter {
   ggxl::MatrixDyn<real> binary_diffusivity_coeff;
   ggxl::MatrixDyn<real> kb_over_eps_jk; // Used to compute reduced temperature for diffusion coefficients
   real *ZRotF298 = nullptr;
-  bool gradPInDiffusionFlux = false;
 
   real Sc = 0.5;
   real Prt = 0.9;
@@ -110,9 +108,14 @@ struct DParameter {
 
   // stat data info
   int n_reyAve = 0;
-  int* reyAveVarIndex = nullptr;
+  int n_species_stat = 0;
+  bool perform_spanwise_average = false; // If we want to perform spanwise average
   bool rho_p_correlation = false;
   bool stat_tke_budget = false;
+  bool stat_species_dissipation_rate = false;
+  bool stat_species_velocity_correlation = false;
+  int *reyAveVarIndex = nullptr;
+  int *specStatIndex = nullptr;
 
   // Sponge layer info
   bool sponge_layer = false;

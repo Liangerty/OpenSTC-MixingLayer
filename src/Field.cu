@@ -8,6 +8,7 @@
 #include "Transport.cuh"
 #include "DParameter.cuh"
 #include "stat_lib/TkeBudget.cuh"
+#include "stat_lib/SpeciesStat.cuh"
 
 cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in) {
   const int mx{block.mx}, my{block.my}, mz{block.mz}, ngg{block.ngg};
@@ -47,6 +48,17 @@ cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in)
     // other statistics
     if (parameter.get_bool("stat_tke_budget")) {
       collect_tke_budget.resize(mx, my, mz, TkeBudget::n_collect, TkeBudget::ngg);
+    }
+    const int n_species_stat = parameter.get_int("n_species_stat");
+    if (n_species_stat > 0) {
+      if (parameter.get_bool("stat_species_velocity_correlation")) {
+        collect_spec_vel_correlation.resize(mx, my, mz, n_species_stat * SpeciesVelocityCorrelation::n_collect,
+                                            SpeciesVelocityCorrelation::ngg);
+      }
+      if (parameter.get_bool("stat_species_dissipation_rate")) {
+        collect_spec_diss_rate.resize(mx, my, mz, n_species_stat * SpeciesDissipationRate::n_collect,
+                                      SpeciesDissipationRate::ngg);
+      }
     }
   }
 
@@ -594,6 +606,19 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
     if (parameter.get_bool("stat_tke_budget")) {
       h_ptr->collect_tke_budget.allocate_memory(mx, my, mz, TkeBudget::n_collect, TkeBudget::ngg);
     }
+    const int n_species_stat = parameter.get_int("n_species_stat");
+    if (n_species_stat > 0) {
+      if (parameter.get_bool("stat_species_velocity_correlation")) {
+        h_ptr->collect_spec_vel_correlation.allocate_memory(
+            mx, my, mz, SpeciesVelocityCorrelation::n_collect * parameter.get_int("n_species_stat"),
+            SpeciesVelocityCorrelation::ngg);
+      }
+      if (parameter.get_bool("stat_species_dissipation_rate")) {
+        h_ptr->collect_spec_diss_rate.allocate_memory(
+            mx, my, mz, SpeciesDissipationRate::n_collect * parameter.get_int("n_species_stat"),
+            SpeciesDissipationRate::ngg);
+      }
+    }
   }
 
   if (parameter.get_bool("sponge_layer")) {
@@ -605,6 +630,11 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
 
   cudaMalloc(&d_ptr, sizeof(DZone));
   cudaMemcpy(d_ptr, h_ptr, sizeof(DZone), cudaMemcpyHostToDevice);
+
+  size_t free, total;
+  cudaMemGetInfo(&free, &total);
+  printf("\tProcess %d, the free memory is %zuGB, the used memory is %zuGB\n", parameter.get_int("myid"),
+         free / 1024 / 1024 / 1024, (total - free) / 1024 / 1024 / 1024);
 }
 
 void cfd::Field::copy_data_from_device(const Parameter &parameter) {

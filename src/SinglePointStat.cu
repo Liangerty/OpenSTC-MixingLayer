@@ -1,12 +1,16 @@
 #include "SinglePointStat.cuh"
 #include <filesystem>
+#include <numeric>
 #include "gxl_lib/MyString.h"
 #include "DParameter.cuh"
 #include "stat_lib/TkeBudget.cuh"
+#include "stat_lib/SpeciesStat.cuh"
+#include "gxl_lib/MyAlgorithm.h"
 
 namespace cfd {
 SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::vector<Field> &_field,
-                                 const Species &species) : parameter(_parameter), mesh(_mesh), field(_field) {
+                                 const Species &_species) : parameter(_parameter), mesh(_mesh), field(_field),
+                                                            species(_species) {
   if (!_parameter.get_bool("if_collect_statistics")) {
     return;
   }
@@ -20,7 +24,49 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
   ty_1gg.resize(mesh.n_block);
   ty_0gg.resize(mesh.n_block);
 
-  init_stat_name(species);
+  // First, identify which species are to be statistically analyzed.
+  if (species.n_spec > 0) {
+    auto &array = _parameter.get_string_array("stat_species");
+    if (gxl::exists<std::string>(array, "all")) {
+      species_stat_index.resize(species.n_spec);
+      std::iota(species_stat_index.begin(), species_stat_index.end(), 0);
+      parameter.update_parameter("stat_species", species.spec_name);
+      printf("\tAll species are used to collect statistical data.\n");
+    } else {
+      if (array.empty()) {
+        printf("\tInfo: No species is specified for statistical analysis.\n");
+      } else {
+        for (const auto &spec: array) {
+          bool found = false;
+          for (const auto &[n, i]: species.spec_list) {
+            if (spec == n) {
+              species_stat_index.push_back(i);
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            printf("\tWarning: Species %s is not found in the species list, whose data will not be collected.\n",
+                   spec.c_str());
+          }
+        }
+        printf("\tThe following species are used to collect statistical data:\n");
+        int counter_spec{0};
+        for (int i: species_stat_index) {
+          printf("\t%s\t", species.spec_name[i].c_str());
+          ++counter_spec;
+          if (counter_spec % 10 == 0) {
+            printf("\n");
+          }
+        }
+      }
+    }
+    n_species_stat = (int) species_stat_index.size();
+    parameter.update_parameter("n_species_stat", n_species_stat);
+    parameter.update_parameter("species_stat_index", species_stat_index);
+  }
+
+  init_stat_name();
   // update the variables in parameter, these are used to initialize the memory in the field.
   counter_rey1st.resize(n_reyAve, 0);
   parameter.update_parameter("n_stat_reynolds_1st", n_reyAve);
@@ -34,12 +80,22 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
 
   // other statistics
   tke_budget = parameter.get_bool("stat_tke_budget");
-  if (tke_budget){
+  if (tke_budget) {
     counter_tke_budget.resize(TkeBudget::n_collect, 0);
+  }
+  if (n_species_stat > 0) {
+    species_velocity_correlation = parameter.get_bool("stat_species_velocity_correlation");
+    if (species_velocity_correlation) {
+      counter_species_velocity_correlation.resize(SpeciesVelocityCorrelation::n_collect * n_species_stat, 0);
+    }
+    species_dissipation_rate = parameter.get_bool("stat_species_dissipation_rate");
+    if (species_dissipation_rate) {
+      counter_species_dissipation_rate.resize(SpeciesDissipationRate::n_collect * n_species_stat, 0);
+    }
   }
 }
 
-void SinglePointStat::init_stat_name(const Species &species) {
+void SinglePointStat::init_stat_name() {
   // The default average is the favre one.
   // All variables computed will be Favre averaged.
   int n_spec = species.n_spec;
@@ -92,7 +148,7 @@ void SinglePointStat::init_stat_name(const Species &species) {
   }
 }
 
-void SinglePointStat::initialize_statistics_collector(const Species &species) {
+void SinglePointStat::initialize_statistics_collector() {
   if (parameter.get_bool("if_continue_collect_statistics")) {
     read_previous_statistical_data();
   }
@@ -206,6 +262,16 @@ void SinglePointStat::compute_offset_for_export_data() {
 
   if (tke_budget) {
     offset_tke_budget = cfd::create_tke_budget_file(parameter, mesh, n_block_ahead);
+  }
+  if (n_species_stat > 0) {
+    if (species_velocity_correlation) {
+      offset_species_velocity_correlation =
+          cfd::create_species_collect_file<SpeciesVelocityCorrelation>(parameter, mesh, n_block_ahead);
+    }
+    if (species_dissipation_rate) {
+      offset_species_dissipation_rate =
+          cfd::create_species_collect_file<SpeciesDissipationRate>(parameter, mesh, n_block_ahead);
+    }
   }
 }
 
@@ -435,9 +501,29 @@ void SinglePointStat::read_previous_statistical_data() {
   if (tke_budget) {
     counter_tke_budget = cfd::read_tke_budget_file(parameter, mesh, n_block_ahead, field);
   }
+  if (species_velocity_correlation) {
+    counter_species_velocity_correlation =
+        cfd::read_species_collect_file<SpeciesVelocityCorrelation>(parameter, mesh, n_block_ahead, field, species);
+  }
+  if (species_dissipation_rate) {
+    counter_species_dissipation_rate =
+        read_species_collect_file<SpeciesDissipationRate>(parameter, mesh, n_block_ahead, field, species);
+  }
 }
 
 void SinglePointStat::collect_data(DParameter *param) {
+  dim3 tpb{8, 8, 4};
+  if (mesh.dimension == 2) {
+    tpb = {16, 16, 1};
+  }
+
+  for (int b = 0; b < mesh.n_block; ++b) {
+    const auto mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
+    dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
+    collect_single_point_statistics<<<bpg, tpb>>>(field[b].d_ptr, param);
+  }
+
+  // Update the counters
   for (auto &c: counter_rey1st) {
     ++c;
   }
@@ -453,15 +539,11 @@ void SinglePointStat::collect_data(DParameter *param) {
   for (auto &c: counter_tke_budget) {
     ++c;
   }
-  dim3 tpb{8, 8, 4};
-  if (mesh.dimension == 2) {
-    tpb = {16, 16, 1};
+  for (auto &c: counter_species_dissipation_rate) {
+    ++c;
   }
-
-  for (int b = 0; b < mesh.n_block; ++b) {
-    const auto mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
-    dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
-    collect_single_point_statistics<<<bpg, tpb>>>(field[b].d_ptr, param);
+  for (auto &c: counter_species_velocity_correlation) {
+    ++c;
   }
 }
 
@@ -551,9 +633,18 @@ void SinglePointStat::export_statistical_data(DParameter *param, bool perform_sp
   MPI_File_close(&fp_fav2);
 
   // Any other stats that need no ghost layer
-// other files
+  // other files
   if (tke_budget) {
     export_tke_budget_file(parameter, mesh, field, offset_tke_budget, counter_tke_budget, ty_0gg);
+  }
+  if (species_velocity_correlation) {
+    export_species_collect_file<SpeciesVelocityCorrelation>
+        (parameter, mesh, field, species, offset_species_velocity_correlation, counter_species_velocity_correlation,
+         ty_0gg);
+  }
+  if (species_dissipation_rate) {
+    export_species_collect_file<SpeciesDissipationRate>
+        (parameter, mesh, field, species, offset_species_dissipation_rate, counter_species_dissipation_rate, ty_0gg);
   }
 }
 
@@ -607,6 +698,12 @@ __global__ void collect_single_point_statistics(DZone *zone, DParameter *param) 
 
   if (param->stat_tke_budget) {
     collect_tke_budget(zone, param, i, j, k);
+  }
+  if (param->stat_species_velocity_correlation) {
+    collect_species_velocity_correlation(zone, param, i, j, k);
+  }
+  if (param->stat_species_dissipation_rate) {
+    collect_species_dissipation_rate(zone, param, i, j, k);
   }
 }
 } // cfd

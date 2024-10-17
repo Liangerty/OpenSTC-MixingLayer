@@ -59,7 +59,7 @@ struct upper_stream = {
     real ps4 = 1
 }
 struct lower_stream = {
-    real temperature = 230
+    real temperature = 3304.504458
     real pressure = 100000
     real O2 = 0.232
     real N2 = 0.768
@@ -132,7 +132,13 @@ array string stat_rey_1st {
     u v w T
 }
 bool rho_p_correlation = 1
-bool stat_tke_budget = 1
+bool stat_tke_budget = 0
+array string stat_species {
+    all     // If "all" is specified, then all species are monitored.
+    // H2 O2 N2
+}
+bool stat_species_velocity_correlation = 0
+bool stat_species_dissipation_rate = 0
 
 // sponge layer info
 bool sponge_layer = 0

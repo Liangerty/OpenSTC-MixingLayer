@@ -1,5 +1,6 @@
 #include "MyAlgorithm.h"
 #include <algorithm>
+#include <string>
 
 namespace gxl {
 template<typename T>
@@ -8,4 +9,5 @@ bool exists(const std::vector<T> &vec, T val){
 }
 
 template bool exists(const std::vector<int> &vec, int val);
+template bool exists(const std::vector<std::string> &vec, std::string val);
 } // gxl
