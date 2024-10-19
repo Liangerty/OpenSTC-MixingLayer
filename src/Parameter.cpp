@@ -490,7 +490,7 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["compressibility_correction"] = 0; // No compressibility correction is added by default
   int_parameters["des_scale_method"] = 0; // How to compute the grid scale in DES simulations. 0 - cubic root of cell volume, 1 - max of cell dimension
 
-  int_parameters["n_passive_scalar"] = 0;
+  int_parameters["n_ps"] = 0;
 
   int_parameters["n_profile"] = 0;
 
@@ -634,10 +634,10 @@ void cfd::Parameter::deduce_sim_info(const Species &spec) {
       ++n_other_var; // mut
     }
   }
-  if (get_int("n_passive_scalar")) {
+  if (get_int("n_ps")) {
     // Some passive scalar is transported
-    n_scalar_transported += get_int("n_passive_scalar");
-    n_scalar += get_int("n_passive_scalar");
+    n_scalar_transported += get_int("n_ps");
+    n_scalar += get_int("n_ps");
   }
   n_var += n_scalar_transported;
   update_parameter("n_var", n_var);
@@ -657,7 +657,7 @@ void cfd::Parameter::deduce_sim_info(const Species &spec) {
     fmt::print("\n{:*^80}\n", "Simulation Details");
     printf("\t->-> %-20d : number of equations to solve\n", n_var);
     printf("\t->-> %-20d : number of scalar variables\n", n_scalar);
-    if (auto n_ps = get_int("n_passive_scalar");n_ps > 0) {
+    if (auto n_ps = get_int("n_ps");n_ps > 0) {
       printf("\t->-> %-20d : number of passive scalar variables\n", n_ps);
     }
 
@@ -795,7 +795,7 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
       }
     }
   }
-  if (int n_ps = get_int("n_passive_scalar");n_ps > 0) {
+  if (int n_ps = get_int("n_ps");n_ps > 0) {
     nv += n_ps;
     for (int i = 0; i < n_ps; ++i) {
       var_name.emplace_back("PS" + std::to_string(i + 1));

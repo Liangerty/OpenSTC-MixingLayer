@@ -1,7 +1,6 @@
 #include "Field.h"
 #include "BoundCond.h"
 #include "UDIO.h"
-#include "UDStat.h"
 #include <fstream>
 #include "Parallel.h"
 #include "gxl_lib/MyString.h"
@@ -50,13 +49,15 @@ cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in)
       collect_tke_budget.resize(mx, my, mz, TkeBudget::n_collect, TkeBudget::ngg);
     }
     const int n_species_stat = parameter.get_int("n_species_stat");
-    if (n_species_stat > 0) {
+    const int n_ps = parameter.get_int("n_ps");
+    int n_scalar_stat = n_species_stat + n_ps;
+    if (n_scalar_stat > 0) {
       if (parameter.get_bool("stat_species_velocity_correlation")) {
-        collect_spec_vel_correlation.resize(mx, my, mz, n_species_stat * SpeciesVelocityCorrelation::n_collect,
+        collect_spec_vel_correlation.resize(mx, my, mz, n_scalar_stat * SpeciesVelocityCorrelation::n_collect,
                                             SpeciesVelocityCorrelation::ngg);
       }
       if (parameter.get_bool("stat_species_dissipation_rate")) {
-        collect_spec_diss_rate.resize(mx, my, mz, n_species_stat * SpeciesDissipationRate::n_collect,
+        collect_spec_diss_rate.resize(mx, my, mz, n_scalar_stat * SpeciesDissipationRate::n_collect,
                                       SpeciesDissipationRate::ngg);
       }
     }
@@ -607,16 +608,16 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
       h_ptr->collect_tke_budget.allocate_memory(mx, my, mz, TkeBudget::n_collect, TkeBudget::ngg);
     }
     const int n_species_stat = parameter.get_int("n_species_stat");
-    if (n_species_stat > 0) {
+    const int n_ps = parameter.get_int("n_ps");
+    const int n_scalar_stat = n_species_stat + n_ps;
+    if (n_scalar_stat > 0) {
       if (parameter.get_bool("stat_species_velocity_correlation")) {
         h_ptr->collect_spec_vel_correlation.allocate_memory(
-            mx, my, mz, SpeciesVelocityCorrelation::n_collect * parameter.get_int("n_species_stat"),
-            SpeciesVelocityCorrelation::ngg);
+            mx, my, mz, SpeciesVelocityCorrelation::n_collect * n_scalar_stat, SpeciesVelocityCorrelation::ngg);
       }
       if (parameter.get_bool("stat_species_dissipation_rate")) {
         h_ptr->collect_spec_diss_rate.allocate_memory(
-            mx, my, mz, SpeciesDissipationRate::n_collect * parameter.get_int("n_species_stat"),
-            SpeciesDissipationRate::ngg);
+            mx, my, mz, SpeciesDissipationRate::n_collect * n_scalar_stat, SpeciesDissipationRate::ngg);
       }
     }
   }

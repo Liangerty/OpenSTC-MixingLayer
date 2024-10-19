@@ -164,7 +164,7 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
     }
   }
 
-  if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+  if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
     for (int i = 1; i <= n_ps; ++i) {
       if (upper.find("ps" + std::to_string(i)) != upper.cend()) {
         var_info.push_back(std::get<real>(upper.at("ps" + std::to_string(i))));

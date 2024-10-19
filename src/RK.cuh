@@ -3,7 +3,6 @@
 #include "Driver.cuh"
 #include "FieldOperation.cuh"
 #include "Monitor.cuh"
-#include "StatisticsCollector.cuh"
 #include "SpongeLayer.cuh"
 
 namespace cfd {

@@ -243,7 +243,7 @@ void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector
       n_fl = 2;
     initialize_mixing_layer_with_info<<<bpg, tpb>>>(field[blk].d_ptr, var_info_dev, species.n_spec,
                                                     parameter.get_real("delta_omega"), parameter.get_int("n_turb"),
-                                                    n_fl, parameter.get_int("n_passive_scalar"));
+                                                    n_fl, parameter.get_int("n_ps"));
     cudaMemcpy(field[blk].bv.data(), field[blk].h_ptr->bv.data(), sizeof(real) * field[blk].h_ptr->bv.size() * 6,
                cudaMemcpyDeviceToHost);
     cudaMemcpy(field[blk].sv.data(), field[blk].h_ptr->sv.data(),

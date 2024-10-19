@@ -38,6 +38,7 @@ private:
   // available statistics
   std::vector<int> species_stat_index;
   int n_species_stat = 0;
+  int n_ps = 0;
   bool tke_budget = false;
   bool species_velocity_correlation = false;
   bool species_dissipation_rate = false;
@@ -49,13 +50,13 @@ private:
   MPI_Offset offset_species_dissipation_rate{0};
 
   int myid{0};
+  int ngg = 1;
   // Data to be bundled
   Parameter &parameter;
   const Mesh &mesh;
   std::vector<Field> &field;
   const Species &species;
 
-  int ngg = 1;
   MPI_Offset offset_unit[4]={0, 0, 0, 0};
   std::vector<MPI_Datatype> ty_1gg, ty_0gg;
 

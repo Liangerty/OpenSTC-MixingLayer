@@ -65,6 +65,7 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
     parameter.update_parameter("n_species_stat", n_species_stat);
     parameter.update_parameter("species_stat_index", species_stat_index);
   }
+  n_ps = parameter.get_int("n_ps");
 
   init_stat_name();
   // update the variables in parameter, these are used to initialize the memory in the field.
@@ -83,14 +84,14 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
   if (tke_budget) {
     counter_tke_budget.resize(TkeBudget::n_collect, 0);
   }
-  if (n_species_stat > 0) {
+  if (n_species_stat > 0 || n_ps > 0) {
     species_velocity_correlation = parameter.get_bool("stat_species_velocity_correlation");
     if (species_velocity_correlation) {
-      counter_species_velocity_correlation.resize(SpeciesVelocityCorrelation::n_collect * n_species_stat, 0);
+      counter_species_velocity_correlation.resize(SpeciesVelocityCorrelation::n_collect * (n_species_stat + n_ps), 0);
     }
     species_dissipation_rate = parameter.get_bool("stat_species_dissipation_rate");
     if (species_dissipation_rate) {
-      counter_species_dissipation_rate.resize(SpeciesDissipationRate::n_collect * n_species_stat, 0);
+      counter_species_dissipation_rate.resize(SpeciesDissipationRate::n_collect * (n_species_stat + n_ps), 0);
     }
   }
 }
@@ -107,7 +108,7 @@ void SinglePointStat::init_stat_name() {
       fav2ndVar.push_back("rho" + species.spec_name[l] + species.spec_name[l]);
     }
   }
-  if (int n_ps = parameter.get_int("n_passive_scalar"); n_ps > 0) {
+  if (n_ps > 0) {
     n_favAve += n_ps;
     n_fav2nd += n_ps;
     for (int l = 0; l < n_ps; ++l) {
@@ -263,7 +264,7 @@ void SinglePointStat::compute_offset_for_export_data() {
   if (tke_budget) {
     offset_tke_budget = cfd::create_tke_budget_file(parameter, mesh, n_block_ahead);
   }
-  if (n_species_stat > 0) {
+  if (n_species_stat > 0 || n_ps > 0) {
     if (species_velocity_correlation) {
       offset_species_velocity_correlation =
           cfd::create_species_collect_file<SpeciesVelocityCorrelation>(parameter, mesh, n_block_ahead);
@@ -503,11 +504,11 @@ void SinglePointStat::read_previous_statistical_data() {
   }
   if (species_velocity_correlation) {
     counter_species_velocity_correlation =
-        cfd::read_species_collect_file<SpeciesVelocityCorrelation>(parameter, mesh, n_block_ahead, field, species);
+        cfd::read_species_collect_file<SpeciesVelocityCorrelation>(parameter, mesh, n_block_ahead, field);
   }
   if (species_dissipation_rate) {
     counter_species_dissipation_rate =
-        read_species_collect_file<SpeciesDissipationRate>(parameter, mesh, n_block_ahead, field, species);
+        read_species_collect_file<SpeciesDissipationRate>(parameter, mesh, n_block_ahead, field);
   }
 }
 
@@ -639,12 +640,12 @@ void SinglePointStat::export_statistical_data(DParameter *param, bool perform_sp
   }
   if (species_velocity_correlation) {
     export_species_collect_file<SpeciesVelocityCorrelation>
-        (parameter, mesh, field, species, offset_species_velocity_correlation, counter_species_velocity_correlation,
+        (parameter, mesh, field, offset_species_velocity_correlation, counter_species_velocity_correlation,
          ty_0gg);
   }
   if (species_dissipation_rate) {
     export_species_collect_file<SpeciesDissipationRate>
-        (parameter, mesh, field, species, offset_species_dissipation_rate, counter_species_dissipation_rate, ty_0gg);
+        (parameter, mesh, field, offset_species_dissipation_rate, counter_species_dissipation_rate, ty_0gg);
   }
 }
 
@@ -695,6 +696,9 @@ __global__ void collect_single_point_statistics(DZone *zone, DParameter *param) 
   fav2nd(i, j, k, 4) += rho * u * w; // rho*u*w
   fav2nd(i, j, k, 5) += rho * v * w; // rho*v*w
   fav2nd(i, j, k, 6) += rho * T * T; // rho*T*T
+  for (int l = 0; l < param->n_scalar; ++l) {
+    fav2nd(i, j, k, 7 + l) += rho * sv(i, j, k, l) * sv(i, j, k, l);
+  }
 
   if (param->stat_tke_budget) {
     collect_tke_budget(zone, param, i, j, k);

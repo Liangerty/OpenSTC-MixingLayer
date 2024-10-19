@@ -114,7 +114,7 @@ struct  periodic  {
 }
 
 // Additional passive scalar
-int n_passive_scalar = 4 // number of additional scalars
+int n_ps = 4 // number of additional scalars
 array real sc_passive_scalar {
     0.2 0.5 1.0 1.2
 }

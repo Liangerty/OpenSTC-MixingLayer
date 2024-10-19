@@ -5,8 +5,8 @@
 // #include <numeric>
 #include <cmath>
 
-namespace gxl{
-template <typename T>
+namespace gxl {
+template<typename T>
 #ifdef __CUDACC__
 __host__ __device__
 #endif
@@ -14,7 +14,7 @@ int sgn(T a) {
   return a < 0 ? -1 : 1;
 }
 
-template <typename T>
+template<typename T>
 int del(T a, T b) {
   return std::abs(a) == std::abs(b) ? 1 : 0;
 }
@@ -23,23 +23,23 @@ int del(T a, T b) {
 // Type T should be a float number
 // The current implementation is based on Newton's iteration
 template<typename T>
-T erfcInv(T z, T eps=1e-5){
+T erfcInv(T z, T eps = 1e-5) {
   constexpr int step_max{50};
   T err{1};
   int step{0};
   T x{1};
-  if (z>1) x=-1;
-  if (std::abs(z-1)<0.02) return 0;
+  if (z > 1) x = -1;
+  if (std::abs(z - 1) < 0.02) return 0;
 
   const double inv_sqrt_pi = 1.0 / sqrt(3.14159265358979);
 
-  while (step<step_max && err>eps){
+  while (step < step_max && err > eps) {
     ++step;
-    T f_x= std::erfc(x) - z;
-    T df_dx=-2* inv_sqrt_pi *std::exp(-x*x);
-    T x1= x - f_x / df_dx;
-    err=std::abs((x1-x)/x);
-    x=x1;
+    T f_x = std::erfc(x) - z;
+    T df_dx = -2 * inv_sqrt_pi * std::exp(-x * x);
+    T x1 = x - f_x / df_dx;
+    err = std::abs((x1 - x) / x);
+    x = x1;
   }
   return x;
 }

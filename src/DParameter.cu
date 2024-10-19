@@ -50,7 +50,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   if (reaction != nullptr) {
     n_reac = reaction->n_reac;
   }
-  n_ps = parameter.get_int("n_passive_scalar");
+  n_ps = parameter.get_int("n_ps");
   i_ps = parameter.get_int("i_ps");
   i_ps_cv = parameter.get_int("i_ps_cv");
   if (n_ps > 0) {

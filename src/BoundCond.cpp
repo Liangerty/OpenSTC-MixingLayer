@@ -119,7 +119,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       }
     }
 
-    if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+    if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
       int i_ps = parameter.get_int("i_ps");
       for (int i = 0; i < n_ps; ++i) {
         sv[i_ps + i] = var_info[14 + 2 * n_spec + 4 + 2 * i];
@@ -245,7 +245,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       }
     }
 
-    if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+    if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
       int i_ps = parameter.get_int("i_ps");
       for (int i = 0; i < n_ps; ++i) {
         sv[i_ps] = std::get<real>(info.at("ps" + std::to_string(i + 1)));

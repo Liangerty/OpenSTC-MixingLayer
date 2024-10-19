@@ -13,7 +13,7 @@
 namespace cfd {
 template<typename T>
 std::vector<int> read_species_collect_file(cfd::Parameter &parameter, const cfd::Mesh &mesh, int n_block_ahead,
-                                           std::vector<Field> &field, const cfd::Species &species);
+                                           std::vector<Field> &field);
 
 template<typename T>
 MPI_Offset
@@ -21,7 +21,7 @@ create_species_collect_file(cfd::Parameter &parameter, const Mesh &mesh, int n_b
 
 template<typename T>
 void export_species_collect_file(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
-                                 const Species &species, MPI_Offset offset_ahead, std::vector<int> &counter,
+                                 MPI_Offset offset_ahead, std::vector<int> &counter,
                                  const std::vector<MPI_Datatype> &tys);
 
 struct SpeciesDissipationRate {
@@ -67,15 +67,16 @@ __device__ void collect_species_velocity_correlation(DZone *zone, DParameter *pa
 
 template<typename T>
 std::vector<int> cfd::read_species_collect_file(cfd::Parameter &parameter, const cfd::Mesh &mesh, int n_block_ahead,
-                                                std::vector<Field> &field, const cfd::Species &species) {
+                                                std::vector<Field> &field) {
   const std::filesystem::path out_dir("output/stat/");
   std::string fileName{T::file_name};
   std::string file_name = (out_dir.string() + fileName + ".bin");
 
   const int n_species_stat = parameter.get_int("n_species_stat");
+  const int n_ps = parameter.get_int("n_ps");
+  const int n_var_stat= n_species_stat + n_ps;
 
-  std::vector<int> counter_read(T::n_collect *n_species_stat,
-  0);
+  std::vector<int> counter_read(T::n_collect *n_var_stat, 0);
   if (!std::filesystem::exists(file_name)) {
     printf("File %s does not exist. The data are collected from now\n", file_name.c_str());
   } else {
@@ -85,9 +86,16 @@ std::vector<int> cfd::read_species_collect_file(cfd::Parameter &parameter, const
 
     constexpr int n_collect = T::n_collect;
     constexpr int ngg = T::ngg;
-    std::vector<std::string> collectName(n_collect * n_species_stat);
+    std::vector<std::string> collectName(n_collect * n_var_stat);
     for (int i = 0; i < n_species_stat; ++i) {
       auto name = parameter.get_string_array("stat_species")[i];
+      for (int j = 0; j < n_collect; ++j) {
+        std::string collNameJ{SpeciesDissipationRate::collect_name[j]};
+        collectName.emplace_back(collNameJ + name);
+      }
+    }
+    for (int i = 0; i < n_ps; ++i) {
+      auto name = "PS" + std::to_string(i + 1);
       for (int j = 0; j < n_collect; ++j) {
         std::string collNameJ{SpeciesDissipationRate::collect_name[j]};
         collectName.emplace_back(collNameJ + name);
@@ -177,7 +185,7 @@ MPI_Offset cfd::create_species_collect_file(cfd::Parameter &parameter, const cfd
   MPI_Offset offset{0};
 
   const int myid = parameter.get_int("myid");
-  const int n_species_stat = parameter.get_int("n_species_stat");
+  const int n_species_stat = parameter.get_int("n_species_stat") + parameter.get_int("n_ps");
   const int n_collect = T::n_collect * n_species_stat;
   constexpr int ngg = T::ngg;
   if (myid == 0) {
@@ -191,6 +199,13 @@ MPI_Offset cfd::create_species_collect_file(cfd::Parameter &parameter, const cfd
       for (auto var: T::collect_name) {
         std::string name{var};
         name += n;
+        gxl::write_str(name.data(), fp, offset);
+      }
+    }
+    for (int i = 0; i < parameter.get_int("n_ps"); ++i) {
+      for (auto var: T::collect_name) {
+        std::string name{var};
+        name += "PS" + std::to_string(i + 1);
         gxl::write_str(name.data(), fp, offset);
       }
     }
@@ -211,8 +226,8 @@ MPI_Offset cfd::create_species_collect_file(cfd::Parameter &parameter, const cfd
 template<typename T>
 void
 cfd::export_species_collect_file(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
-                                 const Species &species, MPI_Offset offset_ahead,
-                                 std::vector<int> &counter, const std::vector<MPI_Datatype> &tys) {
+                                 MPI_Offset offset_ahead, std::vector<int> &counter,
+                                 const std::vector<MPI_Datatype> &tys) {
   const std::filesystem::path out_dir("output/stat/");
   std::string fileName{T::file_name};
   MPI_File fp;
@@ -221,7 +236,7 @@ cfd::export_species_collect_file(Parameter &parameter, const Mesh &mesh, std::ve
   MPI_Status status;
 
   MPI_Offset offset = offset_ahead;
-  const int n_species_stat = parameter.get_int("n_species_stat");
+  const int n_species_stat = parameter.get_int("n_species_stat") + parameter.get_int("n_ps");
   const int n_collect = T::n_collect * n_species_stat;
   const int myid = parameter.get_int("myid");
   if (myid == 0) {

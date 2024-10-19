@@ -471,7 +471,7 @@ FieldIO<mix_model, turb, output_time_choice>::acquire_variable_names(std::vector
     var_name.emplace_back("MixtureFraction");
     var_name.emplace_back("MixtureFractionVariance");
   }
-  if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+  if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
     nv += n_ps;
     for (int i = 0; i < n_ps; ++i) {
       var_name.emplace_back("PS" + std::to_string(i + 1));
@@ -703,7 +703,7 @@ int32_t FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::acquire_variable
     var_name.emplace_back("MixtureFraction");
     var_name.emplace_back("MixtureFractionVariance");
   }
-  if (int n_ps = parameter.get_int("n_passive_scalar");n_ps > 0) {
+  if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
     nv += n_ps;
     for (int i = 0; i < n_ps; ++i) {
       var_name.emplace_back("PS" + std::to_string(i + 1));
