@@ -528,6 +528,9 @@ cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, int, real>
         fluctuation_x1 = std::get<real>(info.at("fluctuation_x1"));
     }
   }
+  if (info.find("if_blow_shock_wave") != info.end()) {
+    if_blow_shock_wave = std::get<int>(info.at("if_blow_shock_wave"));
+  }
 }
 
 cfd::Symmetry::Symmetry(const std::string &inflow_name, cfd::Parameter &parameter) {

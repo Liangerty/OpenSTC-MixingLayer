@@ -5,6 +5,7 @@
 #include "mpi.h"
 #include <filesystem>
 #include <fstream>
+#include "gxl_lib/Math.hpp"
 
 namespace cfd {
 
@@ -30,20 +31,32 @@ __global__ void reduction_of_dv_squared(real *arr, int size) {
   }
   __syncthreads();
 
-  for (int stride = blockDim.x / 2, lst = blockDim.x & 1; stride >= 1; lst = stride & 1, stride >>= 1) {
-    stride += lst;
-    __syncthreads();
-    if (t < stride) {
-      //when t+stride is larger than #elements, there's no meaning of comparison. So when it happens, just keep the current value for parMax[t]. This always happens when an odd number of t satisfying the condition.
-      if (t + stride < size) {
+  // ! Maybe not correct
+  int block2 = gxl::pow2ceil(blockDim.x); // next power of 2
+  for (int stride = block2 / 2; stride > 0; stride >>= 1) {
+    if (t < stride && t + stride < blockDim.x) {
 #pragma unroll
-        for (int l = 0; l < N; ++l) {
-          s[t * N + l] += s[(t + stride) * N + l];
-        }
+      for (int l = 0; l < N; ++l) {
+        s[t * N + l] += s[(t + stride) * N + l];
       }
     }
     __syncthreads();
   }
+
+//  for (int stride = blockDim.x / 2, lst = blockDim.x & 1; stride >= 1; lst = stride & 1, stride >>= 1) {
+//    stride += lst;
+//    __syncthreads();
+//    if (t < stride) {
+//      //when t+stride is larger than #elements, there's no meaning of comparison. So when it happens, just keep the current value for parMax[t]. This always happens when an odd number of t satisfying the condition.
+//      if (t + stride < size) {
+//#pragma unroll
+//        for (int l = 0; l < N; ++l) {
+//          s[t * N + l] += s[(t + stride) * N + l];
+//        }
+//      }
+//    }
+//    __syncthreads();
+//  }
 
   if (t == 0) {
     arr[blockIdx.x] = s[0];

@@ -37,7 +37,7 @@ struct DBoundCond {
   void link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) const;
 
   template<MixtureModel mix_model, class turb>
-  void apply_boundary_conditions(const Block &block, Field &field, DParameter *param) const;
+  void apply_boundary_conditions(const Block &block, Field &field, DParameter *param, int step = -1) const;
 
   // There may be time-dependent BCs, which need to be updated at each time step.
   // E.g., the turbulent library method, we need to update the profile and fluctuation.
@@ -792,7 +792,8 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
 }
 
 template<MixtureModel mix_model, class turb>
-__global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *rng_states_d_ptr) {
+__global__ void
+apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *rng_states_d_ptr, int step = -1) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
@@ -854,6 +855,45 @@ __global__ void apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_fac
   bv(i, j, k, 3) = 0;
   bv(i, j, k, 4) = p;
   bv(i, j, k, 5) = t_wall;
+
+  real v_blow_shock_wave{0};
+  if (wall->if_blow_shock_wave && step >= 0 && step <= 50 && i < 21) {
+    gxl::Matrix<real, 3, 3, 1> bdjin;
+    real d1 = zone->metric(i, j, k)(2, 1);
+    real d2 = zone->metric(i, j, k)(2, 2);
+    real d3 = zone->metric(i, j, k)(2, 3);
+    real kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
+    bdjin(1, 1) = d1 / kk;
+    bdjin(1, 2) = d2 / kk;
+    bdjin(1, 3) = d3 / kk;
+
+    d1 = bdjin(1, 2) - bdjin(1, 3);
+    d2 = bdjin(1, 3) - bdjin(1, 1);
+    d3 = bdjin(1, 1) - bdjin(1, 2);
+    kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
+    bdjin(2, 1) = d1 / kk;
+    bdjin(2, 2) = d2 / kk;
+    bdjin(2, 3) = d3 / kk;
+
+    d1 = bdjin(1, 2) * bdjin(2, 3) - bdjin(1, 3) * bdjin(2, 2);
+    d2 = bdjin(1, 3) * bdjin(2, 1) - bdjin(1, 1) * bdjin(2, 3);
+    d3 = bdjin(1, 1) * bdjin(2, 2) - bdjin(1, 2) * bdjin(2, 1);
+    kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
+    bdjin(3, 1) = d1 / kk;
+    bdjin(3, 2) = d2 / kk;
+    bdjin(3, 3) = d3 / kk;
+
+    real u = bv(i - dir[0], j - dir[1], k - dir[2], 1),
+        v = bv(i - dir[0], j - dir[1], k - dir[2], 2),
+        w = bv(i - dir[0], j - dir[1], k - dir[2], 3);
+    real vn = bdjin(1, 1) * u + bdjin(1, 2) * v + bdjin(1, 3) * w;
+    real vt = bdjin(2, 1) * u + bdjin(2, 2) * v + bdjin(2, 3) * w;
+    real vs = bdjin(3, 1) * u + bdjin(3, 2) * v + bdjin(3, 3) * w;
+
+    bv(i, j, k, 1) = bdjin(2, 1) * vt + bdjin(3, 1) * vs - bdjin(1, 1) * vn;
+    bv(i, j, k, 2) = bdjin(2, 2) * vt + bdjin(3, 2) * vs - bdjin(1, 2) * vn;
+    bv(i, j, k, 3) = bdjin(2, 3) * vt + bdjin(3, 3) * vs - bdjin(1, 3) * vn;
+  }
 
   real v_blow{0};
   if (if_fluctuation == 1) {
@@ -1212,7 +1252,7 @@ __global__ void apply_periodic(DZone *zone, DParameter *param, int i_face) {
 }
 
 template<MixtureModel mix_model, class turb>
-void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DParameter *param) const {
+void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DParameter *param, int step) const {
   // Boundary conditions are applied in the order of priority, which with higher priority is applied later.
   // Finally, the communication between faces will be carried out after these bc applied
   // Priority: (-1 - inner faces >) 2-wall > 3-symmetry > 5-inflow = 7-subsonic inflow > 6-outflow = 9-back pressure > 4-farfield
@@ -1358,7 +1398,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_wall<mix_model, turb><<<BPG, TPB>>>(field.d_ptr, &wall[l], param, i_face, rng_d_ptr);
+      apply_wall<mix_model, turb><<<BPG, TPB>>>(field.d_ptr, &wall[l], param, i_face, rng_d_ptr, step);
     }
   }
 

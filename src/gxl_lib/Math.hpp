@@ -44,6 +44,19 @@ T erfcInv(T z, T eps = 1e-5) {
   return x;
 }
 
+#ifdef __CUDACC__
+
+// device only function smallest power of 2 >= n
+// Ref: Programming in Parallel with CUDA
+template<class T=int>
+__device__ int pow2ceil(int n) {
+  int pow2 = 1 << (31 - __clz(n));
+  if (n > pow2) pow2 = (pow2 << 1);
+  return pow2;
+}
+
+#endif
+
 // template <typename T>
 // void solve_linear_eqn(MatrixDyn<T>& a, std::span<T> b) {
 //   const int dim{a.n_col()};
