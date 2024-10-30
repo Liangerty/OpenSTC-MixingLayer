@@ -856,7 +856,6 @@ apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *
   bv(i, j, k, 4) = p;
   bv(i, j, k, 5) = t_wall;
 
-  real v_blow_shock_wave{0};
   if (wall->if_blow_shock_wave && step >= 0 && step <= 50 && i < 21) {
     gxl::Matrix<real, 3, 3, 1> bdjin;
     real d1 = zone->metric(i, j, k)(2, 1);

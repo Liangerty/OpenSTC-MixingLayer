@@ -48,6 +48,7 @@ void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<F
 
   parameter.update_parameter("solution_time", 0.0);
 
+  MPI_Barrier(MPI_COMM_WORLD);
   if (parameter.get_int("myid") == 0) {
     printf("\t->-> %-20s : initialization method.\n", "From start");
     std::ofstream history("history.dat", std::ios::trunc);
