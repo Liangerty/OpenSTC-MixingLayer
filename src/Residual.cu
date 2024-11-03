@@ -30,4 +30,20 @@ unsteady_screen_output(int step, real err_max, gxl::Time &time, std::array<real,
   printf("CPU time for this step is %16.8fs\n", time.step_time);
   printf("Total elapsed CPU time is %16.8fs\n", time.elapsed_time);
 }
+
+__global__ void check_nan(cfd::DZone *zone, int blk, int myid) {
+  const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
+  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  if (i >= mx || j >= my || k >= mz) return;
+
+  auto &bv = zone->bv;
+
+  if (isnan(bv(i, j, k, 0)) || isnan(bv(i, j, k, 1)) || isnan(bv(i, j, k, 2)) || isnan(bv(i, j, k, 3)) ||
+      isnan(bv(i, j, k, 4)) || isnan(bv(i, j, k, 5))) {
+    printf("Proc %d, block %d, (%d, %d, %d), bv = {%e, %e, %e, %e, %e, %e}.\n", myid, blk, i, j, k, bv(i, j, k, 0),
+           bv(i, j, k, 1), bv(i, j, k, 2), bv(i, j, k, 3), bv(i, j, k, 4), bv(i, j, k, 5));
+  }
+}
 } // cfd

@@ -660,7 +660,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
   const int n_var = param->n_var;
 
   // 0: acans; 1: li xinliang(own flux splitting); 2: my(same spectral radius)
-  constexpr int method = 1;
+  constexpr int method = 0;
 
   if constexpr (method == 1) {
     compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
@@ -784,6 +784,30 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
         }
         fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
       }
+    } else if (param->inviscid_scheme == 72) {
+      for (int l = 0; l < 5; ++l) {
+        real vPlus[7], vMinus[7];
+        memset(vPlus, 0, 7 * sizeof(real));
+        memset(vMinus, 0, 7 * sizeof(real));
+        // ACANS version
+        real lambda_p{ap[1]}, lambda_n{an[1]};
+        if (l == 0) {
+          lambda_p = ap[0];
+          lambda_n = an[0];
+        } else if (l == 4) {
+          lambda_p = ap[2];
+          lambda_n = an[2];
+        }
+        for (int m = 0; m < 7; m++) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += lambda_p * LR(l, n) * cv[(i_shared - 2 + m) * (n_var + 2) + n] * 0.5 *
+                        (jac[i_shared] + jac[i_shared + 1]);
+            vMinus[m] += lambda_n * LR(l, n) * cv[(i_shared - 1 + m) * (n_var + 2) + n] * 0.5 *
+                         (jac[i_shared] + jac[i_shared + 1]);
+          }
+        }
+        fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
+      }
     }
   } else if constexpr (method == 1) {
     // Li Xinliang version
@@ -818,24 +842,26 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
     // My method
     real spec_rad[3];
     memset(spec_rad, 0, 3 * sizeof(real));
-    for (int l = -2; l < 4; ++l) {
-      const real *Q = &cv[(i_shared + l) * (n_var + 2)];
-      real c = sqrt(gamma_air * Q[n_var] / Q[0]);
-      real grad_k = sqrt(metric[(i_shared + l) * 3] * metric[(i_shared + l) * 3] +
-                         metric[(i_shared + l) * 3 + 1] * metric[(i_shared + l) * 3 + 1] +
-                         metric[(i_shared + l) * 3 + 2] * metric[(i_shared + l) * 3 + 2]);
-      real Uk = (metric[(i_shared + l) * 3] * Q[1] + metric[(i_shared + l) * 3 + 1] * Q[2] +
-                 metric[(i_shared + l) * 3 + 2] * Q[3]) / Q[0];
-      real ukPc = abs(Uk + c * grad_k);
-      real ukMc = abs(Uk - c * grad_k);
-      spec_rad[0] = max(spec_rad[0], ukMc);
-      spec_rad[1] = max(spec_rad[1], abs(Uk));
-      spec_rad[2] = max(spec_rad[2], ukPc);
-    }
-    spec_rad[0] = max(spec_rad[0], abs((Uk_bar - cm) * gradK));
-    spec_rad[1] = max(spec_rad[1], abs(Uk_bar * gradK));
-    spec_rad[2] = max(spec_rad[2], abs((Uk_bar + cm) * gradK));
-    if (param->inviscid_scheme == 52) {
+
+    if (param->inviscid_scheme == 52){
+      for (int l = -2; l < 4; ++l) {
+        const real *Q = &cv[(i_shared + l) * (n_var + 2)];
+        real c = sqrt(gamma_air * Q[n_var] / Q[0]);
+        real grad_k = sqrt(metric[(i_shared + l) * 3] * metric[(i_shared + l) * 3] +
+                           metric[(i_shared + l) * 3 + 1] * metric[(i_shared + l) * 3 + 1] +
+                           metric[(i_shared + l) * 3 + 2] * metric[(i_shared + l) * 3 + 2]);
+        real Uk = (metric[(i_shared + l) * 3] * Q[1] + metric[(i_shared + l) * 3 + 1] * Q[2] +
+                   metric[(i_shared + l) * 3 + 2] * Q[3]) / Q[0];
+        real ukPc = abs(Uk + c * grad_k);
+        real ukMc = abs(Uk - c * grad_k);
+        spec_rad[0] = max(spec_rad[0], ukMc);
+        spec_rad[1] = max(spec_rad[1], abs(Uk));
+        spec_rad[2] = max(spec_rad[2], ukPc);
+      }
+      spec_rad[0] = max(spec_rad[0], abs((Uk_bar - cm) * gradK));
+      spec_rad[1] = max(spec_rad[1], abs(Uk_bar * gradK));
+      spec_rad[2] = max(spec_rad[2], abs((Uk_bar + cm) * gradK));
+
       for (int l = 0; l < 5; ++l) {
         real lambda_l{spec_rad[1]};
         if (l == 0) {
@@ -858,6 +884,48 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
           vMinus[m] *= 0.5;
         }
         fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
+      }
+    } else if (param->inviscid_scheme == 72) {
+      for (int l = -3; l < 5; ++l) {
+        const real *Q = &cv[(i_shared + l) * (n_var + 2)];
+        real c = sqrt(gamma_air * Q[n_var] / Q[0]);
+        real grad_k = sqrt(metric[(i_shared + l) * 3] * metric[(i_shared + l) * 3] +
+                           metric[(i_shared + l) * 3 + 1] * metric[(i_shared + l) * 3 + 1] +
+                           metric[(i_shared + l) * 3 + 2] * metric[(i_shared + l) * 3 + 2]);
+        real Uk = (metric[(i_shared + l) * 3] * Q[1] + metric[(i_shared + l) * 3 + 1] * Q[2] +
+                   metric[(i_shared + l) * 3 + 2] * Q[3]) / Q[0];
+        real ukPc = abs(Uk + c * grad_k);
+        real ukMc = abs(Uk - c * grad_k);
+        spec_rad[0] = max(spec_rad[0], ukMc);
+        spec_rad[1] = max(spec_rad[1], abs(Uk));
+        spec_rad[2] = max(spec_rad[2], ukPc);
+      }
+      spec_rad[0] = max(spec_rad[0], abs((Uk_bar - cm) * gradK));
+      spec_rad[1] = max(spec_rad[1], abs(Uk_bar * gradK));
+      spec_rad[2] = max(spec_rad[2], abs((Uk_bar + cm) * gradK));
+
+      for (int l = 0; l < 5; ++l) {
+        real lambda_l{spec_rad[1]};
+        if (l == 0) {
+          lambda_l = spec_rad[0];
+        } else if (l == 4) {
+          lambda_l = spec_rad[2];
+        }
+
+        real vPlus[7], vMinus[7];
+        memset(vPlus, 0, 7 * sizeof(real));
+        memset(vMinus, 0, 7 * sizeof(real));
+        for (int m = 0; m < 7; ++m) {
+          for (int n = 0; n < 5; ++n) {
+            vPlus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * 5 + n] + lambda_l * cv[(i_shared - 2 + m) * 7 + n] *
+                                                                     jac[i_shared - 2 + m]);
+            vMinus[m] += LR(l, n) * (Fm[(i_shared - 1 + m) * 5 + n] - lambda_l * cv[(i_shared - 1 + m) * 7 + n] *
+                                                                      jac[i_shared - 1 + m]);
+          }
+          vPlus[m] *= 0.5;
+          vMinus[m] *= 0.5;
+        }
+        fChar[l] = WENO7(vPlus, vMinus, eps_scaled);
       }
     }
   }

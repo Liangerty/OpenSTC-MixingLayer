@@ -32,31 +32,31 @@ __global__ void reduction_of_dv_squared(real *arr, int size) {
   __syncthreads();
 
   // ! Maybe not correct
-  int block2 = gxl::pow2ceil(blockDim.x); // next power of 2
-  for (int stride = block2 / 2; stride > 0; stride >>= 1) {
-    if (t < stride && t + stride < blockDim.x) {
-#pragma unroll
-      for (int l = 0; l < N; ++l) {
-        s[t * N + l] += s[(t + stride) * N + l];
-      }
-    }
-    __syncthreads();
-  }
-
-//  for (int stride = blockDim.x / 2, lst = blockDim.x & 1; stride >= 1; lst = stride & 1, stride >>= 1) {
-//    stride += lst;
-//    __syncthreads();
-//    if (t < stride) {
-//      //when t+stride is larger than #elements, there's no meaning of comparison. So when it happens, just keep the current value for parMax[t]. This always happens when an odd number of t satisfying the condition.
-//      if (t + stride < size) {
+//  int block2 = gxl::pow2ceil(blockDim.x); // next power of 2
+//  for (int stride = block2 / 2; stride > 0; stride >>= 1) {
+//    if (t < stride && t + stride < blockDim.x) {
 //#pragma unroll
-//        for (int l = 0; l < N; ++l) {
-//          s[t * N + l] += s[(t + stride) * N + l];
-//        }
+//      for (int l = 0; l < N; ++l) {
+//        s[t * N + l] += s[(t + stride) * N + l];
 //      }
 //    }
 //    __syncthreads();
 //  }
+
+  for (int stride = blockDim.x / 2, lst = blockDim.x & 1; stride >= 1; lst = stride & 1, stride >>= 1) {
+    stride += lst;
+    __syncthreads();
+    if (t < stride) {
+      //when t+stride is larger than #elements, there's no meaning of comparison. So when it happens, just keep the current value for parMax[t]. This always happens when an odd number of t satisfying the condition.
+      if (t + stride < size) {
+#pragma unroll
+        for (int l = 0; l < N; ++l) {
+          s[t * N + l] += s[(t + stride) * N + l];
+        }
+      }
+    }
+    __syncthreads();
+  }
 
   if (t == 0) {
     arr[blockIdx.x] = s[0];
@@ -67,6 +67,8 @@ __global__ void reduction_of_dv_squared(real *arr, int size) {
 }
 
 __global__ void reduction_of_dv_squared(real *arr, int size);
+
+__global__ void check_nan(cfd::DZone *zone, int blk, int myid);
 
 template<MixtureModel mix_model, class turb>
 real compute_residual(Driver<mix_model, turb> &driver, int step) {
@@ -158,11 +160,25 @@ real compute_residual(Driver<mix_model, turb> &driver, int step) {
     }
   }
 
+  bool have_nan = false;
+  if (isnan(err_max)) {
+    have_nan = true;
+  }
   if (driver.myid == 0) {
-    if (isnan(err_max)) {
+    if (have_nan) {
       printf("Nan occurred in step %d. Stop simulation.\n", step);
-      cfd::MpiParallel::exit();
     }
+  }
+  if (have_nan){
+    for (int b = 0; b < n_block; ++b) {
+      const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+      dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
+      // compute the square of the difference of the basic variables
+      check_nan<<<bpg, tpb>>>(field[b].d_ptr, b, driver.myid);
+    }
+    cudaDeviceSynchronize();
+    MPI_Barrier(MPI_COMM_WORLD);
+    cfd::MpiParallel::exit();
   }
 
   return err_max;
