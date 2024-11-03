@@ -164,11 +164,6 @@ real compute_residual(Driver<mix_model, turb> &driver, int step) {
   if (isnan(err_max)) {
     have_nan = true;
   }
-  if (driver.myid == 0) {
-    if (have_nan) {
-      printf("Nan occurred in step %d. Stop simulation.\n", step);
-    }
-  }
   if (have_nan){
     for (int b = 0; b < n_block; ++b) {
       const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
@@ -176,9 +171,14 @@ real compute_residual(Driver<mix_model, turb> &driver, int step) {
       // compute the square of the difference of the basic variables
       check_nan<<<bpg, tpb>>>(field[b].d_ptr, b, driver.myid);
     }
-    cudaDeviceSynchronize();
-    MPI_Barrier(MPI_COMM_WORLD);
-    cfd::MpiParallel::exit();
+  }
+  cudaDeviceSynchronize();
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (driver.myid == 0) {
+    if (have_nan) {
+      printf("Nan occurred in step %d. Stop simulation.\n", step);
+      cfd::MpiParallel::exit();
+    }
   }
 
   return err_max;
