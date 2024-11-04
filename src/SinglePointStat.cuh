@@ -7,7 +7,9 @@
 
 namespace cfd {
 
-__global__ void collect_single_point_statistics(DZone *zone, DParameter *param);
+__global__ void collect_single_point_basic_statistics(DZone *zone, DParameter *param);
+
+__global__ void collect_single_point_additional_statistics(DZone *zone, DParameter *param);
 
 class SinglePointStat {
 public:
@@ -57,7 +59,7 @@ private:
   std::vector<Field> &field;
   const Species &species;
 
-  MPI_Offset offset_unit[4]={0, 0, 0, 0};
+  MPI_Offset offset_unit[4] = {0, 0, 0, 0};
   std::vector<MPI_Datatype> ty_1gg, ty_0gg;
 
 private:

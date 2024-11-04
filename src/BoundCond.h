@@ -79,6 +79,9 @@ struct Inflow {
   // If the fluctuation type is 2, the following parameters should be given.
   int fluc_prof_idx = 0;
   real fluctuation_frequency = 0;
+
+  // For random values
+  real *random_phase = nullptr;
 };
 
 struct Wall {

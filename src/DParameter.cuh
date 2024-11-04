@@ -102,6 +102,7 @@ struct DParameter {
   real a_ref2 = 1.0;
   real v_ref = 1.0;
   real T_ref = 1.0;
+  real mach_ref = 0;
   real p_ref = 1.0;
   real weno_eps_scale = 1.0;
   real v_char = 1.0; // characteristic velocity

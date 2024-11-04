@@ -62,9 +62,9 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
       }
     }
     n_species_stat = (int) species_stat_index.size();
-    parameter.update_parameter("n_species_stat", n_species_stat);
-    parameter.update_parameter("species_stat_index", species_stat_index);
   }
+  parameter.update_parameter("n_species_stat", n_species_stat);
+  parameter.update_parameter("species_stat_index", species_stat_index);
   n_ps = parameter.get_int("n_ps");
 
   init_stat_name();
@@ -519,9 +519,11 @@ void SinglePointStat::collect_data(DParameter *param) {
   }
 
   for (int b = 0; b < mesh.n_block; ++b) {
-    const auto mx{mesh[b].mx + 2}, my{mesh[b].my + 2}, mz{mesh[b].mz + 2};
-    dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
-    collect_single_point_statistics<<<bpg, tpb>>>(field[b].d_ptr, param);
+    const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    dim3 bpg = {(mx + 2 - 1) / tpb.x + 1, (my + 2 - 1) / tpb.y + 1, (mz + 2 - 1) / tpb.z + 1};
+    collect_single_point_basic_statistics<<<bpg, tpb>>>(field[b].d_ptr, param);
+    dim3 bpg2 = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
+    collect_single_point_additional_statistics<<<bpg2, tpb>>>(field[b].d_ptr, param);
   }
 
   // Update the counters
@@ -649,7 +651,7 @@ void SinglePointStat::export_statistical_data(DParameter *param, bool perform_sp
   }
 }
 
-__global__ void collect_single_point_statistics(DZone *zone, DParameter *param) {
+__global__ void collect_single_point_basic_statistics(DZone *zone, DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - 1;
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - 1;
@@ -699,6 +701,14 @@ __global__ void collect_single_point_statistics(DZone *zone, DParameter *param) 
   for (int l = 0; l < param->n_scalar; ++l) {
     fav2nd(i, j, k, 7 + l) += rho * sv(i, j, k, l) * sv(i, j, k, l);
   }
+}
+
+__global__ void collect_single_point_additional_statistics(DZone *zone, DParameter *param) {
+  const int extent[3]{zone->mx, zone->my, zone->mz};
+  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   if (param->stat_tke_budget) {
     collect_tke_budget(zone, param, i, j, k);

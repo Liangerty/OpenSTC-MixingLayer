@@ -1097,7 +1097,14 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_common_data_s
 
 template<MixtureModel mix_model, class turb>
 void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::print_field(int step, real time) const {
-  // We assume the data have been copied by the IOManager.
+  if (step % parameter.get_int("output_file") != 0) {
+    // The data has not been updated.
+    // Copy data from GPU to CPU
+    for (auto &f: field) {
+      f.copy_data_from_device(parameter);
+    }
+  }
+
   const std::filesystem::path out_dir("output/time_series");
   MPI_File fp;
   char time_char[11];

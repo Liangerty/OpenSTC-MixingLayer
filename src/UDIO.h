@@ -12,7 +12,7 @@ namespace cfd {
 
 struct UserDefineIO {
   /**********************************************************************************************/
-  constexpr static int n_auxiliary = 1;
+  constexpr static int n_auxiliary = 0;
   constexpr static int n_static_auxiliary = 0;
   constexpr static int n_dynamic_auxiliary = n_auxiliary - n_static_auxiliary;
   /**********************************************************************************************/

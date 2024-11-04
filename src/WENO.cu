@@ -660,7 +660,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
   const int n_var = param->n_var;
 
   // 0: acans; 1: li xinliang(own flux splitting); 2: my(same spectral radius)
-  constexpr int method = 0;
+  constexpr int method = 1;
 
   if constexpr (method == 1) {
     compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],

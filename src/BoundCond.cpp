@@ -5,6 +5,7 @@
 #include "Parallel.h"
 #include "MixingLayer.cuh"
 #include "MixtureFraction.h"
+#include <random>
 
 cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
@@ -343,6 +344,18 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
                                    std::vector<std::string>{std::get<std::string>(info.at("fluctuation_file"))});
         parameter.update_parameter("fluctuation_profile_related_bc_name", std::vector<std::string>{inflow_name});
         fluc_prof_idx = 0;
+      }
+    }
+    if (fluctuation_type == 3) {
+      // The receptivity type of the inflow
+      random_phase = new real[199];
+      std::random_device rd;
+      std::mt19937 generator(rd());
+      std::uniform_real_distribution<real> distribution(0.0, 2 * pi);
+      for (int i = 0; i < 199; ++i) {
+        // use random number generator to generate the random values
+        random_phase[i] = distribution(generator);
+//        printf("random_phase[%d] = %e\n", i, random_phase[i]);
       }
     }
   }

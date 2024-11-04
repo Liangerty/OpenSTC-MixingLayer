@@ -496,6 +496,15 @@ void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &param
     cudaMalloc(&sv_lower, n_scalar * sizeof(real));
     cudaMemcpy(sv_lower, h_sv_lower, n_scalar * sizeof(real), cudaMemcpyHostToDevice);
   }
+  if (fluctuation_type == 3) {
+    // For the case of fluctuation_type == 3, we need to copy the fluctuation field to GPU.
+    real *h_rand_values = new real[199];
+    for (int l = 0; l < 199; ++l) {
+      h_rand_values[l] = random_phase[l];
+    }
+    cudaMalloc(&random_phase, sizeof(real) * 199);
+    cudaMemcpy(random_phase, h_rand_values, sizeof(real) * 199, cudaMemcpyHostToDevice);
+  }
 
   cudaMemcpy(d_inflow, this, sizeof(Inflow), cudaMemcpyHostToDevice);
 }

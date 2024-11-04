@@ -99,7 +99,7 @@ struct  freestream {
     string  type            =   inflow
     int     label           =   5
     int     inflow_type     =   1 // 0 for constant inflow, 1 for mixing-layer-type inflow, other types may be added(such as 2 for self-similar inflow)
-    int     fluctuation_type    =  0       // Specify the type of fluctuation. 0 for no fluctuation, 1 for fluctuation in velocity with white noise.
+    int     fluctuation_type    =  3       // Specify the type of fluctuation. 0 for no fluctuation, 1 for fluctuation in velocity with white noise.
     real    fluctuation_intensity    =   0.01    // Specify the intensity of fluctuation in velocity. The intensity is defined as the ratio of the standard deviation of the fluctuation to the mean value of the velocity.
     real    turb_viscosity_ratio	=	1
     real    turbulence_intensity               =   0.01

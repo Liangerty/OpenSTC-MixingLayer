@@ -265,11 +265,13 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       bv_fluc_real[1] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 1);
       bv_fluc_real[2] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 2);
       bv_fluc_real[3] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 3);
+      bv_fluc_real[4] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 4);
       bv_fluc_real[5] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 5);
       bv_fluc_imag[0] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 6);
       bv_fluc_imag[1] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 7);
       bv_fluc_imag[2] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 8);
       bv_fluc_imag[3] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 9);
+      bv_fluc_imag[4] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 10);
       bv_fluc_imag[5] = fluc_info(idx_fluc[0], idx_fluc[1], idx_fluc[2], 11);
 
       real x = zone->x(i, j, k), z = zone->z(i, j, k);
@@ -486,6 +488,32 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
 
       u += curand_normal_double(&rng_state) * rms * vel;
       vel = sqrt(u * u + v * v + w * w);
+    } else if (inflow->fluctuation_type == 3) {
+      //S mode waves with wide band frequencies and spanwise wavenumbers are induced
+      constexpr real CL = 3.953e-4;
+      constexpr real CU = 126.5e6;
+      real delta_f = 5000;
+      real t = param->physical_time;
+
+      real x = zone->x(i, j, k), z = zone->z(i, j, k);
+      for (int m = 0; m <= 198; ++m) {
+        real f = delta_f * m + 10000;
+        real alpha = 2.0 * pi * f / (1.0 - 1.0 / param->mach_ref) / param->v_ref;
+        real Am = 0;
+        if (f <= 40000) {
+          Am = sqrt(CL / f * delta_f * 0.5) * param->p_ref;
+        } else if (f > 40000) {
+          Am = sqrt(CU / pow(f, 3.5) * delta_f * 0.5) * param->p_ref;
+        }
+        const real disturbance = Am * cos(alpha * x - 2.0 * pi * f * t + inflow->random_phase[m]);
+        p += disturbance;
+        u -= disturbance * param->mach_ref / param->rho_ref / param->v_ref;
+        v += 0;
+        w += 0;
+        T += disturbance * (gamma_air - 1.0) * param->mach_ref * param->mach_ref / param->rho_ref / param->v_ref /
+             param->v_ref * param->T_ref;
+        density = p * mw_air / (R_u * T);
+      }
     }
   }
 
@@ -505,6 +533,36 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
   compute_cv_from_bv_1_point<mix_model, turb>(zone, param, i, j, k);
   for (int g = 1; g <= ngg; g++) {
     const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
+
+    if (inflow->fluctuation_type == 3) {
+      //S mode waves with wide band frequencies and spanwise wavenumbers are induced
+      constexpr real CL = 3.953e-4;
+      constexpr real CU = 126.5e6;
+      real delta_f = 5000;
+      real t = param->physical_time;
+
+      real x = zone->x(gi, gj, gk), z = zone->z(gi, gj, gk);
+      for (int m = 0; m <= 198; ++m) {
+        real f = delta_f * m + 10000;
+        real alpha = 2.0 * pi * f / (1.0 - 1.0 / param->mach_ref) / param->v_ref;
+        real Am = 0;
+        if (f <= 40000) {
+          Am = sqrt(CL / f * delta_f * 0.5) * param->p_ref;
+        } else if (f > 40000) {
+          Am = sqrt(CU / pow(f, 3.5) * delta_f * 0.5) * param->p_ref;
+        }
+        const real disturbance = Am * cos(alpha * x - 2.0 * pi * f * t + inflow->random_phase[m]);
+        p = inflow->pressure + disturbance;
+        u = inflow->u - disturbance * param->mach_ref / param->rho_ref / param->v_ref;
+        v = inflow->v;
+        w = inflow->w;
+        T = inflow->temperature +
+            disturbance * (gamma_air - 1.0) * param->mach_ref * param->mach_ref / param->rho_ref / param->v_ref /
+            param->v_ref * param->T_ref;
+        density = p * mw_air / (R_u * T);
+      }
+    }
+
     bv(gi, gj, gk, 0) = density;
     bv(gi, gj, gk, 1) = u;
     bv(gi, gj, gk, 2) = v;
@@ -856,7 +914,7 @@ apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *
   bv(i, j, k, 4) = p;
   bv(i, j, k, 5) = t_wall;
 
-  if (wall->if_blow_shock_wave && step >= 0 && step <= 50 && i < 21) {
+  if (wall->if_blow_shock_wave && step >= 0 && step <= 50) {
     gxl::Matrix<real, 3, 3, 1> bdjin;
     real d1 = zone->metric(i, j, k)(2, 1);
     real d2 = zone->metric(i, j, k)(2, 2);

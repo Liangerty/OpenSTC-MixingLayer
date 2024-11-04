@@ -181,16 +181,16 @@ void
 cfd::export_tke_budget_file(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, MPI_Offset offset_ahead,
                             std::vector<int> &counter, const std::vector<MPI_Datatype> &tys) {
   const std::filesystem::path out_dir("output/stat");
-  MPI_File fp_rey1;
+  MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/tke_budget.bin").c_str(),
-                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp_rey1);
+                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
   MPI_Status status;
 
   MPI_Offset offset = offset_ahead;
   constexpr int n_collect = TkeBudget::n_collect;
   const int myid = parameter.get_int("myid");
   if (myid == 0) {
-    MPI_File_write_at(fp_rey1, offset, counter.data(), n_collect, MPI_INT32_T, &status);
+    MPI_File_write_at(fp, offset, counter.data(), n_collect, MPI_INT32_T, &status);
     offset += 4 * n_collect;
   }
   constexpr int ngg = TkeBudget::ngg;
@@ -206,13 +206,14 @@ cfd::export_tke_budget_file(Parameter &parameter, const Mesh &mesh, std::vector<
     // However, the nx*ny*nz may be larger than 2^31, so we need to use MPI_Type_create_subarray to create a datatype
     MPI_Datatype ty = tys[b];
 
-    MPI_File_write_at(fp_rey1, offset, &mx, 1, MPI_INT32_T, &status);
+    MPI_File_write_at(fp, offset, &mx, 1, MPI_INT32_T, &status);
     offset += 4;
-    MPI_File_write_at(fp_rey1, offset, &my, 1, MPI_INT32_T, &status);
+    MPI_File_write_at(fp, offset, &my, 1, MPI_INT32_T, &status);
     offset += 4;
-    MPI_File_write_at(fp_rey1, offset, &mz, 1, MPI_INT32_T, &status);
+    MPI_File_write_at(fp, offset, &mz, 1, MPI_INT32_T, &status);
     offset += 4;
-    MPI_File_write_at(fp_rey1, offset, field[b].collect_tke_budget.data(), n_collect, ty, &status);
+    MPI_File_write_at(fp, offset, field[b].collect_tke_budget.data(), n_collect, ty, &status);
     offset += sz * n_collect;
   }
+  MPI_File_close(&fp);
 }

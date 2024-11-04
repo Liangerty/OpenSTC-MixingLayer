@@ -14,7 +14,7 @@ int cfd::add_other_variable_name(std::vector<std::string> &var_name, const Param
   const std::array<std::string, UserDefineIO::n_static_auxiliary> static_auxiliary_var_name =
       {/*"wall_distance"*/};
   const std::array<std::string, UserDefineIO::n_dynamic_auxiliary> dynamic_auxiliary_var_name =
-      {"fd"/*"StrainRate", "Vorticity", "F2"*/};
+      {/*"fd""StrainRate", "Vorticity", "F2"*/};
   /**********************************************************************************************/
 
   auto z_iter = var_name.cbegin() + 3;

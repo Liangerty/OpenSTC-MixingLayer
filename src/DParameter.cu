@@ -26,7 +26,8 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     v_ref{parameter.get_real("v_inf")}, T_ref{parameter.get_real("T_inf")},
     p_ref{parameter.get_real("p_inf")}, weno_eps_scale{
     parameter.get_real("rho_inf") * parameter.get_real("v_inf") * parameter.get_real("rho_inf") *
-    parameter.get_real("v_inf")}, sponge_layer{parameter.get_bool("sponge_layer")},
+    parameter.get_real("v_inf")}, mach_ref{parameter.get_real("M_inf")},
+    sponge_layer{parameter.get_bool("sponge_layer")},
     sponge_function{parameter.get_int("sponge_function")},
     sponge_iter{parameter.get_int("sponge_iter")}, spongeXPlusStart{parameter.get_real("spongeXPlusStart")},
     spongeXPlusEnd{parameter.get_real("spongeXPlusEnd")}, spongeXMinusStart{parameter.get_real("spongeXMinusStart")},

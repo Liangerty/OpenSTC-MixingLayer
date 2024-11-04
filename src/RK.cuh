@@ -217,7 +217,7 @@ void RK3(Driver<mix_model, turb> &driver) {
     }
     err = cudaGetLastError();
     if (err != cudaSuccess) {
-      printf("Error: %s\n", cudaGetErrorString(err));
+      printf("Process %d, Error: %s\n", driver.myid, cudaGetErrorString(err));
       MpiParallel::exit();
     }
   }

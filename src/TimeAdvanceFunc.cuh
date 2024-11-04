@@ -157,8 +157,6 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param) {
       }
     }
 
-    __syncthreads();
-
     // Compute the average of the surrounding points
     if (kn > 0) {
       const real kn_inv{1.0 / kn};
