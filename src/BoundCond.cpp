@@ -16,6 +16,10 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
   if (parameter.get_int("problem_type") == 0 && inflow_type == 2)
     inflow_type = 0;
   if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<int>(info.at("fluctuation_type"));
+  if (inflow_type !=2 && fluctuation_type == 11){
+    // The digital filter is only for mixing layers.
+    fluctuation_type = 0;
+  }
 
   const int n_scalar = parameter.get_int("n_scalar");
   const int n_spec{spec.n_spec};
@@ -355,7 +359,6 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       for (int i = 0; i < 199; ++i) {
         // use random number generator to generate the random values
         random_phase[i] = distribution(generator);
-//        printf("random_phase[%d] = %e\n", i, random_phase[i]);
       }
     }
   }

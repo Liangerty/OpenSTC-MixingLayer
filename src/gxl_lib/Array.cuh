@@ -3,6 +3,49 @@
 #include "Array.hpp"
 
 namespace ggxl {
+template<typename T>
+class Array1D {
+private:
+  int dispt = 0;
+  int sz = 0;
+  T *val = nullptr;
+
+public:
+
+  cudaError_t allocate_memory(int dim1, int n_ghost = 0);
+
+  __device__ T &operator()(const int i) {
+    return val[i + dispt];
+  }
+
+  __device__ const T &operator()(const int i) const {
+    return val[i + dispt];
+  }
+
+  T *data() { return val; }
+
+  auto size() { return sz; }
+
+  cudaError_t deallocate_memory() {
+    cudaError_t err = cudaFree(val);
+    return err;
+  }
+};
+
+template<typename T>
+inline cudaError_t Array1D<T>::allocate_memory(int dim1, int n_ghost) {
+  int ng = n_ghost;
+  int n1 = dim1;
+
+  dispt = ng;
+  sz = n1 + 2 * ng;
+
+  cudaError_t err = cudaMalloc(&val, sz * sizeof(T));
+  cudaMemset(val, 0, sz * sizeof(T));
+
+  return err;
+}
+
 template<typename T, Major major = Major::ColMajor>
 class Array3D {
 private:
@@ -398,6 +441,56 @@ void VectorField3DHost<T, major>::resize(int ni, int nj, int nk, int nl, int ngg
   n1 = ni;
   n2 = nj;
   n3 = nk;
+}
+
+template<typename T>
+class VectorField1D {
+private:
+  int n2 = 0, dispt = 0;
+  int sz = 0;
+  T *val = nullptr;
+
+public:
+
+  cudaError_t allocate_memory(int dim1, int dim2, int n_ghost);
+
+  __device__ T &operator()(const int i, const int l) {
+    return val[i + dispt + l * sz];
+  }
+
+  __device__ const T &operator()(const int i, const int l) const {
+    return val[i + dispt + l * sz];
+  }
+
+  T *operator[](int l) {
+    return val + l * sz;
+  }
+
+  const T *operator[](int l) const {
+    return val + l * sz;
+  }
+
+  T *data() { return val; }
+
+  auto size() { return sz; }
+
+  cudaError_t deallocate_memory() {
+    cudaError_t err = cudaFree(val);
+    return err;
+  }
+};
+
+template<typename T>
+inline cudaError_t VectorField1D<T>::allocate_memory(int dim1, int dim2, int n_ghost) {
+  int ng = n_ghost;
+  int n1 = dim1;
+  n2 = dim2;
+  // Column major
+  dispt = ng;
+  sz = n1 + 2 * ng;
+  cudaError_t err = cudaMalloc(&val, sz * n2 * sizeof(T));
+  cudaMemset(val, 0, sz * n2 * sizeof(T));
+  return err;
 }
 
 }

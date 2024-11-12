@@ -22,6 +22,7 @@ list(APPEND src_file
     SchemeSelector.cuh SourceTerm.cuh SST.cuh SST.cu SteadySim.cuh Simulate.cuh
     SpongeLayer.cu SpongeLayer.cuh SinglePointStat.cu SinglePointStat.cuh
     Transport.cuh Transport.cu TimeAdvanceFunc.cu TimeAdvanceFunc.cuh Thermo.cuh Thermo.cu TurbMethod.hpp
+    TurbInflow.cu TurbInflow.cuh
     UDIO.h UDIO.cu
     ViscousScheme.cuh
     WallDistance.cuh WENO.cu

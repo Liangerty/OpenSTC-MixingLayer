@@ -5,6 +5,7 @@
 #include "WallDistance.cuh"
 #include "MixingLayer.cuh"
 #include "SpongeLayer.cuh"
+#include "TurbInflow.cuh"
 
 namespace cfd {
 
@@ -35,6 +36,7 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
   }
   printf("\tProcess [[%d]] has finished setting up device memory.\n", myid);
   bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter);
+  initialize_digital_filter(parameter, mesh_, bound_cond);
 
   initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec);
 
@@ -85,7 +87,7 @@ void Driver<mix_model, turb>::initialize_computation() {
 
   // Second, apply boundary conditions to all boundaries, including face communication between faces
   for (int b = 0; b < mesh.n_block; ++b) {
-    bound_cond.apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param);
+    bound_cond.apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param, false, 0);
   }
   printf("\tProcess [[%d]] has finished applying boundary conditions for initialization\n", myid);
 

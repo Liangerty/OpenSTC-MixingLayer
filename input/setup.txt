@@ -14,10 +14,10 @@ range real coreRegion = {  // The core region of computation. Only grids in core
 }
 
 // controls
-int initial = 1     // 0 - new case, 1 - continue from a previous case.
-int total_step = 50  // total number of steps
-int output_file = 25  // frequency of output files
-int output_screen = 10 // frequency of screen output
+int initial = 0     // 0 - new case, 1 - continue from a previous case.
+int total_step = 10  // total number of steps
+int output_file = 10  // frequency of output files
+int output_screen = 1 // frequency of screen output
 int output_time_series = 0 // frequency of output time series data. 0 - Not output, else - output every output_time_series steps.
 bool limit_flow = 0     // 0 - no limit, 1 - limit the flow field.
 
@@ -89,6 +89,16 @@ bool    turbulence = 0                  // 0 - laminar/DNS, 1 - turbulent
 int     turbulence_method = 1           // Turbulence model used. Options: 0 - DNS, 1 - RANS, 2 - DES, LES
 int     RANS_model = 2                  // RANS model used. Options: 2 - k-omega_SST, 1 - S-A
 int     turb_implicit   =   1           // If we use RANS, choose whether the source terms are implicitly treated. 1 - Yes(Default), 0 - No
+int     reynolds_stress_supplier = 2    // 0 - No, 1 - read from file, 2 - assume gaussian peak
+array real df_reynolds_gaussian_peak {
+    // The relative order should not be changed.
+    0.193   // R11
+    0.117   // R12
+    0.128   // R22
+    0.1     // R13
+    0.1     // R23
+    0.131   // R33
+}
 
 // bc info
 array string boundary_conditions {
@@ -99,7 +109,7 @@ struct  freestream {
     string  type            =   inflow
     int     label           =   5
     int     inflow_type     =   1 // 0 for constant inflow, 1 for mixing-layer-type inflow, other types may be added(such as 2 for self-similar inflow)
-    int     fluctuation_type    =  3       // Specify the type of fluctuation. 0 for no fluctuation, 1 for fluctuation in velocity with white noise.
+    int     fluctuation_type    =  11       // Specify the type of fluctuation. 0 for no fluctuation, 1 for fluctuation in velocity with white noise.
     real    fluctuation_intensity    =   0.01    // Specify the intensity of fluctuation in velocity. The intensity is defined as the ratio of the standard deviation of the fluctuation to the mean value of the velocity.
     real    turb_viscosity_ratio	=	1
     real    turbulence_intensity               =   0.01

@@ -453,6 +453,7 @@ void cfd::Parameter::setup_default_settings() {
   // If we conduct transient simulations, the following parameters are used by default.
   int_parameters["temporal_scheme"] = 3; // RK3 is used by default
   bool_parameters["fixed_time_step"] = false; // The time step is computed with CFL condition.
+  real_parameters["dt"] = 1e-8;
   real_parameters["n_flowThroughTime"] = -1;
   real_parameters["domain_length"] = 1.0;
   real_parameters["characteristic_velocity"] = -1;
@@ -523,6 +524,8 @@ void cfd::Parameter::setup_default_settings() {
   string_array["fluctuation_profile_related_bc_name"] = {};
   bool_parameters["perform_spanwise_average"] = false;
   bool_parameters["positive_preserving"] = false;
+
+  int_array["df_label"] = {};
 
   bool_parameters["sponge_layer"] = false;
   int_parameters["sponge_function"] = 0; // 0 - (Nektar++, CPC, 2024)

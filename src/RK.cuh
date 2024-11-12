@@ -82,6 +82,8 @@ void RK3(Driver<mix_model, turb> &driver) {
   const int collect_statistics_iter_start{parameter.get_int("start_collect_statistics_iter")};
   auto &statistics_collector{driver.stat_collector};
 
+  bool update_df{true};
+
   while (!finished) {
     ++step;
 
@@ -152,7 +154,7 @@ void RK3(Driver<mix_model, turb> &driver) {
         // the compiler will not treat the called function as a template function,
         // so we need to explicitly specify the "template" keyword here.
         // If we call this function in the "driver" member function, we can omit the "template" keyword, as shown in Driver.cu, line 88.
-        driver.bound_cond.template apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param);
+        driver.bound_cond.template apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param, update_df, 0);
       }
       // Third, transfer data between and within processes
       data_communication<mix_model, turb>(mesh, field, parameter, step, param);

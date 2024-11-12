@@ -215,6 +215,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
     } else {
       v_char = parameter.get_real("DeltaU");
     }
+    delta_u = parameter.get_real("DeltaU");
   } else {
     v_char = parameter.get_real("v_inf");
   }

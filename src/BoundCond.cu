@@ -1452,4 +1452,155 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
                cudaMemcpyHostToDevice);
   }
 }
+
+void DBoundCond::initialize_df_memory(const Mesh &mesh, const Parameter &parameter, std::vector<int> &N1,
+                                      std::vector<int> &N2) {
+  df_lundMatrix_hPtr = new ggxl::VectorField1D<real>[n_df_face];
+  df_by_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+  df_bz_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+  rng_states_hPtr = new ggxl::VectorField2D<curandState>[n_df_face];
+  random_values_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+  df_fy_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+  df_velFluc_old_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+  df_velFluc_new_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+
+  const int ngg = mesh.ngg;
+  for (int i = 0; i < n_df_face; ++i) {
+    int my = N1[i], mz = N2[i];
+    df_lundMatrix_hPtr[i].allocate_memory(my, 6, ngg);
+    df_by_hPtr[i].allocate_memory(my, 1, 3, std::max(ngg, DF_N));
+    df_bz_hPtr[i].allocate_memory(my, 1, 3, std::max(ngg, DF_N));
+    rng_states_hPtr[i].allocate_memory(my, mz, 3, DF_N + ngg);
+    random_values_hPtr[i].allocate_memory(my, mz, 3, DF_N + ngg);
+    df_fy_hPtr[i].allocate_memory(my, mz, 3, DF_N + ngg);
+    df_velFluc_old_hPtr[i].allocate_memory(my, mz, 3, ngg);
+    df_velFluc_new_hPtr[i].allocate_memory(my, mz, 3, ngg);
+  }
+
+  cudaMalloc(&df_lundMatrix_dPtr, n_df_face * sizeof(ggxl::VectorField1D<real>));
+  cudaMemcpy(df_lundMatrix_dPtr, df_lundMatrix_hPtr, n_df_face * sizeof(ggxl::VectorField1D<real>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&df_by_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_by_dPtr, df_by_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>), cudaMemcpyHostToDevice);
+  cudaMalloc(&df_bz_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_bz_dPtr, df_bz_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>), cudaMemcpyHostToDevice);
+  cudaMalloc(&rng_states_dPtr, n_df_face * sizeof(ggxl::VectorField2D<curandState>));
+  cudaMemcpy(rng_states_dPtr, rng_states_hPtr, n_df_face * sizeof(ggxl::VectorField2D<curandState>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&random_values_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(random_values_dPtr, random_values_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&df_fy_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_fy_dPtr, df_fy_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>), cudaMemcpyHostToDevice);
+  cudaMalloc(&df_velFluc_old_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_velFluc_old_dPtr, df_velFluc_old_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&df_velFluc_new_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_velFluc_new_dPtr, df_velFluc_new_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>),
+             cudaMemcpyHostToDevice);
+}
+
+void DBoundCond::generate_random_numbers(int my, int mz, int ngg, int iFace) const {
+  dim3 TPB(32, 32);
+  dim3 BPG{((my + 2 * DBoundCond::DF_N + 2 * ngg + TPB.x - 1) / TPB.x),
+           ((mz + 2 * DBoundCond::DF_N + 2 * ngg + TPB.y - 1) / TPB.y)};
+  generate_random_numbers_kernel<<<BPG, TPB>>>(rng_states_dPtr, iFace, my, mz, random_values_dPtr, ngg);
+
+  BPG = {(my + 2 * DBoundCond::DF_N + 2 * ngg - 1) / TPB.x + 1, ((DBoundCond::DF_N + TPB.y - 1) / TPB.y), 1};
+  apply_periodic_in_spanwise<<<BPG, TPB>>>(random_values_dPtr, iFace, my, mz, ngg);
+}
+
+void DBoundCond::apply_convolution(int my, int mz, int ngg, int iFace) const {
+  dim3 TPB(32, 8);
+  dim3 BPG{((my + 2 * ngg + TPB.x - 1) / TPB.x),
+           ((mz + 2 * ngg + 2 * DBoundCond::DF_N + TPB.y - 1) / TPB.y)};
+  perform_convolution<<<BPG, TPB>>>(random_values_dPtr, df_by_dPtr, df_fy_dPtr, iFace, my, mz,
+                                    df_velFluc_new_dPtr, df_bz_dPtr, ngg);
+}
+
+__global__ void
+generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int iFace, int my,
+                               int mz, ggxl::VectorField2D<real> *random_numbers, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
+  if (j >= my + DBoundCond::DF_N + ngg || j < -DBoundCond::DF_N - ngg ||
+      k >= mz + DBoundCond::DF_N + ngg || k < -DBoundCond::DF_N - ngg) {
+    return;
+  }
+
+  auto &rng_state1 = rng_states[iFace](j, k, 0);
+  auto &rng_state2 = rng_states[iFace](j, k, 1);
+  auto &rng_state3 = rng_states[iFace](j, k, 2);
+
+  random_numbers[iFace](j, k, 0) = curand_normal_double(&rng_state1);
+  random_numbers[iFace](j, k, 1) = curand_normal_double(&rng_state2);
+  random_numbers[iFace](j, k, 2) = curand_normal_double(&rng_state3);
+}
+
+__global__ void
+apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) + 1;
+  if (j < -DBoundCond::DF_N - ngg || j >= my + DBoundCond::DF_N + ngg || k > DBoundCond::DF_N) {
+    return;
+  }
+
+  auto &r = random_numbers[iFace];
+  r(j, mz - 1 + k, 0) = r(j, k, 0);
+  r(j, -k, 0) = r(j, mz - 1 - k, 0);
+  r(j, mz - 1 + k, 1) = r(j, k, 1);
+  r(j, -k, 1) = r(j, mz - 1 - k, 1);
+  r(j, mz - 1 + k, 2) = r(j, k, 2);
+  r(j, -k, 2) = r(j, mz - 1 - k, 2);
+}
+
+__global__ void
+perform_convolution(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
+                    ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
+                    ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg - DBoundCond::DF_N;
+  if (j >= my + ngg || k < -DBoundCond::DF_N - ngg || k >= mz + DBoundCond::DF_N + ngg) {
+    return;
+  }
+
+  auto &by = df_by[iFace];
+  auto &r = random_numbers[iFace];
+
+  auto &fy = df_fy[iFace];
+  auto &fy0 = fy(j, k, 0);
+  auto &fy1 = fy(j, k, 1);
+  auto &fy2 = fy(j, k, 2);
+
+  // y convolution
+  fy0 = 0;
+  fy1 = 0;
+  fy2 = 0;
+
+  for (int jj = -DBoundCond::DF_N; jj <= DBoundCond::DF_N; ++jj) {
+    fy0 += by(j, jj, 0) * r(j + jj, k, 0);
+    fy1 += by(j, jj, 1) * r(j + jj, k, 1);
+    fy2 += by(j, jj, 2) * r(j + jj, k, 2);
+  }
+  __syncthreads();
+
+  // z convolution
+  if (k >= -ngg && k < mz + ngg) {
+    auto &bz = df_bz[iFace];
+    auto &upp = velFluc[iFace](j, k, 0);
+    auto &vpp = velFluc[iFace](j, k, 1);
+    auto &wpp = velFluc[iFace](j, k, 2);
+
+    upp = 0;
+    vpp = 0;
+    wpp = 0;
+
+    for (int kk = -DBoundCond::DF_N; kk <= DBoundCond::DF_N; ++kk) {
+      upp += bz(j, kk, 0) * fy(j, k + kk, 0);
+      vpp += bz(j, kk, 1) * fy(j, k + kk, 1);
+      wpp += bz(j, kk, 2) * fy(j, k + kk, 2);
+    }
+  }
+}
+
 }

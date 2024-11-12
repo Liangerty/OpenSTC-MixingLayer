@@ -106,6 +106,7 @@ struct DParameter {
   real p_ref = 1.0;
   real weno_eps_scale = 1.0;
   real v_char = 1.0; // characteristic velocity
+  real delta_u = 0; // The difference between the velocity of the two streams in the mixing layer
 
   // stat data info
   int n_reyAve = 0;
