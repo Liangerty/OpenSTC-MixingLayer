@@ -51,8 +51,7 @@ time_correlation(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::ve
                  real dt);
 
 // 7. compute the fluctuations!
-void compute_fluctuations(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::vector<int> &N1,
-                          std::vector<int> &N2, int ngg);
+void compute_fluctuations(cfd::DBoundCond &dBoundCond, std::vector<int> &N1, std::vector<int> &N2, int ngg);
 
 
 __global__ void

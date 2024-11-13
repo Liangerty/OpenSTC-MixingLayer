@@ -59,7 +59,7 @@ struct upper_stream = {
     real ps4 = 1
 }
 struct lower_stream = {
-    real temperature = 3304.504458
+    real temperature = 230
     real pressure = 100000
     real O2 = 0.232
     real N2 = 0.768
@@ -92,12 +92,12 @@ int     turb_implicit   =   1           // If we use RANS, choose whether the so
 int     reynolds_stress_supplier = 2    // 0 - No, 1 - read from file, 2 - assume gaussian peak
 array real df_reynolds_gaussian_peak {
     // The relative order should not be changed.
-    0.193   // R11
-    0.117   // R12
-    0.128   // R22
-    0.1     // R13
-    0.1     // R23
-    0.131   // R33
+    0.15    // R11
+    0.09    // R12
+    0.12    // R22
+    0.05     // R13
+    0.05     // R23
+    0.118   // R33
 }
 
 // bc info

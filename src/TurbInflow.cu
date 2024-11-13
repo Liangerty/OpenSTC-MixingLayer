@@ -84,9 +84,8 @@ void cfd::initialize_digital_filter(Parameter &parameter, Mesh &mesh, DBoundCond
           }
           dz /= (n2 - 1);
 
-          printf("Inflow boundary %s with (%d, %d) grid points for digital filter on  process %d, dz = %f.\n",
-                 boundary_name.c_str(),
-                 n1, n2, myid, dz);
+          printf("\tInflow boundary %s with (%d, %d) grid points for digital filter on  process %d, dz = %f.\n",
+                 boundary_name.c_str(), n1, n2, myid, dz);
 
           N1.push_back(n1);
           N2.push_back(n2);
@@ -137,7 +136,7 @@ void cfd::initialize_digital_filter(Parameter &parameter, Mesh &mesh, DBoundCond
   cudaMemcpy(dBoundCond.fluctuation_dPtr, fluctuation_hPtr.data(),
              dBoundCond.n_df_face * sizeof(ggxl::VectorField3D<real>),
              cudaMemcpyHostToDevice);
-  compute_fluctuations(parameter, dBoundCond, N1, N2, mesh.ngg);
+  compute_fluctuations(dBoundCond, N1, N2, mesh.ngg);
   if (myid == 0)
     printf("\tThe velocity fluctuations are computed.\n");
 
@@ -307,8 +306,7 @@ void cfd::time_correlation(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCon
 
 }
 
-void cfd::compute_fluctuations(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::vector<int> &N1,
-                               std::vector<int> &N2, int ngg) {
+void cfd::compute_fluctuations(cfd::DBoundCond &dBoundCond, std::vector<int> &N1, std::vector<int> &N2, int ngg) {
   for (int iFace = 0; iFace < dBoundCond.n_df_face; ++iFace) {
     int my = N1[iFace], mz = N2[iFace];
     dim3 TPB(32, 32);

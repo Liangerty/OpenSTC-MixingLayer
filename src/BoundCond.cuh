@@ -103,6 +103,9 @@ struct DBoundCond {
 
 private:
   void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field);
+
+  void
+  compute_fluctuations(int my, int mz, int ngg, int iFace, DParameter *param, DZone *zone, Inflow *inflowHere) const;
 };
 
 void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, int n_bc, int **sep, int blk_idx, int n_block,
@@ -120,9 +123,19 @@ generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int
 __global__ void
 apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg);
 
+__global__ void
+remove_mean_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg);
+
 __global__ void perform_convolution(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
                                     ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
                                     ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg);
+
+__global__ void
+Castro_time_correlation_and_fluc_computation(ggxl::VectorField2D<real> *velFluc_old,
+                                             ggxl::VectorField2D<real> *velFluc_new, int iFace, int my, int mz,
+                                             int ngg, DParameter *param, DZone *zone, Inflow *inflow,
+                                             ggxl::VectorField3D<real> *fluctuation_dPtr,
+                                             ggxl::VectorField1D<real> *lundMatrix_dPtr);
 
 template<MixtureModel mix_model, class turb>
 __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
@@ -619,7 +632,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
 template<MixtureModel mix_model, class turb>
 __global__ void
 apply_inflow_df(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::VectorField3D<real> *profile_d_ptr,
-                curandState *rng_states_d_ptr, ggxl::VectorField3D<real> *fluctuation_dPtr) {
+                curandState *rng_states_d_ptr, ggxl::VectorField3D<real> *fluctuation_dPtr, int df_iFace) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
@@ -679,9 +692,11 @@ apply_inflow_df(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl
   // The outermost ghost grid
   int ig = ngg;
   const int gi{i + ig * dir[0]}, gj{j + ig * dir[1]}, gk{k + ig * dir[2]};
-  real u_fluc = fluctuation_dPtr[i_face](0, gj, gk, 0) * param->delta_u;
-  real v_fluc = fluctuation_dPtr[i_face](0, gj, gk, 1) * param->delta_u;
-  real w_fluc = fluctuation_dPtr[i_face](0, gj, gk, 2) * param->delta_u;
+//  if (j == 108)
+//    printf("i = %d, j = %d, k = %d, gi = %d, gj = %d, gk = %d\n", i, j, k, gi, gj, gk);
+  real u_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 0) * param->delta_u;
+  real v_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 1) * param->delta_u;
+  real w_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 2) * param->delta_u;
   real gamma{gamma_air}, mw{mw_air};
   real T = y > 0 ? inflow->temperature : inflow->t_lower;
   real rho = y > 0 ? inflow->density : inflow->density_lower;
@@ -1537,10 +1552,10 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         if (update_df) {
           generate_random_numbers(n_point[1], n_point[2], ngg, df_label[l]);
           apply_convolution(n_point[1], n_point[2], ngg, df_label[l]);
-          // TODO: Castro's time correlation
-          // TODO: Compute the fluctuation field
+          compute_fluctuations(n_point[1], n_point[2], ngg, df_label[l], param, field.d_ptr, &inflow[l]);
           apply_inflow_df<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param,
-                                                          profile_dPtr_withGhost, rng_d_ptr, fluctuation_dPtr);
+                                                          profile_dPtr_withGhost, rng_d_ptr, fluctuation_dPtr,
+                                                          df_label[l]);
         }
       } else {
         apply_inflow<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param,

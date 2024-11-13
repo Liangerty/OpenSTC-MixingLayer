@@ -1501,12 +1501,20 @@ void DBoundCond::initialize_df_memory(const Mesh &mesh, const Parameter &paramet
 }
 
 void DBoundCond::generate_random_numbers(int my, int mz, int ngg, int iFace) const {
+  // 1. Generate random numbers
   dim3 TPB(32, 32);
   dim3 BPG{((my + 2 * DBoundCond::DF_N + 2 * ngg + TPB.x - 1) / TPB.x),
            ((mz + 2 * DBoundCond::DF_N + 2 * ngg + TPB.y - 1) / TPB.y)};
   generate_random_numbers_kernel<<<BPG, TPB>>>(rng_states_dPtr, iFace, my, mz, random_values_dPtr, ngg);
 
-  BPG = {(my + 2 * DBoundCond::DF_N + 2 * ngg - 1) / TPB.x + 1, ((DBoundCond::DF_N + TPB.y - 1) / TPB.y), 1};
+  // 2. remove the mean spanwise
+  TPB = 256;
+  BPG = (my + 2 * DBoundCond::DF_N + 2 * ngg - 1) / TPB.x + 1;
+  remove_mean_spanwise<<<BPG, TPB>>>(random_values_dPtr, iFace, my, mz, ngg);
+
+  // 3. Apply periodic boundary condition in spanwise direction
+  TPB = {32, 32};
+  BPG = {(my + 2 * DBoundCond::DF_N + 2 * ngg - 1) / TPB.x + 1, ((DBoundCond::DF_N + TPB.y - 1) / TPB.y)};
   apply_periodic_in_spanwise<<<BPG, TPB>>>(random_values_dPtr, iFace, my, mz, ngg);
 }
 
@@ -1516,6 +1524,16 @@ void DBoundCond::apply_convolution(int my, int mz, int ngg, int iFace) const {
            ((mz + 2 * ngg + 2 * DBoundCond::DF_N + TPB.y - 1) / TPB.y)};
   perform_convolution<<<BPG, TPB>>>(random_values_dPtr, df_by_dPtr, df_fy_dPtr, iFace, my, mz,
                                     df_velFluc_new_dPtr, df_bz_dPtr, ngg);
+}
+
+void
+DBoundCond::compute_fluctuations(int my, int mz, int ngg, int iFace, DParameter *param, DZone *zone,
+                                 Inflow *inflowHere) const {
+  dim3 TPB(32, 8);
+  dim3 BPG{((my + 2 * ngg + TPB.x - 1) / TPB.x), ((mz + 2 * ngg + TPB.y - 1) / TPB.y)};
+  Castro_time_correlation_and_fluc_computation<<<BPG, TPB>>>(df_velFluc_old_dPtr, df_velFluc_new_dPtr, iFace, my, mz,
+                                                             ngg, param, zone, inflowHere, fluctuation_dPtr,
+                                                             df_lundMatrix_dPtr);
 }
 
 __global__ void
@@ -1528,20 +1546,16 @@ generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int
     return;
   }
 
-  auto &rng_state1 = rng_states[iFace](j, k, 0);
-  auto &rng_state2 = rng_states[iFace](j, k, 1);
-  auto &rng_state3 = rng_states[iFace](j, k, 2);
-
-  random_numbers[iFace](j, k, 0) = curand_normal_double(&rng_state1);
-  random_numbers[iFace](j, k, 1) = curand_normal_double(&rng_state2);
-  random_numbers[iFace](j, k, 2) = curand_normal_double(&rng_state3);
+  random_numbers[iFace](j, k, 0) = curand_normal_double(&rng_states[iFace](j, k, 0));
+  random_numbers[iFace](j, k, 1) = curand_normal_double(&rng_states[iFace](j, k, 1));
+  random_numbers[iFace](j, k, 2) = curand_normal_double(&rng_states[iFace](j, k, 2));
 }
 
 __global__ void
 apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
   int k = int(blockIdx.y * blockDim.y + threadIdx.y) + 1;
-  if (j < -DBoundCond::DF_N - ngg || j >= my + DBoundCond::DF_N + ngg || k > DBoundCond::DF_N) {
+  if (j >= my + DBoundCond::DF_N + ngg || k > DBoundCond::DF_N) {
     return;
   }
 
@@ -1560,7 +1574,7 @@ perform_convolution(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField
                     ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
   int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg - DBoundCond::DF_N;
-  if (j >= my + ngg || k < -DBoundCond::DF_N - ngg || k >= mz + DBoundCond::DF_N + ngg) {
+  if (j >= my + ngg || k >= mz + DBoundCond::DF_N + ngg) {
     return;
   }
 
@@ -1601,6 +1615,86 @@ perform_convolution(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField
       wpp += bz(j, kk, 2) * fy(j, k + kk, 2);
     }
   }
+}
+
+__global__ void remove_mean_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  if (j >= my + DBoundCond::DF_N + ngg) {
+    return;
+  }
+
+  auto &r = random_numbers[iFace];
+
+  real mean[3]{0, 0, 0}, rms[3]{0, 0, 0};
+  for (int k = 0; k < mz; ++k) {
+    mean[0] += r(j, k, 0);
+    mean[1] += r(j, k, 1);
+    mean[2] += r(j, k, 2);
+
+    rms[0] += r(j, k, 0) * r(j, k, 0);
+    rms[1] += r(j, k, 1) * r(j, k, 1);
+    rms[2] += r(j, k, 2) * r(j, k, 2);
+  }
+  real mz_inv = 1.0 / mz;
+  mean[0] *= mz_inv;
+  mean[1] *= mz_inv;
+  mean[2] *= mz_inv;
+
+  rms[0] = sqrt(rms[0] * mz_inv - mean[0] * mean[0]);
+  rms[1] = sqrt(rms[1] * mz_inv - mean[1] * mean[1]);
+  rms[2] = sqrt(rms[2] * mz_inv - mean[2] * mean[2]);
+
+  for (int k = 0; k < mz; ++k) {
+    r(j, k, 0) = (r(j, k, 0) - mean[0]) / rms[0];
+    r(j, k, 1) = (r(j, k, 1) - mean[1]) / rms[1];
+    r(j, k, 2) = (r(j, k, 2) - mean[2]) / rms[2];
+  }
+}
+
+__global__ void
+Castro_time_correlation_and_fluc_computation(ggxl::VectorField2D<real> *velFluc_old,
+                                             ggxl::VectorField2D<real> *velFluc_new, int iFace, int my, int mz,
+                                             int ngg, DParameter *param, DZone *zone, Inflow *inflow,
+                                             ggxl::VectorField3D<real> *fluctuation_dPtr,
+                                             ggxl::VectorField1D<real> *lundMatrix_dPtr) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  if (j >= my + ngg || k >= mz + ngg) {
+    return;
+  }
+
+  const real dt = 1.0 / 3.0 * param->dt;
+
+  const real u_upper = inflow->u, u_lower = inflow->u_lower;
+  auto y = zone->y(0, j, k);
+  const real y_ref = inflow->delta_omega;
+  real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / y_ref);
+
+  // The integral timescale is treated as a single value here, thus only the first element is used.
+  real tLen_x = y_ref / u;
+  //real tLen_y = y_ref / u;
+  //real tLen_z = y_ref / u;
+
+  real PiDtDivTInt = -pi * dt / tLen_x;
+
+  real arg1 = exp(PiDtDivTInt * 0.5);
+  real arg2 = sqrt(1 - exp(PiDtDivTInt));
+
+  auto &old = velFluc_old[iFace];
+  auto &vf = velFluc_new[iFace];
+
+  vf(j, k, 0) = arg1 * old(j, k, 0) + arg2 * vf(j, k, 0);
+  vf(j, k, 1) = arg1 * old(j, k, 1) + arg2 * vf(j, k, 1);
+  vf(j, k, 2) = arg1 * old(j, k, 2) + arg2 * vf(j, k, 2);
+  old(j, k, 0) = vf(j, k, 0);
+  old(j, k, 1) = vf(j, k, 1);
+  old(j, k, 2) = vf(j, k, 2);
+
+  auto &lund = lundMatrix_dPtr[iFace];
+  auto &fluc = fluctuation_dPtr[iFace];
+  fluc(0, j, k, 0) = lund(j, 0) * vf(j, k, 0);
+  fluc(0, j, k, 1) = lund(j, 1) * vf(j, k, 0) + lund(j, 2) * vf(j, k, 1);
+  fluc(0, j, k, 2) = lund(j, 3) * vf(j, k, 0) + lund(j, 4) * vf(j, k, 1) + lund(j, 5) * vf(j, k, 2);
 }
 
 }
