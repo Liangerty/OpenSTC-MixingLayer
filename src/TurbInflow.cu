@@ -332,8 +332,8 @@ cfd::compute_fluctuations(ggxl::VectorField3D<real> *fluctuation_dPtr, ggxl::Vec
   fluc(0, j, k, 0) = lund(j, 0) * velGen(j, k, 0);
   fluc(0, j, k, 1) = lund(j, 1) * velGen(j, k, 0) + lund(j, 2) * velGen(j, k, 1);
   fluc(0, j, k, 2) = lund(j, 3) * velGen(j, k, 0) + lund(j, 4) * velGen(j, k, 1) + lund(j, 5) * velGen(j, k, 2);
-  if (j == 108)
-    printf("vFluc(%d, %d, u:w) = (%e, %e, %e)\n", j, k, fluc(0, j, k, 0), fluc(0, j, k, 1), fluc(0, j, k, 2));
+//  if (j == 91)
+//    printf("vFluc(%d, %d, u:w) = (%e, %e, %e)\n", j, k, fluc(0, j, k, 0), fluc(0, j, k, 1), fluc(0, j, k, 2));
   __syncthreads();
 }
 

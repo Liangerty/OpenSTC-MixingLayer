@@ -1514,7 +1514,7 @@ void DBoundCond::generate_random_numbers(int my, int mz, int ngg, int iFace) con
 
   // 3. Apply periodic boundary condition in spanwise direction
   TPB = {32, 32};
-  BPG = {(my + 2 * DBoundCond::DF_N + 2 * ngg - 1) / TPB.x + 1, ((DBoundCond::DF_N + TPB.y - 1) / TPB.y)};
+  BPG = {(my + 2 * DBoundCond::DF_N + 2 * ngg - 1) / TPB.x + 1, ((DBoundCond::DF_N + ngg + TPB.y - 1) / TPB.y)};
   apply_periodic_in_spanwise<<<BPG, TPB>>>(random_values_dPtr, iFace, my, mz, ngg);
 }
 
@@ -1522,8 +1522,12 @@ void DBoundCond::apply_convolution(int my, int mz, int ngg, int iFace) const {
   dim3 TPB(32, 8);
   dim3 BPG{((my + 2 * ngg + TPB.x - 1) / TPB.x),
            ((mz + 2 * ngg + 2 * DBoundCond::DF_N + TPB.y - 1) / TPB.y)};
-  perform_convolution<<<BPG, TPB>>>(random_values_dPtr, df_by_dPtr, df_fy_dPtr, iFace, my, mz,
-                                    df_velFluc_new_dPtr, df_bz_dPtr, ngg);
+  perform_convolution_y<<<BPG, TPB>>>(random_values_dPtr, df_by_dPtr, df_fy_dPtr, iFace, my, mz,
+                                      df_velFluc_new_dPtr, df_bz_dPtr, ngg);
+
+  BPG = {((my + 2 * ngg + TPB.x - 1) / TPB.x), ((mz + 2 * ngg + TPB.y - 1) / TPB.y)};
+  perform_convolution_z<<<BPG, TPB>>>(random_values_dPtr, df_by_dPtr, df_fy_dPtr, iFace, my, mz,
+                                      df_velFluc_new_dPtr, df_bz_dPtr, ngg);
 }
 
 void
@@ -1541,8 +1545,7 @@ generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int
                                int mz, ggxl::VectorField2D<real> *random_numbers, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
   int k = int(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
-  if (j >= my + DBoundCond::DF_N + ngg || j < -DBoundCond::DF_N - ngg ||
-      k >= mz + DBoundCond::DF_N + ngg || k < -DBoundCond::DF_N - ngg) {
+  if (j >= my + DBoundCond::DF_N + ngg || k >= mz + DBoundCond::DF_N + ngg) {
     return;
   }
 
@@ -1555,7 +1558,7 @@ __global__ void
 apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
   int k = int(blockIdx.y * blockDim.y + threadIdx.y) + 1;
-  if (j >= my + DBoundCond::DF_N + ngg || k > DBoundCond::DF_N) {
+  if (j >= my + DBoundCond::DF_N + ngg || k > DBoundCond::DF_N + ngg) {
     return;
   }
 
@@ -1569,9 +1572,9 @@ apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace,
 }
 
 __global__ void
-perform_convolution(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
-                    ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
-                    ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg) {
+perform_convolution_y(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
+                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
+                      ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
   int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg - DBoundCond::DF_N;
   if (j >= my + ngg || k >= mz + DBoundCond::DF_N + ngg) {
@@ -1595,25 +1598,6 @@ perform_convolution(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField
     fy0 += by(j, jj, 0) * r(j + jj, k, 0);
     fy1 += by(j, jj, 1) * r(j + jj, k, 1);
     fy2 += by(j, jj, 2) * r(j + jj, k, 2);
-  }
-  __syncthreads();
-
-  // z convolution
-  if (k >= -ngg && k < mz + ngg) {
-    auto &bz = df_bz[iFace];
-    auto &upp = velFluc[iFace](j, k, 0);
-    auto &vpp = velFluc[iFace](j, k, 1);
-    auto &wpp = velFluc[iFace](j, k, 2);
-
-    upp = 0;
-    vpp = 0;
-    wpp = 0;
-
-    for (int kk = -DBoundCond::DF_N; kk <= DBoundCond::DF_N; ++kk) {
-      upp += bz(j, kk, 0) * fy(j, k + kk, 0);
-      vpp += bz(j, kk, 1) * fy(j, k + kk, 1);
-      wpp += bz(j, kk, 2) * fy(j, k + kk, 2);
-    }
   }
 }
 
@@ -1683,18 +1667,48 @@ Castro_time_correlation_and_fluc_computation(ggxl::VectorField2D<real> *velFluc_
   auto &old = velFluc_old[iFace];
   auto &vf = velFluc_new[iFace];
 
-  vf(j, k, 0) = arg1 * old(j, k, 0) + arg2 * vf(j, k, 0);
-  vf(j, k, 1) = arg1 * old(j, k, 1) + arg2 * vf(j, k, 1);
-  vf(j, k, 2) = arg1 * old(j, k, 2) + arg2 * vf(j, k, 2);
-  old(j, k, 0) = vf(j, k, 0);
-  old(j, k, 1) = vf(j, k, 1);
-  old(j, k, 2) = vf(j, k, 2);
+  real val1 = arg1 * old(j, k, 0) + arg2 * vf(j, k, 0);
+  real val2 = arg1 * old(j, k, 1) + arg2 * vf(j, k, 1);
+  real val3 = arg1 * old(j, k, 2) + arg2 * vf(j, k, 2);
+  vf(j, k, 0) = val1;
+  vf(j, k, 1) = val2;
+  vf(j, k, 2) = val3;
+  old(j, k, 0) = val1;
+  old(j, k, 1) = val2;
+  old(j, k, 2) = val3;
 
   auto &lund = lundMatrix_dPtr[iFace];
   auto &fluc = fluctuation_dPtr[iFace];
-  fluc(0, j, k, 0) = lund(j, 0) * vf(j, k, 0);
-  fluc(0, j, k, 1) = lund(j, 1) * vf(j, k, 0) + lund(j, 2) * vf(j, k, 1);
-  fluc(0, j, k, 2) = lund(j, 3) * vf(j, k, 0) + lund(j, 4) * vf(j, k, 1) + lund(j, 5) * vf(j, k, 2);
+  fluc(0, j, k, 0) = lund(j, 0) * val1;
+  fluc(0, j, k, 1) = lund(j, 1) * val1 + lund(j, 2) * val2;
+  fluc(0, j, k, 2) = lund(j, 3) * val1 + lund(j, 4) * val2 + lund(j, 5) * val3;
+}
+
+__global__ void perform_convolution_z(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
+                                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
+                                      ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  if (j >= my + ngg || k >= mz + ngg) {
+    return;
+  }
+
+  auto &fy = df_fy[iFace];
+  // z convolution
+  auto &bz = df_bz[iFace];
+
+  auto &vf = velFluc[iFace];
+
+  real upp = 0, vpp = 0, wpp = 0;
+
+  for (int kk = -DBoundCond::DF_N; kk <= DBoundCond::DF_N; ++kk) {
+    upp += bz(j, kk, 0) * fy(j, k + kk, 0);
+    vpp += bz(j, kk, 1) * fy(j, k + kk, 1);
+    wpp += bz(j, kk, 2) * fy(j, k + kk, 2);
+  }
+  vf(j, k, 0) = upp;
+  vf(j, k, 1) = vpp;
+  vf(j, k, 2) = wpp;
 }
 
 }

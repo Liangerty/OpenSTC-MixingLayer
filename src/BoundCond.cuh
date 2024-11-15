@@ -81,7 +81,7 @@ struct DBoundCond {
   // Digital filter related
   int n_df_face = 0;
   std::vector<int> df_label;
-  constexpr static int DF_N = 60;
+  constexpr static int DF_N = 50;
   ggxl::VectorField2D<real> *random_values_hPtr = nullptr;
   ggxl::VectorField2D<real> *random_values_dPtr = nullptr; // Random values for digital filter. E.g. the dimensions are often like (ny,nz,3), where 3 is for 3 components of velocity.
   ggxl::VectorField1D<real> *df_lundMatrix_hPtr = nullptr; // Lund matrix for digital filter
@@ -126,9 +126,13 @@ apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace,
 __global__ void
 remove_mean_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg);
 
-__global__ void perform_convolution(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
-                                    ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
-                                    ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg);
+__global__ void perform_convolution_y(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
+                                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
+                                      ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg);
+
+__global__ void perform_convolution_z(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
+                                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
+                                      ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg);
 
 __global__ void
 Castro_time_correlation_and_fluc_computation(ggxl::VectorField2D<real> *velFluc_old,
@@ -631,106 +635,179 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
 
 template<MixtureModel mix_model, class turb>
 __global__ void
-apply_inflow_df(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::VectorField3D<real> *profile_d_ptr,
-                curandState *rng_states_d_ptr, ggxl::VectorField3D<real> *fluctuation_dPtr, int df_iFace) {
+apply_inflow_df(DZone *zone, Inflow *inflow, DParameter *param, ggxl::VectorField3D<real> *fluctuation_dPtr,
+                int df_iFace) {
   const int ngg = zone->ngg;
-  int dir[]{0, 0, 0};
-  const auto &b = zone->boundary[i_face];
-  dir[b.face] = b.direction;
-  auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
-  if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  if (j >= zone->my + ngg || k >= zone->mz + ngg) return;
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
   auto &cv = zone->cv;
 
-  real dt_old = param->dt / 3.0;
-
-  // Mixing layer inflow
+  int i = 0;
   const real u_upper = inflow->u, u_lower = inflow->u_lower;
   auto y = zone->y(i, j, k);
   real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / inflow->delta_omega);
-  real x_convection = u * dt_old;
-
-  for (int ig = 0; ig < ngg; ++ig) {
-    const int gi{i + ig * dir[0]}, gj{j + ig * dir[1]}, gk{k + ig * dir[2]};
-
-    // Here with the assumption of dx is directly computed without a necessity of considering the metrics
-    real dQDx = x_convection / (zone->x(gi, gj, gk) - zone->x(gi - 1, gj, gk));
-
-    // Taylor's hypothesis
-    for (int l = 0; l < param->n_var; ++l) {
-      cv(gi, gj, gk, l) -= dQDx * (cv(gi, gj, gk, l) - cv(gi - 1, gj, gk, l));
-    }
-    if (param->dim == 2) {
-      cv(gi, gj, gk, 3) = 0;
-    }
-
-    bv(gi, gj, gk, 0) = cv(gi, gj, gk, 0);
-    const real density_inv = 1 / bv(gi, gj, gk, 0);
-    bv(gi, gj, gk, 1) = cv(gi, gj, gk, 1) * density_inv;
-    bv(gi, gj, gk, 2) = cv(gi, gj, gk, 2) * density_inv;
-    bv(gi, gj, gk, 3) = cv(gi, gj, gk, 3) * density_inv;
-    auto v2 = bv(gi, gj, gk, 1) * bv(gi, gj, gk, 1) + bv(gi, gj, gk, 2) * bv(gi, gj, gk, 2) +
-              bv(gi, gj, gk, 3) * bv(gi, gj, gk, 3);
-    if constexpr (mix_model != MixtureModel::FL) {
-      for (int l = 0; l < param->n_scalar; ++l) {
-        sv(gi, gj, gk, l) = cv(gi, gj, gk, l + 5) * density_inv;
-      }
-    } // Flamelet is not considered here
-    if constexpr (mix_model != MixtureModel::Air) {
-      compute_temperature_and_pressure(gi, gj, gk, param, zone, cv(gi, gj, gk, 4));
-    } else {
-      // Air
-      bv(gi, gj, gk, 4) = (gamma_air - 1) * (cv(gi, gj, gk, 4) - 0.5 * bv(gi, gj, gk, 0) * v2);
-      bv(gi, gj, gk, 5) = bv(gi, gj, gk, 4) * mw_air * density_inv / R_u;
-    }
-  }
-  // The outermost ghost grid
-  int ig = ngg;
-  const int gi{i + ig * dir[0]}, gj{j + ig * dir[1]}, gk{k + ig * dir[2]};
-//  if (j == 108)
-//    printf("i = %d, j = %d, k = %d, gi = %d, gj = %d, gk = %d\n", i, j, k, gi, gj, gk);
-  real u_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 0) * param->delta_u;
-  real v_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 1) * param->delta_u;
-  real w_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 2) * param->delta_u;
+  real u_fluc = fluctuation_dPtr[df_iFace](0, j, k, 0) * param->delta_u;
+  real v_fluc = fluctuation_dPtr[df_iFace](0, j, k, 1) * param->delta_u;
+  real w_fluc = fluctuation_dPtr[df_iFace](0, j, k, 2) * param->delta_u;
   real gamma{gamma_air}, mw{mw_air};
   real T = y > 0 ? inflow->temperature : inflow->t_lower;
   real rho = y > 0 ? inflow->density : inflow->density_lower;
-  if constexpr (mix_model != MixtureModel::Air) {
-    real cpl[MAX_SPEC_NUMBER];
-    compute_cp(T, cpl, param);
-    real c_p{0}, c_v{0};
-    mw = 0.0;
-    for (int l = 0; l < param->n_spec; ++l) {
-      c_p += cpl[l] * sv(gi, gj, gk, l);
-      c_v += (cpl[l] - R_u / param->mw[l]) * sv(gi, gj, gk, l);
-      mw += sv(gi, gj, gk, l) / param->mw[l];
+  u += u_fluc;
+  real p = y > 0 ? inflow->pressure : inflow->p_lower;
+  for (int ig = 0; ig <= ngg; ++ig) {
+    const int gi{-ig}, gj{j}, gk{k};
+    bv(gi, gj, gk, 0) = rho;
+    bv(gi, gj, gk, 1) = u;
+    bv(gi, gj, gk, 2) = v_fluc;
+    bv(gi, gj, gk, 3) = w_fluc;
+    bv(gi, gj, gk, 4) = p;
+    bv(gi, gj, gk, 5) = T;
+    const real *sv_b = y > 0 ? inflow->sv : inflow->sv_lower;
+    for (int l = 0; l < param->n_scalar; ++l) {
+      sv(gi, gj, gk, l) = sv_b[l];
     }
-    gamma = c_p / c_v;
-    mw = 1 / mw;
+    if constexpr (TurbMethod<turb>::hasMut) {
+      zone->mut(gi, gj, gk) = y > 0 ? inflow->mut : inflow->mut_lower;
+    }
+    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
   }
-  real t_fluc = -(gamma - 1) / gamma * u_fluc * u * mw / R_u; // SRA
-  t_fluc *= 0.25; // StreamS multiplies a parameter "dftscaling=0.25" here
-  real rho_fluc = -t_fluc * rho / T;
-  bv(gi, gj, gk, 0) = rho + rho_fluc;
-  bv(gi, gj, gk, 1) = u + u_fluc;
-  bv(gi, gj, gk, 2) = v_fluc;
-  bv(gi, gj, gk, 3) = w_fluc;
-  bv(gi, gj, gk, 5) = T + t_fluc;
-  bv(gi, gj, gk, 4) = bv(gi, gj, gk, 0) * R_u / mw * bv(gi, gj, gk, 5);
 
-  const real *sv_b = y > 0 ? inflow->sv : inflow->sv_lower;
-  for (int l = 0; l < param->n_scalar; ++l) {
-    sv(gi, gj, gk, l) = sv_b[l];
-  }
-  if constexpr (TurbMethod<turb>::hasMut) {
-    zone->mut(gi, gj, gk) = y > 0 ? inflow->mut : inflow->mut_lower;
-  }
-  compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+  // Mixing layer inflow
+//  const real u_upper = inflow->u, u_lower = inflow->u_lower;
+//  auto y = zone->y(i, j, k);
+//  real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / inflow->delta_omega);
+//  real u_fluc = fluctuation_dPtr[df_iFace](0, j, k, 0) * param->delta_u;
+//  real v_fluc = fluctuation_dPtr[df_iFace](0, j, k, 1) * param->delta_u;
+//  real w_fluc = fluctuation_dPtr[df_iFace](0, j, k, 2) * param->delta_u;
+//  real gamma{gamma_air}, mw{mw_air};
+//  real T = y > 0 ? inflow->temperature : inflow->t_lower;
+//  real rho = y > 0 ? inflow->density : inflow->density_lower;
+//  u += u_fluc;
+//  real p = y > 0 ? inflow->pressure : inflow->p_lower;
+//  for (int ig = 0; ig <= ngg; ++ig) {
+//    const int gi{i + ig * dir[0]}, gj{j + ig * dir[1]}, gk{k + ig * dir[2]};
+//    bv(gi, gj, gk, 0) = rho;
+//    bv(gi, gj, gk, 1) = u;
+//    bv(gi, gj, gk, 2) = v_fluc;
+//    bv(gi, gj, gk, 3) = w_fluc;
+//    bv(gi, gj, gk, 4) = p;
+//    bv(gi, gj, gk, 5) = T;
+//    const real *sv_b = y > 0 ? inflow->sv : inflow->sv_lower;
+//    for (int l = 0; l < param->n_scalar; ++l) {
+//      sv(gi, gj, gk, l) = sv_b[l];
+//    }
+//    if constexpr (TurbMethod<turb>::hasMut) {
+//      zone->mut(gi, gj, gk) = y > 0 ? inflow->mut : inflow->mut_lower;
+//    }
+//    compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+//  }
+
+//  printf("point(%d, %d, %d), (r, u, v, w, p, T) = (%f, %f, %f, %f, %f, %f)\n", i, j, k, bv(i, j, k, 0),
+//         bv(i, j, k, 1), bv(i, j, k, 2), bv(i, j, k, 3), bv(i, j, k, 4), bv(i, j, k, 5));
+
+
+
+//  real x_convection = param->v_char * dt_old;
+
+//  for (int ig = 0; ig < ngg; ++ig) {
+//    const int gi{i + ig * dir[0]}, gj{j + ig * dir[1]}, gk{k + ig * dir[2]};
+//
+//    // Here with the assumption of dx is directly computed without a necessity of considering the metrics
+//    real dQDx = x_convection / (zone->x(gi, gj, gk) - zone->x(gi - 1, gj, gk));
+//
+//    // Taylor's hypothesis
+//    for (int l = 0; l < param->n_var; ++l) {
+//      cv(gi, gj, gk, l) -= dQDx * (cv(gi, gj, gk, l) - cv(gi - 1, gj, gk, l));
+//    }
+//    if (param->dim == 2) {
+//      cv(gi, gj, gk, 3) = 0;
+//    }
+//
+//    bv(gi, gj, gk, 0) = cv(gi, gj, gk, 0);
+//    const real density_inv = 1 / bv(gi, gj, gk, 0);
+//    bv(gi, gj, gk, 1) = cv(gi, gj, gk, 1) * density_inv;
+//    bv(gi, gj, gk, 2) = cv(gi, gj, gk, 2) * density_inv;
+//    bv(gi, gj, gk, 3) = cv(gi, gj, gk, 3) * density_inv;
+//    auto v2 = bv(gi, gj, gk, 1) * bv(gi, gj, gk, 1) + bv(gi, gj, gk, 2) * bv(gi, gj, gk, 2) +
+//              bv(gi, gj, gk, 3) * bv(gi, gj, gk, 3);
+//    if constexpr (mix_model != MixtureModel::FL) {
+//      for (int l = 0; l < param->n_scalar; ++l) {
+//        sv(gi, gj, gk, l) = cv(gi, gj, gk, l + 5) * density_inv;
+//      }
+//    } // Flamelet is not considered here
+//    if constexpr (mix_model != MixtureModel::Air) {
+//      compute_temperature_and_pressure(gi, gj, gk, param, zone, cv(gi, gj, gk, 4));
+//    } else {
+//      // Air
+//      bv(gi, gj, gk, 4) = (gamma_air - 1) * (cv(gi, gj, gk, 4) - 0.5 * bv(gi, gj, gk, 0) * v2);
+//      bv(gi, gj, gk, 5) = bv(gi, gj, gk, 4) * mw_air * density_inv / R_u;
+//    }
+//  }
+  // The outermost ghost grid
+//  int ig = ngg;
+//  const int gi{i + ig * dir[0]}, gj{j + ig * dir[1]}, gk{k + ig * dir[2]};
+////  if (j == 108)
+////    printf("i = %d, j = %d, k = %d, gi = %d, gj = %d, gk = %d\n", i, j, k, gi, gj, gk);
+//  real u_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 0) * param->delta_u;
+//  real v_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 1) * param->delta_u;
+//  real w_fluc = fluctuation_dPtr[df_iFace](0, gj, gk, 2) * param->delta_u;
+//  real gamma{gamma_air}, mw{mw_air};
+//  real T = y > 0 ? inflow->temperature : inflow->t_lower;
+//  real rho = y > 0 ? inflow->density : inflow->density_lower;
+//  if constexpr (mix_model != MixtureModel::Air) {
+//    real cpl[MAX_SPEC_NUMBER];
+//    compute_cp(T, cpl, param);
+//    real c_p{0}, c_v{0};
+//    mw = 0.0;
+//    for (int l = 0; l < param->n_spec; ++l) {
+//      c_p += cpl[l] * sv(gi, gj, gk, l);
+//      c_v += (cpl[l] - R_u / param->mw[l]) * sv(gi, gj, gk, l);
+//      mw += sv(gi, gj, gk, l) / param->mw[l];
+//    }
+//    gamma = c_p / c_v;
+//    mw = 1 / mw;
+//  }
+//  real t_fluc = -(gamma - 1) / gamma * u_fluc * u * mw / R_u; // SRA
+//  t_fluc *= 0.25; // StreamS multiplies a parameter "dftscaling=0.25" here
+//  real rho_fluc = -t_fluc * rho / T;
+//  bv(gi, gj, gk, 0) = rho + rho_fluc;
+//  bv(gi, gj, gk, 1) = u + u_fluc;
+//  bv(gi, gj, gk, 2) = v_fluc;
+//  bv(gi, gj, gk, 3) = w_fluc;
+//  bv(gi, gj, gk, 5) = T + t_fluc;
+//  bv(gi, gj, gk, 4) = bv(gi, gj, gk, 0) * R_u / mw * bv(gi, gj, gk, 5);
+//  bv(gi, gj, gk, 0) = rho;
+//  bv(gi, gj, gk, 1) = u + u_fluc;
+//  bv(gi, gj, gk, 2) = v_fluc;
+//  bv(gi, gj, gk, 3) = w_fluc;
+//  bv(gi, gj, gk, 5) = T;
+//  bv(gi, gj, gk, 4) = bv(gi, gj, gk, 0) * R_u / mw * bv(gi, gj, gk, 5);
+
+//  const real *sv_b = y > 0 ? inflow->sv : inflow->sv_lower;
+//  for (int l = 0; l < param->n_scalar; ++l) {
+//    sv(gi, gj, gk, l) = sv_b[l];
+//  }
+//  if constexpr (TurbMethod<turb>::hasMut) {
+//    zone->mut(gi, gj, gk) = y > 0 ? inflow->mut : inflow->mut_lower;
+//  }
+//  compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
+//  if (abs(v_fluc) > 50 || abs(w_fluc) > 50) {
+//    printf("point(%d, %d), (r, u, v, w, p, T) = (%f, %f, %f, %f, %f, %f)\n", gj, gk, bv(gi, gj, gk, 0),
+//           bv(gi, gj, gk, 1), bv(gi, gj, gk, 2), bv(gi, gj, gk, 3), bv(gi, gj, gk, 4), bv(gi, gj, gk, 5));
+//  }
+//  if (/*y / inflow->delta_omega < 0.3 && y / inflow->delta_omega > -0.3*/j == 91 && k == 0 /*(|| k == 32)*/) {
+//    printf("point(%d, %d), (rpp, upp, vpp, wpp, Ttt) = (%e, %e, %e, %e, %e)\n", gj, gk, rho_fluc, u_fluc, v_fluc,
+//           w_fluc, t_fluc);
+//    printf("point(%d, %d), (r, u, v, w, p, T) = (%f, %f, %f, %f, %f, %f)\n", gj, gk, bv(gi, gj, gk, 0),
+//           bv(gi, gj, gk, 1), bv(gi, gj, gk, 2), bv(gi, gj, gk, 3), bv(gi, gj, gk, 4), bv(gi, gj, gk, 5));
+//    printf("point(%d, %d), (u, v, w) = (%e, %e, %e)\n", gj, gk, bv(gi, gj, gk, 1), bv(gi, gj, gk, 2),
+//           bv(gi, gj, gk, 3));
+//  }
+//  __syncthreads();
 }
 
 template<MixtureModel mix_model, class turb>
@@ -1534,30 +1611,40 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
   for (size_t l = 0; l < n_inflow; l++) {
     const auto nb = inflow_info[l].n_boundary;
     bool l_use_df = (df_label[l] > -1);
-    for (size_t i = 0; i < nb; i++) {
-      auto [i_zone, i_face] = inflow_info[l].boundary[i];
-      if (i_zone != block.block_id) {
-        continue;
-      }
-      const auto &hf = block.boundary[i_face];
-      const auto ngg = block.ngg;
-      uint tpb[3], bpg[3], n_point[3];
-      for (size_t j = 0; j < 3; j++) {
-        n_point[j] = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point[j] <= (2 * ngg + 1) ? 1 : 16;
-        bpg[j] = (n_point[j] - 1) / tpb[j] + 1;
-      }
-      dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      if (l_use_df) {
-        if (update_df) {
-          generate_random_numbers(n_point[1], n_point[2], ngg, df_label[l]);
-          apply_convolution(n_point[1], n_point[2], ngg, df_label[l]);
-          compute_fluctuations(n_point[1], n_point[2], ngg, df_label[l], param, field.d_ptr, &inflow[l]);
-          apply_inflow_df<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param,
-                                                          profile_dPtr_withGhost, rng_d_ptr, fluctuation_dPtr,
+    if (l_use_df) {
+      if (update_df) {
+        // Here we assume only one face corresponds to the inflow boundary
+        // nb should be 1, and the number of points should be my, mz of the corresponding block
+        for (size_t i = 0; i < nb; i++) {
+          auto [i_zone, i_face] = inflow_info[l].boundary[i];
+          if (i_zone != block.block_id) {
+            continue;
+          }
+          int my = block.my, mz = block.mz, mx = 1, ngg = block.ngg;
+          generate_random_numbers(my, mz, ngg, df_label[l]);
+          apply_convolution(my, mz, ngg, df_label[l]);
+          compute_fluctuations(my, mz, ngg, df_label[l], param, field.d_ptr, &inflow[l]);
+          dim3 TPB{32, 8};
+          dim3 BPG{(my - 1) / TPB.x + 1, (mz - 1) / TPB.y + 1};
+          apply_inflow_df<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], param, fluctuation_dPtr,
                                                           df_label[l]);
         }
-      } else {
+      }
+    } else {
+      for (size_t i = 0; i < nb; i++) {
+        auto [i_zone, i_face] = inflow_info[l].boundary[i];
+        if (i_zone != block.block_id) {
+          continue;
+        }
+        const auto &hf = block.boundary[i_face];
+        const auto ngg = block.ngg;
+        uint tpb[3], bpg[3], n_point[3];
+        for (size_t j = 0; j < 3; j++) {
+          n_point[j] = hf.range_end[j] - hf.range_start[j] + 1;
+          tpb[j] = n_point[j] <= (2 * ngg + 1) ? 1 : 16;
+          bpg[j] = (n_point[j] - 1) / tpb[j] + 1;
+        }
+        dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
         apply_inflow<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], i_face, param,
                                                      profile_dPtr_withGhost, rng_d_ptr, fluctuation_dPtr);
       }
