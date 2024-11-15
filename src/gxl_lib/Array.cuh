@@ -341,7 +341,7 @@ inline cudaError_t VectorField2DHost<T>::allocate_memory(int dim1, int dim2, int
   if (err != cudaSuccess) {
     printf(
         "The VectorField2DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
-    val = (real *) malloc(sz * n3 * sizeof(T));
+    val = (T*)malloc(sz * n3 * sizeof(T));
     memset(val, 0, sz * n3 * sizeof(T));
   } else {
     cudaMemset(val, 0, sz * n3 * sizeof(T));

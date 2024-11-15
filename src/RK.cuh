@@ -213,6 +213,9 @@ void RK3(Driver<mix_model, turb> &driver) {
       if (parameter.get_bool("sponge_layer")) {
         output_sponge_layer(parameter, field, mesh, driver.spec);
       }
+      if (parameter.get_bool("use_df")) {
+        driver.bound_cond.write_df(parameter, mesh);
+      }
     }
     if (output_time_series > 0 && step % output_time_series == 0) {
       timeSeriesIOManager.print_field(step, parameter, physical_time);

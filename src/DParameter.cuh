@@ -42,7 +42,7 @@ struct DParameter {
   bool gradPInDiffusionFlux = false;
   real entropy_fix_factor = 0; // The factor for entropy fix
 
-  real dt = -1; // The global time step. If -1, we use the local time step.
+  real dt = 0; // The global time step. If 0, we use the local time step.
   real physical_time = 0; // The physical time of the simulation
 
   int rans_model = 0;  // The tag for RANS model. 0 - Laminar, 1 - SA, 2 - SST

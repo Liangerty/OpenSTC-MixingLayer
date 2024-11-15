@@ -46,6 +46,8 @@ struct DBoundCond {
   void
   apply_boundary_conditions(const Block &block, Field &field, DParameter *param, bool update_df, int step = -1) const;
 
+  void write_df(cfd::Parameter &parameter, const Mesh &mesh);
+
   // There may be time-dependent BCs, which need to be updated at each time step.
   // E.g., the turbulent library method, we need to update the profile and fluctuation.
   // E.g., the NSCBC
@@ -81,23 +83,23 @@ struct DBoundCond {
   // Digital filter related
   int n_df_face = 0;
   std::vector<int> df_label;
+  std::vector<int> df_related_block;
   constexpr static int DF_N = 50;
   ggxl::VectorField2D<real> *random_values_hPtr = nullptr;
   ggxl::VectorField2D<real> *random_values_dPtr = nullptr; // Random values for digital filter. E.g. the dimensions are often like (ny,nz,3), where 3 is for 3 components of velocity.
-  ggxl::VectorField1D<real> *df_lundMatrix_hPtr = nullptr; // Lund matrix for digital filter
   ggxl::VectorField1D<real> *df_lundMatrix_dPtr = nullptr; // Lund matrix for digital filter
-  ggxl::VectorField2D<real> *df_by_hPtr = nullptr; // (0:my-1, 0:2*DF_N, 0:2): my*(2N+1)*3, the second index jj corresponds to jj-N
   ggxl::VectorField2D<real> *df_by_dPtr = nullptr; // (0:my-1, 0:2*DF_N, 0:2): my*(2N+1)*3, the second index jj corresponds to jj-N
-  ggxl::VectorField2D<real> *df_bz_hPtr = nullptr; // (0:my-1, 0:2*DF_N, 0:2): my*(2N+1)*3, the second index jj corresponds to jj-N
   ggxl::VectorField2D<real> *df_bz_dPtr = nullptr; // (0:my-1, 0:2*DF_N, 0:2): my*(2N+1)*3, the second index jj corresponds to jj-N
   ggxl::VectorField2D<curandState> *rng_states_hPtr = nullptr; // Random number generator states for digital filter
   ggxl::VectorField2D<curandState> *rng_states_dPtr = nullptr; // Random number generator states for digital filter
-  ggxl::VectorField2D<real> *df_fy_hPtr = nullptr;
   ggxl::VectorField2D<real> *df_fy_dPtr = nullptr;
   ggxl::VectorField2D<real> *df_velFluc_old_hPtr = nullptr;
   ggxl::VectorField2D<real> *df_velFluc_old_dPtr = nullptr;
   ggxl::VectorField2D<real> *df_velFluc_new_hPtr = nullptr;
   ggxl::VectorField2D<real> *df_velFluc_new_dPtr = nullptr;
+
+  ggxl::VectorField2DHost<curandState> *df_rng_state_cpu = nullptr;
+  ggxl::VectorField2DHost<real> *df_velFluc_cpu = nullptr;
 
   curandState *rng_d_ptr = nullptr;
 
@@ -117,6 +119,10 @@ __global__ void
 initialize_rng(curandState *rng_states, int size, int64_t time_stamp);
 
 __global__ void
+initialize_rest_rng(ggxl::VectorField2D<curandState> *rng_states, int iFace, int64_t time_stamp, int dy, int dz,
+                    int ngg, int my, int mz);
+
+__global__ void
 generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int iFace, int my,
                                int mz, ggxl::VectorField2D<real> *random_numbers, int ngg);
 
@@ -127,12 +133,11 @@ __global__ void
 remove_mean_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg);
 
 __global__ void perform_convolution_y(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
-                                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
-                                      ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg);
+                                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz, int ngg);
 
-__global__ void perform_convolution_z(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
-                                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz,
-                                      ggxl::VectorField2D<real> *velFluc, ggxl::VectorField2D<real> *df_bz, int ngg);
+__global__ void
+perform_convolution_z(ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz, ggxl::VectorField2D<real> *velFluc,
+                      ggxl::VectorField2D<real> *df_bz, int ngg);
 
 __global__ void
 Castro_time_correlation_and_fluc_computation(ggxl::VectorField2D<real> *velFluc_old,
@@ -1579,23 +1584,21 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
     const auto nb = inflow_info[l].n_boundary;
     bool l_use_df = (df_label[l] > -1);
     if (l_use_df) {
-      if (update_df) {
-        // Here we assume only one face corresponds to the inflow boundary
-        // nb should be 1, and the number of points should be my, mz of the corresponding block
-        for (size_t i = 0; i < nb; i++) {
-          auto [i_zone, i_face] = inflow_info[l].boundary[i];
-          if (i_zone != block.block_id) {
-            continue;
-          }
-          int my = block.my, mz = block.mz, mx = 1, ngg = block.ngg;
-          generate_random_numbers(my, mz, ngg, df_label[l]);
-          apply_convolution(my, mz, ngg, df_label[l]);
-          compute_fluctuations(my, mz, ngg, df_label[l], param, field.d_ptr, &inflow[l]);
-          dim3 TPB{32, 8};
-          dim3 BPG{(my - 1) / TPB.x + 1, (mz - 1) / TPB.y + 1};
-          apply_inflow_df<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], param, fluctuation_dPtr,
-                                                          df_label[l]);
+      // Here we assume only one face corresponds to the inflow boundary
+      // nb should be 1, and the number of points should be my, mz of the corresponding block
+      for (size_t i = 0; i < nb; i++) {
+        auto [i_zone, i_face] = inflow_info[l].boundary[i];
+        if (i_zone != block.block_id) {
+          continue;
         }
+        int my = block.my, mz = block.mz, mx = 1, ngg = block.ngg;
+        generate_random_numbers(my, mz, ngg, df_label[l]);
+        apply_convolution(my, mz, ngg, df_label[l]);
+        compute_fluctuations(my, mz, ngg, df_label[l], param, field.d_ptr, &inflow[l]);
+        dim3 TPB{32, 8};
+        dim3 BPG{(my - 1) / TPB.x + 1, (mz - 1) / TPB.y + 1};
+        apply_inflow_df<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], param, fluctuation_dPtr,
+                                                        df_label[l]);
       }
     } else {
       for (size_t i = 0; i < nb; i++) {

@@ -10,6 +10,9 @@ void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<F
   // For problem_type == 1, a mixing layer is required.
   if (parameter.get_int("problem_type") == 1) {
     initialize_mixing_layer(parameter, mesh, field, species);
+    if (parameter.get_bool("turbulence")==0){
+      // DNS
+    }
   } else {
     // For other cases, we initialize by the usual way.
     // First, find out how many groups of initial conditions are needed.

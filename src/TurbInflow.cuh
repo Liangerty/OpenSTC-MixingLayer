@@ -45,11 +45,6 @@ void
 apply_convolution(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::vector<int> &N1,
                   std::vector<int> &N2, int ngg);
 
-// 6. Apply Castro's time correlation formula
-void
-time_correlation(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::vector<int> &N1, std::vector<int> &N2,
-                 real dt);
-
 // 7. compute the fluctuations!
 void compute_fluctuations(cfd::DBoundCond &dBoundCond, std::vector<int> &N1, std::vector<int> &N2, int ngg);
 
@@ -57,4 +52,5 @@ void compute_fluctuations(cfd::DBoundCond &dBoundCond, std::vector<int> &N1, std
 __global__ void
 compute_fluctuations(ggxl::VectorField3D<real> *fluctuation_dPtr, ggxl::VectorField1D<real> *lundMatrix_dPtr,
                      ggxl::VectorField2D<real> *velFluc_dPtr, int iFace, int my, int mz, int ngg);
+
 }
