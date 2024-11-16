@@ -5,7 +5,7 @@
 #include "WallDistance.cuh"
 #include "MixingLayer.cuh"
 #include "SpongeLayer.cuh"
-#include "TurbInflow.cuh"
+#include "DigitalFilter.cuh"
 
 namespace cfd {
 
@@ -36,7 +36,7 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
   }
   printf("\tProcess [[%d]] has finished setting up device memory.\n", myid);
   bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter);
-  initialize_digital_filter(parameter, mesh_, bound_cond);
+//  initialize_digital_filter(parameter, mesh_, bound_cond);
 
   initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec);
 

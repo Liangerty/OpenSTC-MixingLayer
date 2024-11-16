@@ -38,13 +38,13 @@ struct DBoundCond {
 
   void initialize_df_memory(const Mesh &mesh, const Parameter &parameter, std::vector<int> &N1, std::vector<int> &N2);
 
-  void generate_random_numbers(int my, int mz, int ngg, int iFace) const;
-
-  void apply_convolution(int my, int mz, int ngg, int iFace) const;
-
   template<MixtureModel mix_model, class turb>
   void
   apply_boundary_conditions(const Block &block, Field &field, DParameter *param, bool update_df, int step = -1) const;
+
+  void generate_random_numbers(int my, int mz, int ngg, int iFace) const;
+
+  void apply_convolution(int my, int mz, int ngg, int iFace) const;
 
   void write_df(cfd::Parameter &parameter, const Mesh &mesh);
 
@@ -104,6 +104,14 @@ struct DBoundCond {
   curandState *rng_d_ptr = nullptr;
 
 private:
+  void initialize_digital_filter(Parameter &parameter, cfd::Mesh &mesh);
+
+  void
+  get_digital_filter_lund_matrix(Parameter &parameter, std::vector<int> &N1, std::vector<std::vector<real>> &scaled_y);
+
+  void get_digital_filter_convolution_kernel(Parameter &parameter, std::vector<int> &N1,
+                                             std::vector<std::vector<real>> &y_scaled, real dz) const;
+
   void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field);
 
   void
@@ -121,6 +129,10 @@ initialize_rng(curandState *rng_states, int size, int64_t time_stamp);
 __global__ void
 initialize_rest_rng(ggxl::VectorField2D<curandState> *rng_states, int iFace, int64_t time_stamp, int dy, int dz,
                     int ngg, int my, int mz);
+
+__global__ void
+compute_fluctuations_first_step(ggxl::VectorField3D<real> *fluctuation_dPtr, ggxl::VectorField1D<real> *lundMatrix_dPtr,
+                                ggxl::VectorField2D<real> *df_velFluc_old_dPtr, int iFace, int my, int mz, int ngg);
 
 __global__ void
 generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int iFace, int my,
