@@ -14,10 +14,10 @@ range real coreRegion = {  // The core region of computation. Only grids in core
 }
 
 // controls
-int initial = 0     // 0 - new case, 1 - continue from a previous case.
+int initial = 1     // 0 - new case, 1 - continue from a previous case.
 int total_step = 10  // total number of steps
 int output_file = 10  // frequency of output files
-int output_screen = 1 // frequency of screen output
+int output_screen = 5 // frequency of screen output
 int output_time_series = 0 // frequency of output time series data. 0 - Not output, else - output every output_time_series steps.
 bool limit_flow = 0     // 0 - no limit, 1 - limit the flow field.
 
@@ -133,7 +133,7 @@ array real sct_passive_scalar {
 }
 
 // statistics control
-bool if_collect_statistics = 1
+bool if_collect_statistics = 0
 bool if_continue_collect_statistics = 0
 bool perform_spanwise_average = 1
 bool output_statistics_plt = 0

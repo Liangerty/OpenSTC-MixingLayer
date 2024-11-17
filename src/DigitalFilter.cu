@@ -107,163 +107,143 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
     printf("\tThe memory for the digital filter is allocated.\n");
 
   // compute lund matrix
-  cfd::get_digital_filter_lund_matrix(parameter, *this, N1, scaled_y);
-//  get_digital_filter_lund_matrix(parameter, N1, scaled_y);
+  get_digital_filter_lund_matrix(parameter, N1, scaled_y);
   if (myid == 0)
     printf("\tThe Lund matrix for the digital filter is computed.\n");
 
   // compute convolution kernel
-  cfd::get_digital_filter_convolution_kernel(parameter, *this, N1, scaled_y, dz);
-  //get_digital_filter_convolution_kernel(parameter, N1, scaled_y, dz);
+  get_digital_filter_convolution_kernel(parameter, N1, scaled_y, dz);
   if (myid == 0)
     printf("\tThe convolution kernel for the digital filter is computed.\n");
 
-//  int init = parameter.get_int("initial");
-//  if (init == 1) {
-//    // continue from previous computation
-//    bool initialized{true};
-//    for (int iFace = 0; iFace < n_df_face; ++iFace) {
-//      std::string filename = "./output/df-p" + std::to_string(myid) + "-f" + std::to_string(iFace) + ".bin";
-//      MPI_File fp;
-//      MPI_File_open(MPI_COMM_SELF, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fp);
-//      if (fp == nullptr) {
-//        printf("Error: cannot open the file %s, the df states will be restarted.\n", filename.c_str());
-//        initialized = false;
-//        break;
-//      }
-//      int my = N1[iFace], mz = N2[iFace];
-//      int my_read, mz_read;
-//      MPI_Offset offset = 0;
-//      MPI_File_read_at(fp, offset, &my_read, 1, MPI_INT, MPI_STATUS_IGNORE);
-//      offset += 4;
-//      MPI_File_read_at(fp, offset, &mz_read, 1, MPI_INT, MPI_STATUS_IGNORE);
-//      offset += 4;
-//      if (my != my_read || mz != mz_read) {
-//        printf(
-//            "Error: the grid size in the file %s is not consistent with the current grid size, the df states will be restarted.\n",
-//            filename.c_str());
-//        initialized = false;
-//        break;
-//      }
-//      int ngg_read, DF_N_read;
-//      MPI_File_read_at(fp, offset, &ngg_read, 1, MPI_INT, MPI_STATUS_IGNORE);
-//      offset += 4;
-//      MPI_File_read_at(fp, offset, &DF_N_read, 1, MPI_INT, MPI_STATUS_IGNORE);
-//      offset += 4;
-//
-//      int old_width_single_side = ngg_read + DF_N_read;
-//      if (old_width_single_side >= ngg + DF_N) {
-//        MPI_Datatype ty;
-//        int lSize[2]{my + 2 * old_width_single_side, mz + 2 * old_width_single_side};
-//        int sSize[2]{my + 2 * ngg + 2 * DF_N, mz + 2 * ngg + 2 * DF_N};
-//        int start[2]{old_width_single_side - ngg - DF_N, old_width_single_side - ngg - DF_N};
-//        // The old data type is curandState
-//        MPI_Datatype mpi_curandState;
-//        MPI_Type_contiguous(sizeof(curandState), MPI_BYTE, &mpi_curandState);
-//        MPI_Type_commit(&mpi_curandState);
-//        MPI_Type_create_subarray(2, lSize, sSize, start, MPI_ORDER_FORTRAN, mpi_curandState, &ty);
-//        MPI_Type_commit(&ty);
-//
-//        MPI_File_read_at(fp, offset, df_rng_state_cpu[iFace].data(), 3, ty, MPI_STATUS_IGNORE);
-//        offset += (MPI_Offset) ((my + 2 * old_width_single_side) * (mz + 2 * old_width_single_side) * 3 *
-//                                sizeof(curandState));
-//        cudaMemcpy(rng_states_hPtr[iFace].data(), df_rng_state_cpu[iFace].data(),
-//                   (my + 2 * ngg + 2 * DF_N) * (mz + 2 * ngg + 2 * DF_N) * 3 * sizeof(curandState),
-//                   cudaMemcpyHostToDevice);
-//        MPI_Type_free(&ty);
-//        MPI_Type_free(&mpi_curandState);
-//      } else {
-//        auto &rng_cpu = df_rng_state_cpu[iFace];
-//        for (int l = 0; l < 3; ++l) {
-//          for (int k = -old_width_single_side; k < mz + old_width_single_side; ++k) {
-//            for (int j = -old_width_single_side; j < my + old_width_single_side; ++j) {
-//              MPI_File_read_at(fp, offset, &rng_cpu(j, k, l), 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-//              offset += sizeof(curandState);
-//            }
-//          }
-//        }
-//        cudaMemcpy(rng_states_hPtr[iFace].data(), df_rng_state_cpu[iFace].data(),
-//                   (my + 2 * ngg + 2 * DF_N) * (mz + 2 * ngg + 2 * DF_N) * 3 * sizeof(curandState),
-//                   cudaMemcpyHostToDevice);
-//        dim3 TPB{32, 32};
-//        dim3 BPG{((my + 2 * ngg + 2 * DF_N - 1) / TPB.x + 1), ((mz + 2 * ngg + 2 * DF_N - 1) / TPB.y + 1)};
-//        time_t time_curr;
-//        initialize_rest_rng<<<BPG, TPB>>>(rng_states_dPtr, iFace, time(&time_curr), ngg + DF_N - old_width_single_side,
-//                                          ngg + DF_N - old_width_single_side, ngg, my, mz);
-//      }
-//
-//      // The velocity fluctuation of last step
-//      if (ngg_read >= ngg) {
-//        MPI_Datatype ty;
-//        int lSize[2]{my + 2 * ngg_read, mz + 2 * ngg_read};
-//        int sSize[2]{my + 2 * ngg, mz + 2 * ngg};
-//        int start[2]{ngg_read - ngg, ngg_read - ngg};
-//        MPI_Type_create_subarray(2, lSize, sSize, start, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
-//        MPI_Type_commit(&ty);
-//
-//        MPI_File_read_at(fp, offset, df_velFluc_cpu[iFace].data(), 3, ty, MPI_STATUS_IGNORE);
-//        // offset += (MPI_Offset) ((my + 2 * ngg_read) * (mz + 2 * ngg_read) * 3 * sizeof(real));
-//        MPI_Type_free(&ty);
-//        cudaMemcpy(df_velFluc_old_hPtr[iFace].data(), df_velFluc_cpu[iFace].data(),
-//                   (my + 2 * ngg) * (mz + 2 * ngg) * 3 * sizeof(real), cudaMemcpyHostToDevice);
-//      } else {
-//        auto &velFluc_cpu = df_velFluc_cpu[iFace];
-//        for (int l = 0; l < 3; ++l) {
-//          for (int k = -ngg_read; k < mz + ngg_read; ++k) {
-//            for (int j = -ngg_read; j < my + ngg_read; ++j) {
-//              MPI_File_read_at(fp, offset, &velFluc_cpu(j, k, l), 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
-//              offset += sizeof(real);
-//            }
-//          }
-//        }
-//        cudaMemcpy(df_velFluc_old_hPtr[iFace].data(), df_velFluc_cpu[iFace].data(),
-//                   (my + 2 * ngg) * (mz + 2 * ngg) * 3 * sizeof(real), cudaMemcpyHostToDevice);
-//      }
-//    }
-//    if (initialized)
-//      return;
-//  }
+  int init = parameter.get_int("initial");
+  if (init == 1) {
+    // continue from previous computation
+    bool initialized{true};
+    for (int iFace = 0; iFace < n_df_face; ++iFace) {
+      std::string filename = "./output/df-p" + std::to_string(myid) + "-f" + std::to_string(iFace) + ".bin";
+      MPI_File fp;
+      MPI_File_open(MPI_COMM_SELF, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fp);
+      if (fp == nullptr) {
+        printf("Error: cannot open the file %s, the df states will be restarted.\n", filename.c_str());
+        initialized = false;
+        break;
+      }
+      int my = N1[iFace], mz = N2[iFace];
+      int my_read, mz_read;
+      MPI_Offset offset = 0;
+      MPI_File_read_at(fp, offset, &my_read, 1, MPI_INT, MPI_STATUS_IGNORE);
+      offset += 4;
+      MPI_File_read_at(fp, offset, &mz_read, 1, MPI_INT, MPI_STATUS_IGNORE);
+      offset += 4;
+      if (my != my_read || mz != mz_read) {
+        printf(
+            "Error: the grid size in the file %s is not consistent with the current grid size, the df states will be restarted.\n",
+            filename.c_str());
+        initialized = false;
+        break;
+      }
+      int ngg_read, DF_N_read;
+      MPI_File_read_at(fp, offset, &ngg_read, 1, MPI_INT, MPI_STATUS_IGNORE);
+      offset += 4;
+      MPI_File_read_at(fp, offset, &DF_N_read, 1, MPI_INT, MPI_STATUS_IGNORE);
+      offset += 4;
+
+      int old_width_single_side = ngg_read + DF_N_read;
+      if (old_width_single_side >= ngg + DF_N) {
+        MPI_Datatype ty;
+        int lSize[2]{my + 2 * old_width_single_side, mz + 2 * old_width_single_side};
+        int sSize[2]{my + 2 * ngg + 2 * DF_N, mz + 2 * ngg + 2 * DF_N};
+        int start[2]{old_width_single_side - ngg - DF_N, old_width_single_side - ngg - DF_N};
+        // The old data type is curandState
+        MPI_Datatype mpi_curandState;
+        MPI_Type_contiguous(sizeof(curandState), MPI_BYTE, &mpi_curandState);
+        MPI_Type_commit(&mpi_curandState);
+        MPI_Type_create_subarray(2, lSize, sSize, start, MPI_ORDER_FORTRAN, mpi_curandState, &ty);
+        MPI_Type_commit(&ty);
+
+        MPI_File_read_at(fp, offset, df_rng_state_cpu[iFace].data(), 3, ty, MPI_STATUS_IGNORE);
+        offset += (MPI_Offset) ((my + 2 * old_width_single_side) * (mz + 2 * old_width_single_side) * 3 *
+                                sizeof(curandState));
+        cudaMemcpy(rng_states_hPtr[iFace].data(), df_rng_state_cpu[iFace].data(),
+                   (my + 2 * ngg + 2 * DF_N) * (mz + 2 * ngg + 2 * DF_N) * 3 * sizeof(curandState),
+                   cudaMemcpyHostToDevice);
+        MPI_Type_free(&ty);
+        MPI_Type_free(&mpi_curandState);
+      } else {
+        auto &rng_cpu = df_rng_state_cpu[iFace];
+        for (int l = 0; l < 3; ++l) {
+          for (int k = -old_width_single_side; k < mz + old_width_single_side; ++k) {
+            for (int j = -old_width_single_side; j < my + old_width_single_side; ++j) {
+              MPI_File_read_at(fp, offset, &rng_cpu(j, k, l), 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
+              offset += sizeof(curandState);
+            }
+          }
+        }
+        cudaMemcpy(rng_states_hPtr[iFace].data(), df_rng_state_cpu[iFace].data(),
+                   (my + 2 * ngg + 2 * DF_N) * (mz + 2 * ngg + 2 * DF_N) * 3 * sizeof(curandState),
+                   cudaMemcpyHostToDevice);
+        dim3 TPB{32, 32};
+        dim3 BPG{((my + 2 * ngg + 2 * DF_N - 1) / TPB.x + 1), ((mz + 2 * ngg + 2 * DF_N - 1) / TPB.y + 1)};
+        time_t time_curr;
+        initialize_rest_rng<<<BPG, TPB>>>(rng_states_dPtr, iFace, time(&time_curr), ngg + DF_N - old_width_single_side,
+                                          ngg + DF_N - old_width_single_side, ngg, my, mz);
+      }
+
+      // The velocity fluctuation of last step
+      if (ngg_read >= ngg) {
+        MPI_Datatype ty;
+        int lSize[2]{my + 2 * ngg_read, mz + 2 * ngg_read};
+        int sSize[2]{my + 2 * ngg, mz + 2 * ngg};
+        int start[2]{ngg_read - ngg, ngg_read - ngg};
+        MPI_Type_create_subarray(2, lSize, sSize, start, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
+        MPI_Type_commit(&ty);
+
+        MPI_File_read_at(fp, offset, df_velFluc_cpu[iFace].data(), 3, ty, MPI_STATUS_IGNORE);
+        // offset += (MPI_Offset) ((my + 2 * ngg_read) * (mz + 2 * ngg_read) * 3 * sizeof(real));
+        MPI_Type_free(&ty);
+        cudaMemcpy(df_velFluc_old_hPtr[iFace].data(), df_velFluc_cpu[iFace].data(),
+                   (my + 2 * ngg) * (mz + 2 * ngg) * 3 * sizeof(real), cudaMemcpyHostToDevice);
+      } else {
+        auto &velFluc_cpu = df_velFluc_cpu[iFace];
+        for (int l = 0; l < 3; ++l) {
+          for (int k = -ngg_read; k < mz + ngg_read; ++k) {
+            for (int j = -ngg_read; j < my + ngg_read; ++j) {
+              MPI_File_read_at(fp, offset, &velFluc_cpu(j, k, l), 1, MPI_DOUBLE, MPI_STATUS_IGNORE);
+              offset += sizeof(real);
+            }
+          }
+        }
+        cudaMemcpy(df_velFluc_old_hPtr[iFace].data(), df_velFluc_cpu[iFace].data(),
+                   (my + 2 * ngg) * (mz + 2 * ngg) * 3 * sizeof(real), cudaMemcpyHostToDevice);
+      }
+    }
+    if (initialized)
+      return;
+  }
 
   // From start
   // initialize the random number states
-  initialize_digital_filter_random_number_states(*this, N1, N2, ngg);
-  if (myid == 0)
-    printf("\tThe random number states for the digital filter are initialized.\n");
-
-  // Do the same for a new velocity fluctuation
-  for (int iFace = 0; iFace < n_df_face; ++iFace) {
-    generate_random_numbers(N1[iFace], N2[iFace], ngg, iFace);
-    apply_convolution(N1[iFace], N2[iFace], ngg, iFace);
-    int sz = N1[iFace] * N2[iFace] * 3;
-    cudaMemcpy(df_velFluc_old_hPtr[iFace].data(), df_velFluc_new_hPtr[iFace].data(),
-               sz * sizeof(real), cudaMemcpyDeviceToDevice);
+  for (int i = 0; i < n_df_face; ++i) {
+    int sz = (N1[i] + 2 * DF_N + 2 * ngg) * (N2[i] + 2 * DF_N + 2 * ngg) * 3;
+    dim3 TPB = {1024, 1, 1};
+    dim3 BPG = {(sz - 1) / TPB.x + 1, 1, 1};
+    // Get the current time
+    time_t time_curr;
+    initialize_rng<<<BPG, TPB>>>(rng_states_hPtr[i].data(), sz, time(&time_curr));
+    // Initialize the old velocity fluctuation
+    generate_random_numbers(N1[i], N2[i], ngg, i);
+    apply_convolution(N1[i], N2[i], ngg, i);
+    sz = (N1[i] + 2 * ngg) * (N2[i] + 2 * ngg) * 3;
+    cudaMemcpy(df_velFluc_old_hPtr[i].data(), df_velFluc_new_hPtr[i].data(), sz * sizeof(real),
+               cudaMemcpyDeviceToDevice);
+    TPB = {32, 32};
+    BPG = {((N1[i] + 2 * ngg + TPB.x - 1) / TPB.x), ((N2[i] + 2 * ngg + TPB.y - 1) / TPB.y)};
+    compute_fluctuations_first_step<<<BPG, TPB>>>(fluctuation_dPtr, df_lundMatrix_dPtr, df_velFluc_old_dPtr, i, N1[i],
+                                                  N2[i], ngg);
   }
-
-  // generate the fluctuation profile
-  cfd::compute_fluctuations(*this, N1, N2, mesh.ngg);
   if (myid == 0)
     printf("\tThe velocity fluctuations are computed.\n");
-
-//  for (int i = 0; i < n_df_face; ++i) {
-//    int sz = (N1[i] + 2 * DF_N + 2 * ngg) * (N2[i] + 2 * DF_N + 2 * ngg) * 3;
-//    dim3 TPB = {1024, 1, 1};
-//    dim3 BPG = {(sz - 1) / TPB.x + 1, 1, 1};
-//    // Get the current time
-//    time_t time_curr;
-//    initialize_rng<<<BPG, TPB>>>(rng_states_hPtr[i].data(), sz, time(&time_curr));
-//    // Initialize the old velocity fluctuation
-//    generate_random_numbers(N1[i], N2[i], ngg, i);
-//    apply_convolution(N1[i], N2[i], ngg, i);
-//    sz = (N1[i] + 2 * ngg) * (N2[i] + 2 * ngg) * 3;
-//    cudaMemcpy(df_velFluc_old_hPtr[i].data(), df_velFluc_new_hPtr[i].data(), sz * sizeof(real),
-//               cudaMemcpyDeviceToDevice);
-//    TPB = {32, 32};
-//    BPG = {((N1[i] + 2 * ngg + TPB.x - 1) / TPB.x), ((N2[i] + 2 * ngg + TPB.y - 1) / TPB.y)};
-//    compute_fluctuations_first_step<<<BPG, TPB>>>(fluctuation_dPtr, df_lundMatrix_dPtr, df_velFluc_old_dPtr, i, N1[i],
-//                                                  N2[i], ngg);
-//  }
-//  if (myid == 0)
-//    printf("\tThe velocity fluctuations are computed.\n");
 }
 
 void DBoundCond::get_digital_filter_lund_matrix(Parameter &parameter, std::vector<int> &N1,
