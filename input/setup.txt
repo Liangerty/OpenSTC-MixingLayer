@@ -75,7 +75,7 @@ bool upper_faster = 0   // 1 - upper stream has larger mach number, 0 - lower st
 int characteristic_velocity_ml = 0 // 0 - convective velocity, 1 - velocity delta.
 
 // spatial discretization
-int inviscid_scheme = 71               // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
+int inviscid_scheme = 72               // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
 bool positive_preserving = 1            // If the Positive-preserving limiter is activated, only implemented for 51/52
 int viscous_order = 2                   // Default: 2nd order central discretization. Other choices: 0(inviscid)
 

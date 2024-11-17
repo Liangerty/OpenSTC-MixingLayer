@@ -108,14 +108,15 @@ private:
   void get_digital_filter_convolution_kernel(Parameter &parameter, std::vector<int> &N1,
                                              std::vector<std::vector<real>> &y_scaled, real dz) const;
 
-  void generate_random_numbers(int my, int mz, int ngg, int iFace) const;
+  void generate_random_numbers(int iFace, int my, int mz, int ngg) const;
 
-  void apply_convolution(int my, int mz, int ngg, int iFace) const;
+  void apply_convolution(int iFace, int my, int mz, int ngg) const;
 
   void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field);
 
   void
-  compute_fluctuations(int my, int mz, int ngg, int iFace, DParameter *param, DZone *zone, Inflow *inflowHere) const;
+  compute_fluctuations(DParameter *param, DZone *zone, Inflow *inflowHere, int iFace, int my, int mz,
+                       int ngg) const;
 };
 
 void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, int n_bc, int **sep, int blk_idx, int n_block,
@@ -1575,10 +1576,10 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         if (i_zone != block.block_id) {
           continue;
         }
-        int my = block.my, mz = block.mz, mx = 1, ngg = block.ngg;
-        generate_random_numbers(my, mz, ngg, df_label[l]);
-        apply_convolution(my, mz, ngg, df_label[l]);
-        compute_fluctuations(my, mz, ngg, df_label[l], param, field.d_ptr, &inflow[l]);
+        int my = block.my, mz = block.mz, ngg = block.ngg;
+        generate_random_numbers(df_label[l], my, mz, ngg);
+        apply_convolution(df_label[l], my, mz, ngg);
+        compute_fluctuations(param, field.d_ptr, &inflow[l], df_label[l], my, mz, ngg);
         dim3 TPB{32, 8};
         dim3 BPG{(my - 1) / TPB.x + 1, (mz - 1) / TPB.y + 1};
         apply_inflow_df<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], param, fluctuation_dPtr,

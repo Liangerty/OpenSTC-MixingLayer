@@ -232,8 +232,8 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
     time_t time_curr;
     initialize_rng<<<BPG, TPB>>>(rng_states_hPtr[i].data(), sz, time(&time_curr));
     // Initialize the old velocity fluctuation
-    generate_random_numbers(N1[i], N2[i], ngg, i);
-    apply_convolution(N1[i], N2[i], ngg, i);
+    generate_random_numbers(i, N1[i], N2[i], ngg);
+    apply_convolution(i, N1[i], N2[i], ngg);
     sz = (N1[i] + 2 * ngg) * (N2[i] + 2 * ngg) * 3;
     cudaMemcpy(df_velFluc_old_hPtr[i].data(), df_velFluc_new_hPtr[i].data(), sz * sizeof(real),
                cudaMemcpyDeviceToDevice);
@@ -317,7 +317,7 @@ void DBoundCond::get_digital_filter_lund_matrix(Parameter &parameter, std::vecto
 
 void
 assume_gaussian_reynolds_stress(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::vector<int> &N1,
-                                     std::vector<std::vector<real>> &y_scaled) {
+                                std::vector<std::vector<real>> &y_scaled) {
   auto Rij = parameter.get_real_array("df_reynolds_gaussian_peak");
 
   real *Rij_dPtr;
@@ -355,18 +355,18 @@ void DBoundCond::get_digital_filter_convolution_kernel(Parameter &parameter, std
 
     int TPB = 512;
     int BPG = (N1[iFace] + 2 * ngg + TPB - 1) / TPB;
-    compute_convolution_kernel<<<BPG, TPB>>>(y_scaled_dPtr, df_by_dPtr, df_bz_dPtr, iFace, N1[iFace],
-                                             dz / DF_IntegralLength, ngg);
+    compute_convolution_kernel<<<BPG, TPB>>>(y_scaled_dPtr, df_by_dPtr, df_bz_dPtr, dz / DF_IntegralLength, iFace,
+                                             N1[iFace], ngg);
     cudaFree(y_scaled_dPtr);
   }
 }
 
-void DBoundCond::generate_random_numbers(int my, int mz, int ngg, int iFace) const {
+void DBoundCond::generate_random_numbers(int iFace, int my, int mz, int ngg) const {
   // 1. Generate random numbers
   dim3 TPB(32, 32);
   dim3 BPG{((my + 2 * DBoundCond::DF_N + 2 * ngg + TPB.x - 1) / TPB.x),
            ((mz + 2 * DBoundCond::DF_N + 2 * ngg + TPB.y - 1) / TPB.y)};
-  generate_random_numbers_kernel<<<BPG, TPB>>>(rng_states_dPtr, iFace, my, mz, random_values_dPtr, ngg);
+  generate_random_numbers_kernel<<<BPG, TPB>>>(rng_states_dPtr, random_values_dPtr, iFace, my, mz, ngg);
 
   // 2. remove the mean spanwise
   TPB = 256;
@@ -379,30 +379,29 @@ void DBoundCond::generate_random_numbers(int my, int mz, int ngg, int iFace) con
   apply_periodic_in_spanwise<<<BPG, TPB>>>(random_values_dPtr, iFace, my, mz, ngg);
 }
 
-void DBoundCond::apply_convolution(int my, int mz, int ngg, int iFace) const {
+void DBoundCond::apply_convolution(int iFace, int my, int mz, int ngg) const {
   dim3 TPB(32, 8);
   dim3 BPG{((my + 2 * ngg + TPB.x - 1) / TPB.x),
            ((mz + 2 * ngg + 2 * DBoundCond::DF_N + TPB.y - 1) / TPB.y)};
   perform_convolution_y<<<BPG, TPB>>>(random_values_dPtr, df_by_dPtr, df_fy_dPtr, iFace, my, mz, ngg);
 
   BPG = {((my + 2 * ngg + TPB.x - 1) / TPB.x), ((mz + 2 * ngg + TPB.y - 1) / TPB.y)};
-  perform_convolution_z<<<BPG, TPB>>>(df_fy_dPtr, iFace, my, mz, df_velFluc_new_dPtr, df_bz_dPtr, ngg);
+  perform_convolution_z<<<BPG, TPB>>>(df_fy_dPtr, df_bz_dPtr, df_velFluc_new_dPtr, iFace, my, mz, ngg);
 }
 
 void
-DBoundCond::compute_fluctuations(int my, int mz, int ngg, int iFace, DParameter *param, DZone *zone,
-                                 Inflow *inflowHere) const {
+DBoundCond::compute_fluctuations(DParameter *param, DZone *zone, Inflow *inflowHere, int iFace, int my, int mz,
+                                 int ngg) const {
   dim3 TPB(32, 8);
   dim3 BPG{((my + 2 * ngg + TPB.x - 1) / TPB.x), ((mz + 2 * ngg + TPB.y - 1) / TPB.y)};
-  Castro_time_correlation_and_fluc_computation<<<BPG, TPB>>>(df_velFluc_old_dPtr, df_velFluc_new_dPtr, iFace, my, mz,
-                                                             ngg, param, zone, inflowHere, fluctuation_dPtr,
-                                                             df_lundMatrix_dPtr);
+  Castro_time_correlation_and_fluc_computation<<<BPG, TPB>>>(param, zone, inflowHere, df_velFluc_old_dPtr,
+                                                             df_velFluc_new_dPtr, df_lundMatrix_dPtr, fluctuation_dPtr,
+                                                             iFace, my, mz, ngg);
 }
 
 __global__ void
-compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij,
-                                                           ggxl::VectorField1D<real> *df_lundMatrix_hPtr,
-                                                           int i_face, const real *y_scaled, int my, int ngg) {
+compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij, ggxl::VectorField1D<real> *df_lundMatrix_hPtr,
+                                                      int i_face, const real *y_scaled, int my, int ngg) {
   int j = (int) (blockIdx.x * blockDim.x + threadIdx.x) - ngg;
   if (j >= my + ngg) {
     return;
@@ -432,9 +431,9 @@ compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij,
 //         mat(j, 5));
 }
 
-__global__ void compute_convolution_kernel(const real *y_scaled, ggxl::VectorField2D<real> *df_by,
-                                                ggxl::VectorField2D<real> *df_bz, int iFace, int my,
-                                                real dz_scaled, int ngg) {
+__global__ void
+compute_convolution_kernel(const real *y_scaled, ggxl::VectorField2D<real> *df_by, ggxl::VectorField2D<real> *df_bz,
+                           real dz_scaled, int iFace, int my, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
   if (j >= my + ngg) {
     return;
@@ -483,8 +482,8 @@ __global__ void compute_convolution_kernel(const real *y_scaled, ggxl::VectorFie
 }
 
 __global__ void
-generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int iFace, int my,
-                               int mz, ggxl::VectorField2D<real> *random_numbers, int ngg) {
+generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, ggxl::VectorField2D<real> *random_numbers,
+                               int iFace, int my, int mz, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
   int k = int(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
   if (j >= my + DBoundCond::DF_N + ngg || k >= mz + DBoundCond::DF_N + ngg) {
@@ -577,8 +576,8 @@ perform_convolution_y(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorFie
 }
 
 __global__ void
-perform_convolution_z(ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz, ggxl::VectorField2D<real> *velFluc,
-                      ggxl::VectorField2D<real> *df_bz, int ngg) {
+perform_convolution_z(ggxl::VectorField2D<real> *df_fy, ggxl::VectorField2D<real> *df_bz,
+                      ggxl::VectorField2D<real> *velFluc, int iFace, int my, int mz, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
   int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
   if (j >= my + ngg || k >= mz + ngg) {
@@ -622,11 +621,12 @@ compute_fluctuations_first_step(ggxl::VectorField3D<real> *fluctuation_dPtr, ggx
 }
 
 __global__ void
-Castro_time_correlation_and_fluc_computation(ggxl::VectorField2D<real> *velFluc_old,
-                                             ggxl::VectorField2D<real> *velFluc_new, int iFace, int my, int mz,
-                                             int ngg, DParameter *param, DZone *zone, Inflow *inflow,
-                                             ggxl::VectorField3D<real> *fluctuation_dPtr,
-                                             ggxl::VectorField1D<real> *lundMatrix_dPtr) {
+Castro_time_correlation_and_fluc_computation(DParameter *param, DZone *zone, Inflow *inflow,
+                                             ggxl::VectorField2D<real> *velFluc_old,
+                                             ggxl::VectorField2D<real> *velFluc_new,
+                                             ggxl::VectorField1D<real> *lundMatrix_dPtr,
+                                             ggxl::VectorField3D<real> *fluctuation_dPtr, int iFace, int my,
+                                             int mz, int ngg) {
   int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
   int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
   if (j >= my + ngg || k >= mz + ngg) {
