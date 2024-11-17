@@ -36,15 +36,9 @@ struct DBoundCond {
 
   void link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) const;
 
-  void initialize_df_memory(const Mesh &mesh, const Parameter &parameter, std::vector<int> &N1, std::vector<int> &N2);
-
   template<MixtureModel mix_model, class turb>
   void
   apply_boundary_conditions(const Block &block, Field &field, DParameter *param, bool update_df, int step = -1) const;
-
-  void generate_random_numbers(int my, int mz, int ngg, int iFace) const;
-
-  void apply_convolution(int my, int mz, int ngg, int iFace) const;
 
   void write_df(cfd::Parameter &parameter, const Mesh &mesh);
 
@@ -106,11 +100,17 @@ struct DBoundCond {
 private:
   void initialize_digital_filter(Parameter &parameter, cfd::Mesh &mesh);
 
+  void initialize_df_memory(const Mesh &mesh, std::vector<int> &N1, std::vector<int> &N2);
+
   void
   get_digital_filter_lund_matrix(Parameter &parameter, std::vector<int> &N1, std::vector<std::vector<real>> &scaled_y);
 
   void get_digital_filter_convolution_kernel(Parameter &parameter, std::vector<int> &N1,
                                              std::vector<std::vector<real>> &y_scaled, real dz) const;
+
+  void generate_random_numbers(int my, int mz, int ngg, int iFace) const;
+
+  void apply_convolution(int my, int mz, int ngg, int iFace) const;
 
   void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field);
 
@@ -129,34 +129,6 @@ initialize_rng(curandState *rng_states, int size, int64_t time_stamp);
 __global__ void
 initialize_rest_rng(ggxl::VectorField2D<curandState> *rng_states, int iFace, int64_t time_stamp, int dy, int dz,
                     int ngg, int my, int mz);
-
-__global__ void
-compute_fluctuations_first_step(ggxl::VectorField3D<real> *fluctuation_dPtr, ggxl::VectorField1D<real> *lundMatrix_dPtr,
-                                ggxl::VectorField2D<real> *df_velFluc_old_dPtr, int iFace, int my, int mz, int ngg);
-
-__global__ void
-generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int iFace, int my,
-                               int mz, ggxl::VectorField2D<real> *random_numbers, int ngg);
-
-__global__ void
-apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg);
-
-__global__ void
-remove_mean_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg);
-
-__global__ void perform_convolution_y(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
-                                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz, int ngg);
-
-__global__ void
-perform_convolution_z(ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz, ggxl::VectorField2D<real> *velFluc,
-                      ggxl::VectorField2D<real> *df_bz, int ngg);
-
-__global__ void
-Castro_time_correlation_and_fluc_computation(ggxl::VectorField2D<real> *velFluc_old,
-                                             ggxl::VectorField2D<real> *velFluc_new, int iFace, int my, int mz,
-                                             int ngg, DParameter *param, DZone *zone, Inflow *inflow,
-                                             ggxl::VectorField3D<real> *fluctuation_dPtr,
-                                             ggxl::VectorField1D<real> *lundMatrix_dPtr);
 
 template<MixtureModel mix_model, class turb>
 __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {

@@ -102,7 +102,7 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
     return;
   }
 
-  initialize_df_memory(mesh, parameter, N1, N2);
+  initialize_df_memory(mesh, N1, N2);
   if (myid == 0)
     printf("\tThe memory for the digital filter is allocated.\n");
 
@@ -246,6 +246,63 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
     printf("\tThe velocity fluctuations are computed.\n");
 }
 
+void DBoundCond::initialize_df_memory(const Mesh &mesh, std::vector<int> &N1, std::vector<int> &N2) {
+  std::vector<ggxl::VectorField1D<real>> df_lundMatrix_hPtr(n_df_face);
+  std::vector<ggxl::VectorField2D<real>> df_by_hPtr(n_df_face);
+  std::vector<ggxl::VectorField2D<real>> df_bz_hPtr(n_df_face);
+  rng_states_hPtr = new ggxl::VectorField2D<curandState>[n_df_face];
+  random_values_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+  std::vector<ggxl::VectorField2D<real>> df_fy_hPtr(n_df_face);
+  df_velFluc_old_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+  df_velFluc_new_hPtr = new ggxl::VectorField2D<real>[n_df_face];
+  std::vector<ggxl::VectorField3D<real>> fluctuation_hPtr(n_df_face);
+
+  df_rng_state_cpu = new ggxl::VectorField2DHost<curandState>[n_df_face];
+  df_velFluc_cpu = new ggxl::VectorField2DHost<real>[n_df_face];
+
+  const int ngg = mesh.ngg;
+  for (int i = 0; i < n_df_face; ++i) {
+    int my = N1[i], mz = N2[i];
+    df_lundMatrix_hPtr[i].allocate_memory(my, 6, ngg);
+    df_by_hPtr[i].allocate_memory(my, 1, 3, std::max(ngg, DF_N));
+    df_bz_hPtr[i].allocate_memory(my, 1, 3, std::max(ngg, DF_N));
+    rng_states_hPtr[i].allocate_memory(my, mz, 3, DF_N + ngg);
+    random_values_hPtr[i].allocate_memory(my, mz, 3, DF_N + ngg);
+    df_fy_hPtr[i].allocate_memory(my, mz, 3, DF_N + ngg);
+    df_velFluc_old_hPtr[i].allocate_memory(my, mz, 3, ngg);
+    df_velFluc_new_hPtr[i].allocate_memory(my, mz, 3, ngg);
+    fluctuation_hPtr[i].allocate_memory(1, my, mz, 3, ngg);
+
+    df_rng_state_cpu[i].allocate_memory(my, mz, 3, DF_N + ngg);
+    df_velFluc_cpu[i].allocate_memory(my, mz, 3, ngg);
+  }
+
+  cudaMalloc(&df_lundMatrix_dPtr, n_df_face * sizeof(ggxl::VectorField1D<real>));
+  cudaMemcpy(df_lundMatrix_dPtr, df_lundMatrix_hPtr.data(), n_df_face * sizeof(ggxl::VectorField1D<real>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&df_by_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_by_dPtr, df_by_hPtr.data(), n_df_face * sizeof(ggxl::VectorField2D<real>), cudaMemcpyHostToDevice);
+  cudaMalloc(&df_bz_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_bz_dPtr, df_bz_hPtr.data(), n_df_face * sizeof(ggxl::VectorField2D<real>), cudaMemcpyHostToDevice);
+  cudaMalloc(&rng_states_dPtr, n_df_face * sizeof(ggxl::VectorField2D<curandState>));
+  cudaMemcpy(rng_states_dPtr, rng_states_hPtr, n_df_face * sizeof(ggxl::VectorField2D<curandState>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&random_values_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(random_values_dPtr, random_values_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&df_fy_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_fy_dPtr, df_fy_hPtr.data(), n_df_face * sizeof(ggxl::VectorField2D<real>), cudaMemcpyHostToDevice);
+  cudaMalloc(&df_velFluc_old_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_velFluc_old_dPtr, df_velFluc_old_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&df_velFluc_new_dPtr, n_df_face * sizeof(ggxl::VectorField2D<real>));
+  cudaMemcpy(df_velFluc_new_dPtr, df_velFluc_new_hPtr, n_df_face * sizeof(ggxl::VectorField2D<real>),
+             cudaMemcpyHostToDevice);
+  cudaMalloc(&fluctuation_dPtr, n_df_face * sizeof(ggxl::VectorField3D<real>));
+  cudaMemcpy(fluctuation_dPtr, fluctuation_hPtr.data(), n_df_face * sizeof(ggxl::VectorField3D<real>),
+             cudaMemcpyHostToDevice);
+}
+
 void DBoundCond::get_digital_filter_lund_matrix(Parameter &parameter, std::vector<int> &N1,
                                                 std::vector<std::vector<real>> &scaled_y) {
   int method = parameter.get_int("reynolds_stress_supplier");
@@ -278,6 +335,165 @@ void DBoundCond::get_digital_filter_convolution_kernel(Parameter &parameter, std
   }
 }
 
+void DBoundCond::generate_random_numbers(int my, int mz, int ngg, int iFace) const {
+  // 1. Generate random numbers
+  dim3 TPB(32, 32);
+  dim3 BPG{((my + 2 * DBoundCond::DF_N + 2 * ngg + TPB.x - 1) / TPB.x),
+           ((mz + 2 * DBoundCond::DF_N + 2 * ngg + TPB.y - 1) / TPB.y)};
+  generate_random_numbers_kernel<<<BPG, TPB>>>(rng_states_dPtr, iFace, my, mz, random_values_dPtr, ngg);
+
+  // 2. remove the mean spanwise
+  TPB = 256;
+  BPG = (my + 2 * DBoundCond::DF_N + 2 * ngg - 1) / TPB.x + 1;
+  remove_mean_spanwise<<<BPG, TPB>>>(random_values_dPtr, iFace, my, mz, ngg);
+
+  // 3. Apply periodic boundary condition in spanwise direction
+  TPB = {32, 32};
+  BPG = {(my + 2 * DBoundCond::DF_N + 2 * ngg - 1) / TPB.x + 1, ((DBoundCond::DF_N + ngg + TPB.y - 1) / TPB.y)};
+  apply_periodic_in_spanwise<<<BPG, TPB>>>(random_values_dPtr, iFace, my, mz, ngg);
+}
+
+void DBoundCond::apply_convolution(int my, int mz, int ngg, int iFace) const {
+  dim3 TPB(32, 8);
+  dim3 BPG{((my + 2 * ngg + TPB.x - 1) / TPB.x),
+           ((mz + 2 * ngg + 2 * DBoundCond::DF_N + TPB.y - 1) / TPB.y)};
+  perform_convolution_y<<<BPG, TPB>>>(random_values_dPtr, df_by_dPtr, df_fy_dPtr, iFace, my, mz, ngg);
+
+  BPG = {((my + 2 * ngg + TPB.x - 1) / TPB.x), ((mz + 2 * ngg + TPB.y - 1) / TPB.y)};
+  perform_convolution_z<<<BPG, TPB>>>(df_fy_dPtr, iFace, my, mz, df_velFluc_new_dPtr, df_bz_dPtr, ngg);
+}
+
+void
+DBoundCond::compute_fluctuations(int my, int mz, int ngg, int iFace, DParameter *param, DZone *zone,
+                                 Inflow *inflowHere) const {
+  dim3 TPB(32, 8);
+  dim3 BPG{((my + 2 * ngg + TPB.x - 1) / TPB.x), ((mz + 2 * ngg + TPB.y - 1) / TPB.y)};
+  Castro_time_correlation_and_fluc_computation<<<BPG, TPB>>>(df_velFluc_old_dPtr, df_velFluc_new_dPtr, iFace, my, mz,
+                                                             ngg, param, zone, inflowHere, fluctuation_dPtr,
+                                                             df_lundMatrix_dPtr);
+}
+
+__global__ void
+generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, int iFace, int my,
+                               int mz, ggxl::VectorField2D<real> *random_numbers, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
+  if (j >= my + DBoundCond::DF_N + ngg || k >= mz + DBoundCond::DF_N + ngg) {
+    return;
+  }
+
+  random_numbers[iFace](j, k, 0) = curand_normal_double(&rng_states[iFace](j, k, 0));
+  random_numbers[iFace](j, k, 1) = curand_normal_double(&rng_states[iFace](j, k, 1));
+  random_numbers[iFace](j, k, 2) = curand_normal_double(&rng_states[iFace](j, k, 2));
+}
+
+__global__ void remove_mean_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  if (j >= my + DBoundCond::DF_N + ngg) {
+    return;
+  }
+
+  auto &r = random_numbers[iFace];
+
+  real mean[3]{0, 0, 0}, rms[3]{0, 0, 0};
+  for (int k = 0; k < mz; ++k) {
+    mean[0] += r(j, k, 0);
+    mean[1] += r(j, k, 1);
+    mean[2] += r(j, k, 2);
+
+    rms[0] += r(j, k, 0) * r(j, k, 0);
+    rms[1] += r(j, k, 1) * r(j, k, 1);
+    rms[2] += r(j, k, 2) * r(j, k, 2);
+  }
+  real mz_inv = 1.0 / mz;
+  mean[0] *= mz_inv;
+  mean[1] *= mz_inv;
+  mean[2] *= mz_inv;
+
+  rms[0] = sqrt(rms[0] * mz_inv - mean[0] * mean[0]);
+  rms[1] = sqrt(rms[1] * mz_inv - mean[1] * mean[1]);
+  rms[2] = sqrt(rms[2] * mz_inv - mean[2] * mean[2]);
+
+  for (int k = 0; k < mz; ++k) {
+    r(j, k, 0) = (r(j, k, 0) - mean[0]) / rms[0];
+    r(j, k, 1) = (r(j, k, 1) - mean[1]) / rms[1];
+    r(j, k, 2) = (r(j, k, 2) - mean[2]) / rms[2];
+  }
+}
+
+__global__ void
+apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) + 1;
+  if (j >= my + DBoundCond::DF_N + ngg || k > DBoundCond::DF_N + ngg) {
+    return;
+  }
+
+  auto &r = random_numbers[iFace];
+  r(j, mz - 1 + k, 0) = r(j, k, 0);
+  r(j, -k, 0) = r(j, mz - 1 - k, 0);
+  r(j, mz - 1 + k, 1) = r(j, k, 1);
+  r(j, -k, 1) = r(j, mz - 1 - k, 1);
+  r(j, mz - 1 + k, 2) = r(j, k, 2);
+  r(j, -k, 2) = r(j, mz - 1 - k, 2);
+}
+
+__global__ void
+perform_convolution_y(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
+                      ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg - DBoundCond::DF_N;
+  if (j >= my + ngg || k >= mz + DBoundCond::DF_N + ngg) {
+    return;
+  }
+
+  auto &by = df_by[iFace];
+  auto &r = random_numbers[iFace];
+
+  auto &fy = df_fy[iFace];
+  auto &fy0 = fy(j, k, 0);
+  auto &fy1 = fy(j, k, 1);
+  auto &fy2 = fy(j, k, 2);
+
+  // y convolution
+  fy0 = 0;
+  fy1 = 0;
+  fy2 = 0;
+
+  for (int jj = -DBoundCond::DF_N; jj <= DBoundCond::DF_N; ++jj) {
+    fy0 += by(j, jj, 0) * r(j + jj, k, 0);
+    fy1 += by(j, jj, 1) * r(j + jj, k, 1);
+    fy2 += by(j, jj, 2) * r(j + jj, k, 2);
+  }
+}
+
+__global__ void
+perform_convolution_z(ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz, ggxl::VectorField2D<real> *velFluc,
+                      ggxl::VectorField2D<real> *df_bz, int ngg) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  if (j >= my + ngg || k >= mz + ngg) {
+    return;
+  }
+
+  auto &fy = df_fy[iFace];
+  // z convolution
+  auto &bz = df_bz[iFace];
+
+  auto &vf = velFluc[iFace];
+
+  real upp = 0, vpp = 0, wpp = 0;
+
+  for (int kk = -DBoundCond::DF_N; kk <= DBoundCond::DF_N; ++kk) {
+    upp += bz(j, kk, 0) * fy(j, k + kk, 0);
+    vpp += bz(j, kk, 1) * fy(j, k + kk, 1);
+    wpp += bz(j, kk, 2) * fy(j, k + kk, 2);
+  }
+  vf(j, k, 0) = upp;
+  vf(j, k, 1) = vpp;
+  vf(j, k, 2) = wpp;
+}
+
 __global__ void
 compute_fluctuations_first_step(ggxl::VectorField3D<real> *fluctuation_dPtr, ggxl::VectorField1D<real> *lundMatrix_dPtr,
                                 ggxl::VectorField2D<real> *df_velFluc_old_dPtr, int iFace, int my, int mz, int ngg) {
@@ -295,7 +511,171 @@ compute_fluctuations_first_step(ggxl::VectorField3D<real> *fluctuation_dPtr, ggx
   fluc(0, j, k, 1) = lund(j, 1) * velGen(j, k, 0) + lund(j, 2) * velGen(j, k, 1);
   fluc(0, j, k, 2) = lund(j, 3) * velGen(j, k, 0) + lund(j, 4) * velGen(j, k, 1) + lund(j, 5) * velGen(j, k, 2);
 }
+
+__global__ void
+Castro_time_correlation_and_fluc_computation(ggxl::VectorField2D<real> *velFluc_old,
+                                             ggxl::VectorField2D<real> *velFluc_new, int iFace, int my, int mz,
+                                             int ngg, DParameter *param, DZone *zone, Inflow *inflow,
+                                             ggxl::VectorField3D<real> *fluctuation_dPtr,
+                                             ggxl::VectorField1D<real> *lundMatrix_dPtr) {
+  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  if (j >= my + ngg || k >= mz + ngg) {
+    return;
+  }
+
+  const real dt = 1.0 / 3.0 * param->dt;
+
+  const real u_upper = inflow->u, u_lower = inflow->u_lower;
+  auto y = zone->y(0, j, k);
+  const real y_ref = inflow->delta_omega;
+  real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / y_ref);
+
+  // The integral timescale is treated as a single value here, thus only the first element is used.
+  real tLen_x = y_ref / u;
+  //real tLen_y = y_ref / u;
+  //real tLen_z = y_ref / u;
+
+  real PiDtDivTInt = -pi * dt / tLen_x;
+
+  real arg1 = exp(PiDtDivTInt * 0.5);
+  real arg2 = sqrt(1 - exp(PiDtDivTInt));
+
+  auto &old = velFluc_old[iFace];
+  auto &vf = velFluc_new[iFace];
+
+  real val1 = arg1 * old(j, k, 0) + arg2 * vf(j, k, 0);
+  real val2 = arg1 * old(j, k, 1) + arg2 * vf(j, k, 1);
+  real val3 = arg1 * old(j, k, 2) + arg2 * vf(j, k, 2);
+  vf(j, k, 0) = val1;
+  vf(j, k, 1) = val2;
+  vf(j, k, 2) = val3;
+  old(j, k, 0) = val1;
+  old(j, k, 1) = val2;
+  old(j, k, 2) = val3;
+
+  auto &lund = lundMatrix_dPtr[iFace];
+  auto &fluc = fluctuation_dPtr[iFace];
+  fluc(0, j, k, 0) = lund(j, 0) * val1;
+  fluc(0, j, k, 1) = lund(j, 1) * val1 + lund(j, 2) * val2;
+  fluc(0, j, k, 2) = lund(j, 3) * val1 + lund(j, 4) * val2 + lund(j, 5) * val3;
 }
+
+void DBoundCond::write_df(cfd::Parameter &parameter, const Mesh &mesh) {
+  int myid = parameter.get_int("myid");
+  printf("Process %d is writing the digital filter to the file.\n", myid);
+
+  auto err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error: %s\n", cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
+  for (int iFace = 0; iFace < n_df_face; ++iFace) {
+    std::string filename = "./output/df-p" + std::to_string(myid) + "-f" + std::to_string(iFace) + ".bin";
+    FILE *fp = fopen(filename.c_str(), "wb");
+    if (fp == nullptr) {
+      printf("Error: cannot open the file %s.\n", filename.c_str());
+      MpiParallel::exit();
+    }
+
+    // First, write the state of the random number generator
+    int blk = df_related_block[iFace];
+    int my = mesh[blk].my, mz = mesh[blk].mz, ngg = mesh.ngg;
+    int sz1 = (my + 2 * DBoundCond::DF_N + 2 * ngg) * (mz + 2 * DBoundCond::DF_N + 2 * ngg) * 3;
+    int sz2 = (my + 2 * ngg) * (mz + 2 * ngg) * 3;
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+      printf("Error: %s\n", cudaGetErrorString(err));
+      MpiParallel::exit();
+    }
+    cudaMemcpy(df_rng_state_cpu[iFace].data(), rng_states_hPtr[iFace].data(), sz1 * sizeof(curandState),
+               cudaMemcpyDeviceToHost);
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+      printf("Error: %s\n", cudaGetErrorString(err));
+      MpiParallel::exit();
+    }
+    cudaMemcpy(df_velFluc_cpu[iFace].data(), df_velFluc_new_hPtr[iFace].data(),
+               sz2 * sizeof(real), cudaMemcpyDeviceToHost);
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+      printf("Error: %s\n", cudaGetErrorString(err));
+      MpiParallel::exit();
+    }
+    fwrite(&my, sizeof(int), 1, fp);
+    fwrite(&mz, sizeof(int), 1, fp);
+    fwrite(&ngg, sizeof(int), 1, fp);
+    fwrite(&DF_N, sizeof(int), 1, fp);
+
+    fwrite(df_rng_state_cpu[iFace].data(), sizeof(curandState), sz1, fp);
+    fwrite(df_velFluc_cpu[iFace].data(), sizeof(real), sz2, fp);
+
+    fclose(fp);
+  }
+}
+
+}
+
+void
+cfd::assume_gaussian_reynolds_stress(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::vector<int> &N1,
+                                     std::vector<std::vector<real>> &y_scaled) {
+  auto Rij = parameter.get_real_array("df_reynolds_gaussian_peak");
+
+  real *Rij_dPtr;
+  cudaMalloc(&Rij_dPtr, 6 * sizeof(real));
+  cudaMemcpy(Rij_dPtr, Rij.data(), 6 * sizeof(real), cudaMemcpyHostToDevice);
+
+  // Assume the Reynolds stress is Gaussian
+  const int ngg = parameter.get_int("ngg");
+  for (int i = 0; i < dBoundCond.n_df_face; ++i) {
+    real *y_scaled_dPtr;
+    cudaMalloc(&y_scaled_dPtr, y_scaled[i].size() * sizeof(real));
+    cudaMemcpy(y_scaled_dPtr, y_scaled[i].data(), y_scaled[i].size() * sizeof(real), cudaMemcpyHostToDevice);
+
+    int TPB = 512;
+    int BPG = (N1[i] + 2 * ngg + TPB - 1) / TPB;
+    compute_lundMat_with_assumed_gaussian_reynolds_stress<<<BPG, TPB>>>(Rij_dPtr, dBoundCond.df_lundMatrix_dPtr, i,
+                                                                        y_scaled_dPtr, N1[i], ngg);
+
+    cudaFree(y_scaled_dPtr);
+  }
+  cudaFree(Rij_dPtr);
+}
+
+__global__ void
+cfd::compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij,
+                                                           ggxl::VectorField1D<real> *df_lundMatrix_hPtr,
+                                                           int i_face, const real *y_scaled, int my, int ngg) {
+  int j = (int) (blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  if (j >= my + ngg) {
+    return;
+  }
+
+  auto &mat = df_lundMatrix_hPtr[i_face];
+  real y_ = y_scaled[j + ngg]; // The first element is the ghost cell, the last element is the ghost cell
+
+  // Assume the Reynolds stress is Gaussian, Rij[0] is the peak value, sigma = 1/2
+  real gaussian_y = exp(-y_ * y_ * 0.5 * 4);
+
+  real R11_y = Rij[0] * gaussian_y;
+  real R12_y = Rij[1] * gaussian_y;
+  real R22_y = Rij[2] * gaussian_y;
+  real R13_y = Rij[3] * gaussian_y;
+  real R23_y = Rij[4] * gaussian_y;
+  real R33_y = Rij[5] * gaussian_y;
+//  printf("R(%d, 0:5) = (%e, %e, %e, %e, %e, %e)\n", j, R11_y, R12_y, R22_y, R13_y, R23_y, R33_y);
+
+  mat(j, 0) = sqrt(abs(R11_y)); // a(1, 1)
+  mat(j, 1) = mat(j, 0) < 1e-40 ? 0 : R12_y / mat(j, 0); // a(2, 1)
+  mat(j, 2) = sqrt(abs(R22_y - mat(j, 1) * mat(j, 1))); // a(2, 2)
+  mat(j, 3) = mat(j, 0) < 1e-40 ? 0 : R13_y / mat(j, 0); // a(3, 1)
+  mat(j, 4) = mat(j, 2) < 1e-40 ? 0 : (R23_y - mat(j, 3) * mat(j, 1)) / mat(j, 2); // a(3, 2)
+  mat(j, 5) = sqrt(abs(R33_y - mat(j, 3) * mat(j, 3) - mat(j, 4) * mat(j, 4))); // a(3, 3)
+//  printf("Lund(%d, 0:5) = (%e, %e, %e, %e, %e, %e)\n", j, mat(j, 0), mat(j, 1), mat(j, 2), mat(j, 3), mat(j, 4),
+//         mat(j, 5));
+}
+
+
 
 //void cfd::initialize_digital_filter(Parameter &parameter, Mesh &mesh, DBoundCond &dBoundCond) {
 //  if (parameter.get_int("problem_type") != 1) {
@@ -551,65 +931,6 @@ cfd::get_digital_filter_lund_matrix(cfd::Parameter &parameter, cfd::DBoundCond &
     printf("The method %d is not supported for the Reynolds stress supplier.\n", method);
     MpiParallel::exit();
   }
-}
-
-void
-cfd::assume_gaussian_reynolds_stress(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::vector<int> &N1,
-                                     std::vector<std::vector<real>> &y_scaled) {
-  auto Rij = parameter.get_real_array("df_reynolds_gaussian_peak");
-
-  real *Rij_dPtr;
-  cudaMalloc(&Rij_dPtr, 6 * sizeof(real));
-  cudaMemcpy(Rij_dPtr, Rij.data(), 6 * sizeof(real), cudaMemcpyHostToDevice);
-
-  // Assume the Reynolds stress is Gaussian
-  const int ngg = parameter.get_int("ngg");
-  for (int i = 0; i < dBoundCond.n_df_face; ++i) {
-    real *y_scaled_dPtr;
-    cudaMalloc(&y_scaled_dPtr, y_scaled[i].size() * sizeof(real));
-    cudaMemcpy(y_scaled_dPtr, y_scaled[i].data(), y_scaled[i].size() * sizeof(real), cudaMemcpyHostToDevice);
-
-    int TPB = 512;
-    int BPG = (N1[i] + 2 * ngg + TPB - 1) / TPB;
-    compute_lundMat_with_assumed_gaussian_reynolds_stress<<<BPG, TPB>>>(Rij_dPtr, dBoundCond.df_lundMatrix_dPtr, i,
-                                                                        y_scaled_dPtr, N1[i], ngg);
-
-    cudaFree(y_scaled_dPtr);
-  }
-  cudaFree(Rij_dPtr);
-}
-
-__global__ void
-cfd::compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij,
-                                                           ggxl::VectorField1D<real> *df_lundMatrix_hPtr,
-                                                           int i_face, const real *y_scaled, int my, int ngg) {
-  int j = (int) (blockIdx.x * blockDim.x + threadIdx.x) - ngg;
-  if (j >= my + ngg) {
-    return;
-  }
-
-  auto &mat = df_lundMatrix_hPtr[i_face];
-  real y_ = y_scaled[j + ngg]; // The first element is the ghost cell, the last element is the ghost cell
-
-  // Assume the Reynolds stress is Gaussian, Rij[0] is the peak value, sigma = 1/2
-  real gaussian_y = exp(-y_ * y_ * 0.5 * 4);
-
-  real R11_y = Rij[0] * gaussian_y;
-  real R12_y = Rij[1] * gaussian_y;
-  real R22_y = Rij[2] * gaussian_y;
-  real R13_y = Rij[3] * gaussian_y;
-  real R23_y = Rij[4] * gaussian_y;
-  real R33_y = Rij[5] * gaussian_y;
-//  printf("R(%d, 0:5) = (%e, %e, %e, %e, %e, %e)\n", j, R11_y, R12_y, R22_y, R13_y, R23_y, R33_y);
-
-  mat(j, 0) = sqrt(abs(R11_y)); // a(1, 1)
-  mat(j, 1) = mat(j, 0) < 1e-40 ? 0 : R12_y / mat(j, 0); // a(2, 1)
-  mat(j, 2) = sqrt(abs(R22_y - mat(j, 1) * mat(j, 1))); // a(2, 2)
-  mat(j, 3) = mat(j, 0) < 1e-40 ? 0 : R13_y / mat(j, 0); // a(3, 1)
-  mat(j, 4) = mat(j, 2) < 1e-40 ? 0 : (R23_y - mat(j, 3) * mat(j, 1)) / mat(j, 2); // a(3, 2)
-  mat(j, 5) = sqrt(abs(R33_y - mat(j, 3) * mat(j, 3) - mat(j, 4) * mat(j, 4))); // a(3, 3)
-//  printf("Lund(%d, 0:5) = (%e, %e, %e, %e, %e, %e)\n", j, mat(j, 0), mat(j, 1), mat(j, 2), mat(j, 3), mat(j, 4),
-//         mat(j, 5));
 }
 
 void
