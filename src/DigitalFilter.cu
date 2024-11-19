@@ -9,26 +9,29 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
     // The current implementation is only for mixing layers
     return;
   }
+  parameter.update_parameter("use_df", false);
 
   int n_df = 0;
   std::vector<int> df_bc;
   std::vector<std::string> df_related_boundary = {};
   auto &bcs = parameter.get_string_array("boundary_conditions");
   df_label.resize(n_inflow, -1);
-  int i_inflow = 0;
-  for (auto &bc_name: bcs) {
-    auto &bc = parameter.get_struct(bc_name);
-    auto &type = std::get<std::string>(bc.at("type"));
+  if (n_inflow > 0) {
+    int i_inflow = 0;
+    for (auto &bc_name: bcs) {
+      auto &bc = parameter.get_struct(bc_name);
+      auto &type = std::get<std::string>(bc.at("type"));
 
-    if (type == "inflow") {
-      int fluc = std::get<int>(bc.at("fluctuation_type"));
-      if (fluc == 11) {
-        ++n_df;
-        df_bc.push_back(std::get<int>(bc.at("label")));
-        df_related_boundary.push_back(bc_name);
-        df_label[i_inflow] = i_inflow;
+      if (type == "inflow") {
+        int fluc = std::get<int>(bc.at("fluctuation_type"));
+        if (fluc == 11) {
+          ++n_df;
+          df_bc.push_back(std::get<int>(bc.at("label")));
+          df_related_boundary.push_back(bc_name);
+          df_label[i_inflow] = i_inflow;
+        }
+        ++i_inflow;
       }
-      ++i_inflow;
     }
   }
 
