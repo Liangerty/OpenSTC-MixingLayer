@@ -1581,7 +1581,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         apply_convolution(df_label[l], my, mz, ngg);
         compute_fluctuations(param, field.d_ptr, &inflow[l], df_label[l], my, mz, ngg);
         dim3 TPB{32, 8};
-        dim3 BPG{(my - 1) / TPB.x + 1, (mz - 1) / TPB.y + 1};
+        dim3 BPG{(my + 2 * ngg - 1) / TPB.x + 1, (mz + 2 * ngg - 1) / TPB.y + 1};
         apply_inflow_df<mix_model, turb> <<<BPG, TPB>>>(field.d_ptr, &inflow[l], param, fluctuation_dPtr,
                                                         df_label[l]);
       }
