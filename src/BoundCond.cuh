@@ -38,7 +38,7 @@ struct DBoundCond {
 
   template<MixtureModel mix_model, class turb>
   void
-  apply_boundary_conditions(const Block &block, Field &field, DParameter *param, bool update_df, int step = -1) const;
+  apply_boundary_conditions(const Block &block, Field &field, DParameter *param, int step = -1) const;
 
   void write_df(cfd::Parameter &parameter, const Mesh &mesh);
 
@@ -643,24 +643,22 @@ apply_inflow_df(DZone *zone, Inflow *inflow, DParameter *param, ggxl::VectorFiel
   real u_fluc = fluctuation_dPtr[df_iFace](0, j, k, 0) * param->delta_u;
   real v_fluc = fluctuation_dPtr[df_iFace](0, j, k, 1) * param->delta_u;
   real w_fluc = fluctuation_dPtr[df_iFace](0, j, k, 2) * param->delta_u;
-  real gamma{gamma_air}, mw{mw_air};
+  real mw = y > 0 ? inflow->mw : inflow->mw_lower;
   real T = y > 0 ? inflow->temperature : inflow->t_lower;
   real rho = y > 0 ? inflow->density : inflow->density_lower;
   real p = y > 0 ? inflow->pressure : inflow->p_lower;
+  real c_p = 0;
   if constexpr (mix_model != MixtureModel::Air) {
+    real *sv_b = y > 0 ? inflow->sv : inflow->sv_lower;
     real cpl[MAX_SPEC_NUMBER];
     compute_cp(T, cpl, param);
-    real c_p{0}, c_v{0};
-    mw = 0.0;
     for (int l = 0; l < param->n_spec; ++l) {
-      c_p += cpl[l] * sv(i, j, k, l);
-      c_v += (cpl[l] - R_u / param->mw[l]) * sv(i, j, k, l);
-      mw += sv(i, j, k, l) / param->mw[l];
+      c_p += cpl[l] * sv_b[l];
     }
-    gamma = c_p / c_v;
-    mw = 1 / mw;
+  } else {
+    c_p = gamma_air * R_u / mw_air / (gamma_air - 1);
   }
-  real t_fluc = -(gamma - 1) / gamma * u_fluc * u * mw / R_u; // SRA
+  real t_fluc = -u_fluc * u / c_p; // SRA
   t_fluc *= 0.25; // StreamS multiplies a parameter "dftscaling=0.25" here
   real rho_fluc = -t_fluc * rho / T;
   u += u_fluc;
@@ -1497,8 +1495,7 @@ __global__ void apply_periodic(DZone *zone, DParameter *param, int i_face) {
 }
 
 template<MixtureModel mix_model, class turb>
-void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DParameter *param, bool update_df,
-                                           int step) const {
+void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DParameter *param, int step) const {
   // Boundary conditions are applied in the order of priority, which with higher priority is applied later.
   // Finally, the communication between faces will be carried out after these bc applied
   // Priority: (-1 - inner faces >) 2-wall > 3-symmetry > 5-inflow = 7-subsonic inflow > 6-outflow = 9-back pressure > 4-farfield
