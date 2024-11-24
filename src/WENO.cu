@@ -9,6 +9,7 @@ namespace cfd {
 
 template<MixtureModel mix_model>
 __global__ void
+__launch_bounds__(64, 8)
 compute_convective_term_weno_x(cfd::DZone *zone, int max_extent, DParameter *param) {
   int i = (int) ((blockDim.x - 1) * blockIdx.x + threadIdx.x - 1);
   int j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -169,6 +170,7 @@ compute_convective_term_weno_x(cfd::DZone *zone, int max_extent, DParameter *par
 
 template<MixtureModel mix_model>
 __global__ void
+__launch_bounds__(64, 8)
 compute_convective_term_weno_y(cfd::DZone *zone, int max_extent, DParameter *param) {
   int i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   int j = (int) ((blockDim.y - 1) * blockIdx.y + threadIdx.y - 1);
@@ -327,6 +329,7 @@ compute_convective_term_weno_y(cfd::DZone *zone, int max_extent, DParameter *par
 
 template<MixtureModel mix_model>
 __global__ void
+__launch_bounds__(64, 8)
 compute_convective_term_weno_z(cfd::DZone *zone, int max_extent, DParameter *param) {
   int i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   int j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
