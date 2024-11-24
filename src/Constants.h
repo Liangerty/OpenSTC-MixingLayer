@@ -30,4 +30,6 @@ constexpr double boltzmann_constants = 1.380649e-23;
 constexpr double stefan_boltzmann_constants = 5.670374419e-8;
 
 constexpr double pi = 3.1415926535;
+
+constexpr double R_air = R_u / mw_air;
 }
