@@ -33,16 +33,6 @@ compute_convective_term_weno_x(cfd::DZone *zone, int max_extent, DParameter *par
   real *f_1st = nullptr;
   if (param->positive_preserving)
     f_1st = &fc[block_dim * n_var];
-//  real *fc = s;
-//  real *fp = &s[block_dim * n_var];
-//  real *fm = &fp[n_point * n_var];
-//  real *cv = &fm[n_point * n_var];
-//  real *jac = &cv[n_point * n_reconstruct];
-//  real *metric = &jac[n_point];
-//  real *f_1st{nullptr};
-//  if (param->positive_preserving) {
-//    f_1st = &metric[n_point * 3];
-//  }
 
   const int i_shared = tid - 1 + ngg;
   for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
@@ -194,16 +184,6 @@ compute_convective_term_weno_y(cfd::DZone *zone, int max_extent, DParameter *par
   real *f_1st = nullptr;
   if (param->positive_preserving)
     f_1st = &fc[block_dim * n_var];
-//  real *fc = s;
-//  real *fp = &s[block_dim * n_var];
-//  real *fm = &fp[n_point * n_var];
-//  real *cv = &fm[n_point * n_var];
-//  real *jac = &cv[n_point * n_reconstruct];
-//  real *metric = &jac[n_point];
-//  real *f_1st{nullptr};
-//  if (param->positive_preserving) {
-//    f_1st = &metric[n_point * 3];
-//  }
 
   const int i_shared = tid - 1 + ngg;
   for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
@@ -353,16 +333,6 @@ compute_convective_term_weno_z(cfd::DZone *zone, int max_extent, DParameter *par
   real *f_1st = nullptr;
   if (param->positive_preserving)
     f_1st = &fc[block_dim * n_var];
-//  real *fc = s;
-//  real *fp = &s[block_dim * n_var];
-//  real *fm = &fp[n_point * n_var];
-//  real *cv = &fm[n_point * n_var];
-//  real *jac = &cv[n_point * n_reconstruct];
-//  real *metric = &jac[n_point];
-//  real *f_1st{nullptr};
-//  if (param->positive_preserving) {
-//    f_1st = &metric[n_point * 3];
-//  }
 
   const int i_shared = tid - 1 + ngg;
   for (auto l = 0; l < n_var; ++l) { // 0-rho,1-rho*u,2-rho*v,3-rho*w,4-rho*E, ..., Nv-rho*scalar
@@ -772,21 +742,22 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
   // The first n_var in the cv array is conservative vars, followed by p and cm.
   const real *cvl{&cv[i_shared * (n_var + 2)]};
   const real *cvr{&cv[(i_shared + 1) * (n_var + 2)]};
+  const real rhoL_inv{1.0 / cvl[0]}, rhoR_inv{1.0 / cvr[0]};
   // First, compute the Roe average of the half-point variables.
   const real rlc{sqrt(cvl[0]) / (sqrt(cvl[0]) + sqrt(cvr[0]))};
   const real rrc{sqrt(cvr[0]) / (sqrt(cvl[0]) + sqrt(cvr[0]))};
-  const real um{rlc * cvl[1] / cvl[0] + rrc * cvr[1] / cvr[0]};
-  const real vm{rlc * cvl[2] / cvl[0] + rrc * cvr[2] / cvr[0]};
-  const real wm{rlc * cvl[3] / cvl[0] + rrc * cvr[3] / cvr[0]};
+  const real um{rlc * cvl[1] * rhoL_inv + rrc * cvr[1] * rhoR_inv};
+  const real vm{rlc * cvl[2] * rhoL_inv + rrc * cvr[2] * rhoR_inv};
+  const real wm{rlc * cvl[3] * rhoL_inv + rrc * cvr[3] * rhoR_inv};
   const real ekm{0.5 * (um * um + vm * vm + wm * wm)};
-  const real hl{(cvl[4] + cvl[n_var]) / cvl[0]};
-  const real hr{(cvr[4] + cvr[n_var]) / cvr[0]};
+  const real hl{(cvl[4] + cvl[n_var]) * rhoL_inv};
+  const real hr{(cvr[4] + cvr[n_var]) * rhoR_inv};
   const real hm{rlc * hl + rrc * hr};
 
   real svm[MAX_SPEC_NUMBER];
   memset(svm, 0, MAX_SPEC_NUMBER * sizeof(real));
   for (int l = 0; l < n_var - 5; ++l) {
-    svm[l] = (rlc * cvl[l + 5] / cvl[0] + rrc * cvr[l + 5] / cvr[0]);
+    svm[l] = (rlc * cvl[l + 5] * rhoL_inv + rrc * cvr[l + 5] * rhoR_inv);
   }
 
   const int n_spec{param->n_spec};
@@ -795,8 +766,8 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
     mw_inv += svm[l] / param->mw[l];
   }
 
-  const real tl{cvl[n_var] / cvl[0]};
-  const real tr{cvr[n_var] / cvr[0]};
+  const real tl{cvl[n_var] * rhoL_inv};
+  const real tr{cvr[n_var] * rhoR_inv};
   const real tm = (rlc * tl + rrc * tr) / (R_u * mw_inv);
 
   real cp_i[MAX_SPEC_NUMBER], h_i[MAX_SPEC_NUMBER];
@@ -812,9 +783,12 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
 
   // Next, we compute the left characteristic matrix at i+1/2.
   const real jac_l{jac[i_shared]}, jac_r{jac[i_shared + 1]};
-  real kx{(jac_l * m_l[0] + jac_r * m_r[0]) / (jac_l + jac_r)};
-  real ky{(jac_l * m_l[1] + jac_r * m_r[1]) / (jac_l + jac_r)};
-  real kz{(jac_l * m_l[2] + jac_r * m_r[2]) / (jac_l + jac_r)};
+  real kxJ{m_l[0] * jac_l + m_r[0] * jac_r};
+  real kyJ{m_l[1] * jac_l + m_r[1] * jac_r};
+  real kzJ{m_l[2] * jac_l + m_r[2] * jac_r};
+  real kx{kxJ / (jac_l + jac_r)};
+  real ky{kyJ / (jac_l + jac_r)};
+  real kz{kzJ / (jac_l + jac_r)};
   const real gradK{sqrt(kx * kx + ky * ky + kz * kz)};
   kx /= gradK;
   ky /= gradK;
@@ -854,10 +828,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
   // Compute the characteristic flux with L.
   real fChar[5 + MAX_SPEC_NUMBER];
   constexpr real eps{1e-40};
-  const real eps_scaled = eps * param->weno_eps_scale * 0.25 *
-                          ((m_l[0] * jac_l + m_r[0] * jac_r) * (m_l[0] * jac_l + m_r[0] * jac_r) +
-                           (m_l[1] * jac_l + m_r[1] * jac_r) * (m_l[1] * jac_l + m_r[1] * jac_r) +
-                           (m_l[2] * jac_l + m_r[2] * jac_r) * (m_l[2] * jac_l + m_r[2] * jac_r));
+  const real eps_scaled = eps * param->weno_eps_scale * 0.25 * (kxJ * kxJ + kyJ * kyJ + kzJ * kzJ);
 
   real alpha_l[MAX_SPEC_NUMBER];
   // compute the partial derivative of pressure to species density
@@ -871,9 +842,9 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
     // Li Xinliang's flux splitting
     bool pp_limiter{param->positive_preserving};
     if (pp_limiter) {
-      real spectralRadThis = abs((m_l[0] * cvl[1] + m_l[1] * cvl[2] + m_l[2] * cvl[3]) / cvl[0] +
+      real spectralRadThis = abs((m_l[0] * cvl[1] + m_l[1] * cvl[2] + m_l[2] * cvl[3]) * rhoL_inv +
                                  cvl[n_var + 1] * sqrt(m_l[0] * m_l[0] + m_l[1] * m_l[1] + m_l[2] * m_l[2]));
-      real spectralRadNext = abs((m_r[0] * cvr[1] + m_r[1] * cvr[2] + m_r[2] * cvr[3]) / cvr[0] +
+      real spectralRadNext = abs((m_r[0] * cvr[1] + m_r[1] * cvr[2] + m_r[2] * cvr[3]) * rhoR_inv +
                                  cvr[n_var + 1] * sqrt(m_r[0] * m_r[0] + m_r[1] * m_r[1] + m_r[2] * m_r[2]));
       for (int l = 0; l < n_var - 5; ++l) {
         f_1st[tid * (n_var - 5) + l] =
