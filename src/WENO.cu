@@ -1132,14 +1132,14 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
   fci[1] = (um - kx * cm) * fChar[0] + (kx * um) * fChar[1] + (ky * um - kz * cm) * fChar[2] +
            (kz * um + ky * cm) * fChar[3] + (um + kx * cm) * fChar[4];
   fci[2] = (vm - ky * cm) * fChar[0] + (kx * vm + kz * cm) * fChar[1] + (ky * vm) * fChar[2] +
-            (kz * vm - kx * cm) * fChar[3] + (vm + ky * cm) * fChar[4];
+           (kz * vm - kx * cm) * fChar[3] + (vm + ky * cm) * fChar[4];
   fci[3] = (wm - kz * cm) * fChar[0] + (kx * wm - ky * cm) * fChar[1] + (ky * wm + kx * cm) * fChar[2] +
-            (kz * wm) * fChar[3] + (wm + kz * cm) * fChar[4];
+           (kz * wm) * fChar[3] + (wm + kz * cm) * fChar[4];
 
   fci[4] = (hm - Uk_bar * cm) * fChar[0] + (kx * (hm - cm * cm / gm1) + (kz * vm - ky * wm) * cm) * fChar[1] +
-            (ky * (hm - cm * cm / gm1) + (kx * wm - kz * um) * cm) * fChar[2] +
-            (kz * (hm - cm * cm / gm1) + (ky * um - kx * vm) * cm) * fChar[3] +
-            (hm + Uk_bar * cm) * fChar[4];
+           (ky * (hm - cm * cm / gm1) + (kx * wm - kz * um) * cm) * fChar[2] +
+           (kz * (hm - cm * cm / gm1) + (ky * um - kx * vm) * cm) * fChar[3] +
+           (hm + Uk_bar * cm) * fChar[4];
   real add{0};
   const real coeff_add = fChar[0] + kx * fChar[1] + ky * fChar[2] + kz * fChar[3] + fChar[4];
   for (int l = 0; l < n_spec; ++l) {
@@ -1633,27 +1633,30 @@ __device__ real WENO5(const real *vp, const real *vm, real eps) {
 
 __device__ real WENO7(const real *vp, const real *vm, real eps) {
   constexpr real one6th{1.0 / 6};
-  // 1st order derivative
-  real s10{one6th * (-2 * vp[0] + 9 * vp[1] - 18 * vp[2] + 11 * vp[3])};
-  real s11{one6th * (vp[1] - 6 * vp[2] + 3 * vp[3] + 2 * vp[4])};
-  real s12{one6th * (-2 * vp[2] - 3 * vp[3] + 6 * vp[4] - vp[5])};
-  real s13{one6th * (-11 * vp[3] + 18 * vp[4] - 9 * vp[5] + 2 * vp[6])};
-  // 2nd order derivative
-  real s20{-vp[0] + 4 * vp[1] - 5 * vp[2] + 2 * vp[3]};
-  real s21{vp[2] - 2 * vp[3] + vp[4]};
-  real s22{s21};
-  real s23{2 * vp[3] - 5 * vp[4] + 4 * vp[5] - vp[6]};
-  // 3rd order derivative
-  real s30{-vp[0] + 3 * vp[1] - 3 * vp[2] + vp[3]};
-  real s31{-vp[1] + 3 * vp[2] - 3 * vp[3] + vp[4]};
-  real s32{-vp[2] + 3 * vp[3] - 3 * vp[4] + vp[5]};
-  real s33{-vp[3] + 3 * vp[4] - 3 * vp[5] + vp[6]};
-
   constexpr real d12{13.0 / 12.0}, d13{1043.0 / 960}, d14{1.0 / 12};
-  real beta0{s10 * s10 + d12 * s20 * s20 + d13 * s30 * s30 + d14 * s10 * s30};
-  real beta1{s11 * s11 + d12 * s21 * s21 + d13 * s31 * s31 + d14 * s11 * s31};
-  real beta2{s12 * s12 + d12 * s22 * s22 + d13 * s32 * s32 + d14 * s12 * s32};
-  real beta3{s13 * s13 + d12 * s23 * s23 + d13 * s33 * s33 + d14 * s13 * s33};
+
+  // Re-organize the data to improve locality
+  // 1st order derivative
+  real s1{one6th * (-2 * vp[0] + 9 * vp[1] - 18 * vp[2] + 11 * vp[3])};
+  // 2nd order derivative
+  real s2{-vp[0] + 4 * vp[1] - 5 * vp[2] + 2 * vp[3]};
+  // 3rd order derivative
+  real s3{-vp[0] + 3 * vp[1] - 3 * vp[2] + vp[3]};
+  real beta0{s1 * s1 + d12 * s2 * s2 + d13 * s3 * s3 + d14 * s1 * s3};
+
+  s1 = one6th * (vp[1] - 6 * vp[2] + 3 * vp[3] + 2 * vp[4]);
+  s2 = vp[2] - 2 * vp[3] + vp[4];
+  s3 = -vp[1] + 3 * vp[2] - 3 * vp[3] + vp[4];
+  real beta1{s1 * s1 + d12 * s2 * s2 + d13 * s3 * s3 + d14 * s1 * s3};
+
+  s1 = one6th * (-2 * vp[2] - 3 * vp[3] + 6 * vp[4] - vp[5]);
+  s3 = -vp[2] + 3 * vp[3] - 3 * vp[4] + vp[5];
+  real beta2{s1 * s1 + d12 * s2 * s2 + d13 * s3 * s3 + d14 * s1 * s3};
+
+  s1 = one6th * (-11 * vp[3] + 18 * vp[4] - 9 * vp[5] + 2 * vp[6]);
+  s2 = 2 * vp[3] - 5 * vp[4] + 4 * vp[5] - vp[6];
+  s3 = -vp[3] + 3 * vp[4] - 3 * vp[5] + vp[6];
+  real beta3{s1 * s1 + d12 * s2 * s2 + d13 * s3 * s3 + d14 * s1 * s3};
 
   real tau7sqr{(beta0 - beta3) * (beta0 - beta3)};
   constexpr real c0{1.0 / 35}, c1{12.0 / 35}, c2{18.0 / 35}, c3{4.0 / 35};
@@ -1670,25 +1673,24 @@ __device__ real WENO7(const real *vp, const real *vm, real eps) {
   const real fPlus{(a0 * v0 + a1 * v1 + a2 * v2 + a3 * v3) / (a0 + a1 + a2 + a3)};
 
   // Minus part
-  s10 = one6th * (-2 * vm[6] + 9 * vm[5] - 18 * vm[4] + 11 * vm[3]);
-  s11 = one6th * (vm[5] - 6 * vm[4] + 3 * vm[3] + 2 * vm[2]);
-  s12 = one6th * (-2 * vm[4] - 3 * vm[3] + 6 * vm[2] - vm[1]);
-  s13 = one6th * (-11 * vm[3] + 18 * vm[2] - 9 * vm[1] + 2 * vm[0]);
+  s1 = one6th * (-2 * vm[6] + 9 * vm[5] - 18 * vm[4] + 11 * vm[3]);
+  s2 = -vm[6] + 4 * vm[5] - 5 * vm[4] + 2 * vm[3];
+  s3 = -vm[6] + 3 * vm[5] - 3 * vm[4] + vm[3];
+  beta0 = s1 * s1 + d12 * s2 * s2 + d13 * s3 * s3 + d14 * s1 * s3;
 
-  s20 = -vm[6] + 4 * vm[5] - 5 * vm[4] + 2 * vm[3];
-  s21 = vm[4] - 2 * vm[3] + vm[2];
-  s22 = s21;
-  s23 = 2 * vm[3] - 5 * vm[2] + 4 * vm[1] - vm[0];
+  s1 = one6th * (vm[5] - 6 * vm[4] + 3 * vm[3] + 2 * vm[2]);
+  s2 = vm[4] - 2 * vm[3] + vm[2];
+  s3 = -vm[5] + 3 * vm[4] - 3 * vm[3] + vm[2];
+  beta1 = s1 * s1 + d12 * s2 * s2 + d13 * s3 * s3 + d14 * s1 * s3;
 
-  s30 = -vm[6] + 3 * vm[5] - 3 * vm[4] + vm[3];
-  s31 = -vm[5] + 3 * vm[4] - 3 * vm[3] + vm[2];
-  s32 = -vm[4] + 3 * vm[3] - 3 * vm[2] + vm[1];
-  s33 = -vm[3] + 3 * vm[2] - 3 * vm[1] + vm[0];
+  s1 = one6th * (-2 * vm[4] - 3 * vm[3] + 6 * vm[2] - vm[1]);
+  s3 = -vm[4] + 3 * vm[3] - 3 * vm[2] + vm[1];
+  beta2 = s1 * s1 + d12 * s2 * s2 + d13 * s3 * s3 + d14 * s1 * s3;
 
-  beta0 = s10 * s10 + d12 * s20 * s20 + d13 * s30 * s30 + d14 * s10 * s30;
-  beta1 = s11 * s11 + d12 * s21 * s21 + d13 * s31 * s31 + d14 * s11 * s31;
-  beta2 = s12 * s12 + d12 * s22 * s22 + d13 * s32 * s32 + d14 * s12 * s32;
-  beta3 = s13 * s13 + d12 * s23 * s23 + d13 * s33 * s33 + d14 * s13 * s33;
+  s1 = one6th * (-11 * vm[3] + 18 * vm[2] - 9 * vm[1] + 2 * vm[0]);
+  s2 = 2 * vm[3] - 5 * vm[2] + 4 * vm[1] - vm[0];
+  s3 = -vm[3] + 3 * vm[2] - 3 * vm[1] + vm[0];
+  beta3 = s1 * s1 + d12 * s2 * s2 + d13 * s3 * s3 + d14 * s1 * s3;
 
   tau7sqr = (beta0 - beta3) * (beta0 - beta3);
   a0 = c0 + c0 * tau7sqr / ((eps + beta0) * (eps + beta0));
