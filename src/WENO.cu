@@ -1141,15 +1141,12 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
             (kz * (hm - cm * cm / gm1) + (ky * um - kx * vm) * cm) * fChar[3] +
             (hm + Uk_bar * cm) * fChar[4];
   real add{0};
-  for (int l = 0; l < n_spec; ++l) {
-    add += alpha_l[l] * fChar[l + 5];
-  }
-  fci[4] -= add * cm * cm / gm1;
-
   const real coeff_add = fChar[0] + kx * fChar[1] + ky * fChar[2] + kz * fChar[3] + fChar[4];
   for (int l = 0; l < n_spec; ++l) {
     fci[5 + l] = svm[l] * coeff_add + fChar[l + 5];
+    add += alpha_l[l] * fChar[l + 5];
   }
+  fci[4] -= add * cm * cm / gm1;
 }
 
 // The above function can actually realize the following ability, but the speed is slower than the specific version.
