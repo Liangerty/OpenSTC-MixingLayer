@@ -568,6 +568,13 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
     // Roe scheme
     h_ptr->entropy_fix_delta.allocate_memory(mx, my, mz, 1);
   }
+  if (parameter.get_int("inviscid_scheme") == 72) {
+//    // WENO scheme
+//    h_ptr->Fp.allocate_memory(mx, my, mz, n_var, ngg);
+//    h_ptr->Fm.allocate_memory(mx, my, mz, n_var, ngg);
+//    h_ptr->flux.allocate_memory(mx, my, mz, n_var, ngg);
+//    h_ptr->f_1st.allocate_memory(mx, my, mz, n_var - 5, ngg);
+  }
 
   if (!parameter.get_bool("steady")) {
     // unsteady simulation

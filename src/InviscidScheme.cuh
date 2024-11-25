@@ -28,6 +28,9 @@ void compute_convective_term_aweno(const Block &block, cfd::DZone *zone, DParame
 template<MixtureModel mix_model>
 void compute_convective_term_weno(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
                                   const Parameter &parameter);
+template<MixtureModel mix_model>
+void compute_convective_term_weno_opt(const Block &block, cfd::DZone *zone, DParameter *param, int n_var,
+                                  const Parameter &parameter);
 
 template<MixtureModel mix_model>
 __global__ void
@@ -48,6 +51,21 @@ Roe_compute_inviscid_flux_1D(cfd::DZone *zone, int direction, int max_extent, DP
 template<MixtureModel mix_model>
 __global__ void
 compute_convective_term_weno_1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
+
+template<MixtureModel mix_model>
+__global__ void
+__launch_bounds__(64, 8)
+compute_convective_term_weno_x(cfd::DZone *zone, int max_extent, DParameter *param);
+
+template<MixtureModel mix_model>
+__global__ void
+__launch_bounds__(64, 8)
+compute_convective_term_weno_y(cfd::DZone *zone, int max_extent, DParameter *param);
+
+template<MixtureModel mix_model>
+__global__ void
+__launch_bounds__(64, 8)
+compute_convective_term_weno_z(cfd::DZone *zone, int max_extent, DParameter *param);
 
 template<MixtureModel mix_model>
 __device__ void

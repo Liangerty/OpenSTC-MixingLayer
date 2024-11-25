@@ -25,7 +25,7 @@ list(APPEND src_file
     DigitalFilter.cu DigitalFilter.cuh
     UDIO.h UDIO.cu
     ViscousScheme.cuh
-    WallDistance.cuh WENO.cu
+    WallDistance.cuh WENO.cu wenoOpt.cu
 
     stat_lib/TkeBudget.cu stat_lib/TkeBudget.cuh stat_lib/SpeciesStat.cu stat_lib/SpeciesStat.cuh
 

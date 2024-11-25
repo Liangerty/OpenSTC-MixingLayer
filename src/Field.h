@@ -60,6 +60,9 @@ struct DZone {
   // RK-3 related variables
   ggxl::VectorField3D<real> qn; // The conservative variables from the last step.
 
+  // WENO-related variables
+//  ggxl::VectorField3D<real> Fp, Fm, flux, f_1st; // The fluxes at the cell faces.
+
   // Dual-time stepping related variables
   ggxl::VectorField3D<real> qn1; // The conservative variables from the last iteration.
   ggxl::VectorField3D<real> qn_star; // qn_star=(4*qn-qn1)/(2J*dt)
