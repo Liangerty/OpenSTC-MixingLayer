@@ -798,33 +798,6 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
 
   // The matrix we consider here does not contain the turbulent variables, such as tke and omega.
   const real cm2_inv{1.0 / (cm * cm)};
-  gxl::Matrix<real, 5, 5> LR;
-  LR(0, 0) = (alpha + Uk_bar * cm) * cm2_inv * 0.5;
-  LR(0, 1) = -(gm1 * um + kx * cm) * cm2_inv * 0.5;
-  LR(0, 2) = -(gm1 * vm + ky * cm) * cm2_inv * 0.5;
-  LR(0, 3) = -(gm1 * wm + kz * cm) * cm2_inv * 0.5;
-  LR(0, 4) = gm1 * cm2_inv * 0.5;
-  LR(1, 0) = kx * (1 - alpha * cm2_inv) - (kz * vm - ky * wm) / cm;
-  LR(1, 1) = kx * gm1 * um * cm2_inv;
-  LR(1, 2) = (kx * gm1 * vm + kz * cm) * cm2_inv;
-  LR(1, 3) = (kx * gm1 * wm - ky * cm) * cm2_inv;
-  LR(1, 4) = -kx * gm1 * cm2_inv;
-  LR(2, 0) = ky * (1 - alpha * cm2_inv) - (kx * wm - kz * um) / cm;
-  LR(2, 1) = (ky * gm1 * um - kz * cm) * cm2_inv;
-  LR(2, 2) = ky * gm1 * vm * cm2_inv;
-  LR(2, 3) = (ky * gm1 * wm + kx * cm) * cm2_inv;
-  LR(2, 4) = -ky * gm1 * cm2_inv;
-  LR(3, 0) = kz * (1 - alpha * cm2_inv) - (ky * um - kx * vm) / cm;
-  LR(3, 1) = (kz * gm1 * um + ky * cm) * cm2_inv;
-  LR(3, 2) = (kz * gm1 * vm - kx * cm) * cm2_inv;
-  LR(3, 3) = kz * gm1 * wm * cm2_inv;
-  LR(3, 4) = -kz * gm1 * cm2_inv;
-  LR(4, 0) = (alpha - Uk_bar * cm) * cm2_inv * 0.5;
-  LR(4, 1) = -(gm1 * um - kx * cm) * cm2_inv * 0.5;
-  LR(4, 2) = -(gm1 * vm - ky * cm) * cm2_inv * 0.5;
-  LR(4, 3) = -(gm1 * wm - kz * cm) * cm2_inv * 0.5;
-  LR(4, 4) = gm1 * cm2_inv * 0.5;
-
   // Compute the characteristic flux with L.
   real fChar[5 + MAX_SPEC_NUMBER];
   constexpr real eps{1e-40};
@@ -856,20 +829,56 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
     if (param->inviscid_scheme == 52) {
       for (int l = 0; l < 5; ++l) {
         real coeff_alpha_s{0.5};
-        if (l == 1) {
-          coeff_alpha_s = -kx;
-        } else if (l == 2) {
-          coeff_alpha_s = -ky;
-        } else if (l == 3) {
-          coeff_alpha_s = -kz;
+        real L[5];
+        switch (l) {
+          case 0:
+            L[0] = (alpha + Uk_bar * cm) * cm2_inv * 0.5;
+            L[1] = -(gm1 * um + kx * cm) * cm2_inv * 0.5;
+            L[2] = -(gm1 * vm + ky * cm) * cm2_inv * 0.5;
+            L[3] = -(gm1 * wm + kz * cm) * cm2_inv * 0.5;
+            L[4] = gm1 * cm2_inv * 0.5;
+            break;
+          case 1:
+            coeff_alpha_s = -kx;
+            L[0] = kx * (1 - alpha * cm2_inv) - (kz * vm - ky * wm) / cm;
+            L[1] = kx * gm1 * um * cm2_inv;
+            L[2] = (kx * gm1 * vm + kz * cm) * cm2_inv;
+            L[3] = (kx * gm1 * wm - ky * cm) * cm2_inv;
+            L[4] = -kx * gm1 * cm2_inv;
+            break;
+          case 2:
+            coeff_alpha_s = -ky;
+            L[0] = ky * (1 - alpha * cm2_inv) - (kx * wm - kz * um) / cm;
+            L[1] = (ky * gm1 * um - kz * cm) * cm2_inv;
+            L[2] = ky * gm1 * vm * cm2_inv;
+            L[3] = (ky * gm1 * wm + kx * cm) * cm2_inv;
+            L[4] = -ky * gm1 * cm2_inv;
+            break;
+          case 3:
+            coeff_alpha_s = -kz;
+            L[0] = kz * (1 - alpha * cm2_inv) - (ky * um - kx * vm) / cm;
+            L[1] = (kz * gm1 * um + ky * cm) * cm2_inv;
+            L[2] = (kz * gm1 * vm - kx * cm) * cm2_inv;
+            L[3] = kz * gm1 * wm * cm2_inv;
+            L[4] = -kz * gm1 * cm2_inv;
+            break;
+          case 4:
+            L[0] = (alpha - Uk_bar * cm) * cm2_inv * 0.5;
+            L[1] = -(gm1 * um - kx * cm) * cm2_inv * 0.5;
+            L[2] = -(gm1 * vm - ky * cm) * cm2_inv * 0.5;
+            L[3] = -(gm1 * wm - kz * cm) * cm2_inv * 0.5;
+            L[4] = gm1 * cm2_inv * 0.5;
+            break;
+          default:
+            break;
         }
         real vPlus[5], vMinus[5];
         memset(vPlus, 0, 5 * sizeof(real));
         memset(vMinus, 0, 5 * sizeof(real));
         for (int m = 0; m < 5; ++m) {
           for (int n = 0; n < 5; ++n) {
-            vPlus[m] += LR(l, n) * Fp[(i_shared - 2 + m) * n_var + n];
-            vMinus[m] += LR(l, n) * Fm[(i_shared - 1 + m) * n_var + n];
+            vPlus[m] += L[n] * Fp[(i_shared - 3 + m) * n_var + n];
+            vMinus[m] += L[n] * Fm[(i_shared - 2 + m) * n_var + n];
           }
           for (int n = 0; n < n_spec; ++n) {
             vPlus[m] += coeff_alpha_s * alpha_l[n] * Fp[(i_shared - 2 + m) * n_var + 5 + n];
@@ -889,20 +898,57 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
     } else if (param->inviscid_scheme == 72) {
       for (int l = 0; l < 5; ++l) {
         real coeff_alpha_s{0.5};
-        if (l == 1) {
-          coeff_alpha_s = -kx;
-        } else if (l == 2) {
-          coeff_alpha_s = -ky;
-        } else if (l == 3) {
-          coeff_alpha_s = -kz;
+        real L[5];
+        switch (l) {
+          case 0:
+            L[0] = (alpha + Uk_bar * cm) * cm2_inv * 0.5;
+            L[1] = -(gm1 * um + kx * cm) * cm2_inv * 0.5;
+            L[2] = -(gm1 * vm + ky * cm) * cm2_inv * 0.5;
+            L[3] = -(gm1 * wm + kz * cm) * cm2_inv * 0.5;
+            L[4] = gm1 * cm2_inv * 0.5;
+            break;
+          case 1:
+            coeff_alpha_s = -kx;
+            L[0] = kx * (1 - alpha * cm2_inv) - (kz * vm - ky * wm) / cm;
+            L[1] = kx * gm1 * um * cm2_inv;
+            L[2] = (kx * gm1 * vm + kz * cm) * cm2_inv;
+            L[3] = (kx * gm1 * wm - ky * cm) * cm2_inv;
+            L[4] = -kx * gm1 * cm2_inv;
+            break;
+          case 2:
+            coeff_alpha_s = -ky;
+            L[0] = ky * (1 - alpha * cm2_inv) - (kx * wm - kz * um) / cm;
+            L[1] = (ky * gm1 * um - kz * cm) * cm2_inv;
+            L[2] = ky * gm1 * vm * cm2_inv;
+            L[3] = (ky * gm1 * wm + kx * cm) * cm2_inv;
+            L[4] = -ky * gm1 * cm2_inv;
+            break;
+          case 3:
+            coeff_alpha_s = -kz;
+            L[0] = kz * (1 - alpha * cm2_inv) - (ky * um - kx * vm) / cm;
+            L[1] = (kz * gm1 * um + ky * cm) * cm2_inv;
+            L[2] = (kz * gm1 * vm - kx * cm) * cm2_inv;
+            L[3] = kz * gm1 * wm * cm2_inv;
+            L[4] = -kz * gm1 * cm2_inv;
+            break;
+          case 4:
+            L[0] = (alpha - Uk_bar * cm) * cm2_inv * 0.5;
+            L[1] = -(gm1 * um - kx * cm) * cm2_inv * 0.5;
+            L[2] = -(gm1 * vm - ky * cm) * cm2_inv * 0.5;
+            L[3] = -(gm1 * wm - kz * cm) * cm2_inv * 0.5;
+            L[4] = gm1 * cm2_inv * 0.5;
+            break;
+          default:
+            break;
         }
+
         real vPlus[7], vMinus[7];
         memset(vPlus, 0, 7 * sizeof(real));
         memset(vMinus, 0, 7 * sizeof(real));
         for (int m = 0; m < 7; ++m) {
           for (int n = 0; n < 5; ++n) {
-            vPlus[m] += LR(l, n) * Fp[(i_shared - 3 + m) * n_var + n];
-            vMinus[m] += LR(l, n) * Fm[(i_shared - 2 + m) * n_var + n];
+            vPlus[m] += L[n] * Fp[(i_shared - 3 + m) * n_var + n];
+            vMinus[m] += L[n] * Fm[(i_shared - 2 + m) * n_var + n];
           }
           for (int n = 0; n < n_spec; ++n) {
             vPlus[m] += coeff_alpha_s * alpha_l[n] * Fp[(i_shared - 3 + m) * n_var + 5 + n];
@@ -922,6 +968,33 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
     }
   } else {
     // My method
+    gxl::Matrix<real, 5, 5> LR;
+    LR(0, 0) = (alpha + Uk_bar * cm) * cm2_inv * 0.5;
+    LR(0, 1) = -(gm1 * um + kx * cm) * cm2_inv * 0.5;
+    LR(0, 2) = -(gm1 * vm + ky * cm) * cm2_inv * 0.5;
+    LR(0, 3) = -(gm1 * wm + kz * cm) * cm2_inv * 0.5;
+    LR(0, 4) = gm1 * cm2_inv * 0.5;
+    LR(1, 0) = kx * (1 - alpha * cm2_inv) - (kz * vm - ky * wm) / cm;
+    LR(1, 1) = kx * gm1 * um * cm2_inv;
+    LR(1, 2) = (kx * gm1 * vm + kz * cm) * cm2_inv;
+    LR(1, 3) = (kx * gm1 * wm - ky * cm) * cm2_inv;
+    LR(1, 4) = -kx * gm1 * cm2_inv;
+    LR(2, 0) = ky * (1 - alpha * cm2_inv) - (kx * wm - kz * um) / cm;
+    LR(2, 1) = (ky * gm1 * um - kz * cm) * cm2_inv;
+    LR(2, 2) = ky * gm1 * vm * cm2_inv;
+    LR(2, 3) = (ky * gm1 * wm + kx * cm) * cm2_inv;
+    LR(2, 4) = -ky * gm1 * cm2_inv;
+    LR(3, 0) = kz * (1 - alpha * cm2_inv) - (ky * um - kx * vm) / cm;
+    LR(3, 1) = (kz * gm1 * um + ky * cm) * cm2_inv;
+    LR(3, 2) = (kz * gm1 * vm - kx * cm) * cm2_inv;
+    LR(3, 3) = kz * gm1 * wm * cm2_inv;
+    LR(3, 4) = -kz * gm1 * cm2_inv;
+    LR(4, 0) = (alpha - Uk_bar * cm) * cm2_inv * 0.5;
+    LR(4, 1) = -(gm1 * um - kx * cm) * cm2_inv * 0.5;
+    LR(4, 2) = -(gm1 * vm - ky * cm) * cm2_inv * 0.5;
+    LR(4, 3) = -(gm1 * wm - kz * cm) * cm2_inv * 0.5;
+    LR(4, 4) = gm1 * cm2_inv * 0.5;
+
     real spec_rad[3], spectralRadThis, spectralRadNext;
     memset(spec_rad, 0, 3 * sizeof(real));
     bool pp_limiter{param->positive_preserving};
@@ -1052,41 +1125,21 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
     }
   }
 
-  // Compute the right characteristic matrix
-  LR(0, 0) = 1.0;
-  LR(0, 1) = kx;
-  LR(0, 2) = ky;
-  LR(0, 3) = kz;
-  LR(0, 4) = 1.0;
-  LR(1, 0) = um - kx * cm;
-  LR(1, 1) = kx * um;
-  LR(1, 2) = ky * um - kz * cm;
-  LR(1, 3) = kz * um + ky * cm;
-  LR(1, 4) = um + kx * cm;
-  LR(2, 0) = vm - ky * cm;
-  LR(2, 1) = kx * vm + kz * cm;
-  LR(2, 2) = ky * vm;
-  LR(2, 3) = kz * vm - kx * cm;
-  LR(2, 4) = vm + ky * cm;
-  LR(3, 0) = wm - kz * cm;
-  LR(3, 1) = kx * wm - ky * cm;
-  LR(3, 2) = ky * wm + kx * cm;
-  LR(3, 3) = kz * wm;
-  LR(3, 4) = wm + kz * cm;
-  LR(4, 0) = hm - Uk_bar * cm;
-  LR(4, 1) = kx * (hm - cm * cm / gm1) + (kz * vm - ky * wm) * cm;
-  LR(4, 2) = ky * (hm - cm * cm / gm1) + (kx * wm - kz * um) * cm;
-  LR(4, 3) = kz * (hm - cm * cm / gm1) + (ky * um - kx * vm) * cm;
-  LR(4, 4) = hm + Uk_bar * cm;
-
   // Project the flux back to physical space
+  // We do not compute the right characteristic matrix here, because we explicitly write the components below.
   auto fci = &fc[tid * n_var];
-  fci[0] = LR(0, 0) * fChar[0] + LR(0, 1) * fChar[1] + LR(0, 2) * fChar[2] + LR(0, 3) * fChar[3] + LR(0, 4) * fChar[4];
-  fci[1] = LR(1, 0) * fChar[0] + LR(1, 1) * fChar[1] + LR(1, 2) * fChar[2] + LR(1, 3) * fChar[3] + LR(1, 4) * fChar[4];
-  fci[2] = LR(2, 0) * fChar[0] + LR(2, 1) * fChar[1] + LR(2, 2) * fChar[2] + LR(2, 3) * fChar[3] + LR(2, 4) * fChar[4];
-  fci[3] = LR(3, 0) * fChar[0] + LR(3, 1) * fChar[1] + LR(3, 2) * fChar[2] + LR(3, 3) * fChar[3] + LR(3, 4) * fChar[4];
+  fci[0] = fChar[0] + kx * fChar[1] + ky * fChar[2] + kz * fChar[3] + fChar[4];
+  fci[1] = (um - kx * cm) * fChar[0] + (kx * um) * fChar[1] + (ky * um - kz * cm) * fChar[2] +
+           (kz * um + ky * cm) * fChar[3] + (um + kx * cm) * fChar[4];
+  fci[2] = (vm - ky * cm) * fChar[0] + (kx * vm + kz * cm) * fChar[1] + (ky * vm) * fChar[2] +
+            (kz * vm - kx * cm) * fChar[3] + (vm + ky * cm) * fChar[4];
+  fci[3] = (wm - kz * cm) * fChar[0] + (kx * wm - ky * cm) * fChar[1] + (ky * wm + kx * cm) * fChar[2] +
+            (kz * wm) * fChar[3] + (wm + kz * cm) * fChar[4];
 
-  fci[4] = LR(4, 0) * fChar[0] + LR(4, 1) * fChar[1] + LR(4, 2) * fChar[2] + LR(4, 3) * fChar[3] + LR(4, 4) * fChar[4];
+  fci[4] = (hm - Uk_bar * cm) * fChar[0] + (kx * (hm - cm * cm / gm1) + (kz * vm - ky * wm) * cm) * fChar[1] +
+            (ky * (hm - cm * cm / gm1) + (kx * wm - kz * um) * cm) * fChar[2] +
+            (kz * (hm - cm * cm / gm1) + (ky * um - kx * vm) * cm) * fChar[3] +
+            (hm + Uk_bar * cm) * fChar[4];
   real add{0};
   for (int l = 0; l < n_spec; ++l) {
     add += alpha_l[l] * fChar[l + 5];
