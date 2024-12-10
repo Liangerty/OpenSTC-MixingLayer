@@ -26,6 +26,7 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
   if (lower.find("mach") != lower.cend()) {
     ma_lower = std::get<real>(lower.at("mach"));
   }
+  real vel_ratio{parameter.get_real("velocity_ratio")};
 
   real T_upper{std::get<real>(upper.at("temperature"))}, T_lower{std::get<real>(lower.at("temperature"))};
   real p_upper{std::get<real>(upper.at("pressure"))}, p_lower{std::get<real>(lower.at("pressure"))};
@@ -76,7 +77,24 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
     mu_upper = Sutherland(T_upper);
     mu_lower = Sutherland(T_lower);
   }
-  if (ma_upper < 0 && ma_lower < 0) {
+  if (vel_ratio > 0) {
+    real u_slow, u_fast;
+    if (vel_ratio > 1) {
+      u_slow = ma_c * (c_upper + c_lower) / (vel_ratio - 1);
+      u_fast = vel_ratio * u_slow;
+    } else {
+      u_fast = ma_c * (c_upper + c_lower) / (1 - vel_ratio);
+      u_slow = u_fast * vel_ratio;
+    }
+    bool upper_faster = parameter.get_bool("upper_faster");
+    if (upper_faster) {
+      ma_upper = u_fast / c_upper;
+      ma_lower = u_slow / c_lower;
+    } else {
+      ma_upper = u_slow / c_upper;
+      ma_lower = u_fast / c_lower;
+    }
+  } else if (ma_upper < 0 && ma_lower < 0) {
     printf("At least one of the mach number and the convective Mach number should be given.\n");
     MpiParallel::exit();
   } else if (ma_upper > 0 && ma_lower > 0) {

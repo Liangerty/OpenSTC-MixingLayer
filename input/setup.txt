@@ -45,6 +45,7 @@ int total_step_steady = 100
 // for mixing layer computations(problem type=1), specify the following info.
 real ma_c = 0.3            // the convective Mach number Ma_c
 real delta_omega = 1e-4     // the inlet vorticity thickness(m)
+real velocity_ratio = 1.5   // the velocity ratio between the two streams
 struct upper_stream = {
     real mach = 1.1
     real temperature = 230

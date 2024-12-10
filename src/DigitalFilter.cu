@@ -15,7 +15,6 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
   std::vector<int> df_bc;
   std::vector<std::string> df_related_boundary = {};
   auto &bcs = parameter.get_string_array("boundary_conditions");
-  df_label.resize(n_inflow, -1);
   if (n_inflow > 0) {
     int i_inflow = 0;
     for (auto &bc_name: bcs) {
