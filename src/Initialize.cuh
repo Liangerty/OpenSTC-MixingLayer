@@ -12,9 +12,11 @@
 
 namespace cfd {
 template<MixtureModel mix_model, class turb>
-void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
+void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
+                                ggxl::VectorField3D<real> *profile_dPtr);
 
-void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
+void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
+                           ggxl::VectorField3D<real> *profile_dPtr);
 
 template<MixtureModel mix_model, class turb>
 void read_flowfield(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
@@ -38,6 +40,10 @@ template<MixtureModel mix_model, class turb>
 void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
 
 void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
+
+__global__ void
+initialize_mixing_layer_with_profile(ggxl::VectorField3D<real> *profile_dPtr, int profile_idx, DZone *zone,
+                                     int n_scalar);
 
 __global__ void
 initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec, real delta_omega, int n_turb, int n_fl,
@@ -66,7 +72,8 @@ void expand_2D_to_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> 
 
 // Implementations
 template<MixtureModel mix_model, class turb>
-void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species) {
+void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
+                                ggxl::VectorField3D<real> *profile_dPtr) {
   const int init_method = parameter.get_int("initial");
   // No matter which method is used to initialize the flowfield,
   // the default inflow is first read and initialize the inf parameters.
@@ -77,7 +84,7 @@ void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vec
 
   switch (init_method) {
     case 0:
-      initialize_from_start(parameter, mesh, field, species);
+      initialize_from_start(parameter, mesh, field, species, profile_dPtr);
       break;
     case 1:
       read_flowfield<mix_model, turb>(parameter, mesh, field, species);
@@ -87,7 +94,7 @@ void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vec
       break;
     default:
       printf("\tThe initialization method is unknown, use freestream value to initialize by default.\n");
-      initialize_from_start(parameter, mesh, field, species);
+      initialize_from_start(parameter, mesh, field, species, profile_dPtr);
   }
 }
 
@@ -178,7 +185,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
       for (int i = 0; i < n_zone; ++i) {
         int find{0};
         for (int j = 0; j < n_zone; ++j) {
-          if (mesh.mx_blk[i]==mx[j] && mesh.my_blk[i]==my[j] && mesh.mz_blk[i]==mz[j]) {
+          if (mesh.mx_blk[i] == mx[j] && mesh.my_blk[i] == my[j] && mesh.mz_blk[i] == mz[j]) {
             ++find;
             blk_order[i] = j;
             if (find > 1) {
@@ -324,7 +331,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
       }
     }
 
-      for (auto &f: field) {
+    for (auto &f: field) {
       cudaMemcpy(f.h_ptr->bv.data(), f.bv.data(), f.h_ptr->bv.size() * sizeof(real) * 6, cudaMemcpyHostToDevice);
       cudaMemcpy(f.h_ptr->sv.data(), f.sv.data(), f.h_ptr->sv.size() * sizeof(real) * parameter.get_int("n_scalar"),
                  cudaMemcpyHostToDevice);
@@ -789,13 +796,13 @@ void read_flowfield_by_0Order_interpolation(Parameter &parameter, const Mesh &me
 
   // Next, find the max block of previous simulation
   int max_blk_idx{0};
-  int n_block_read{(int)(mx.size())};
-  int64_t max_N{mx[1]*my[1]*mz[1]};
-  for (int b=1;b<n_block_read;++b){
-    int64_t N=mx[b]*my[b]*mz[b];
-    if (N>max_N){
-      max_N=N;
-      max_blk_idx=b;
+  int n_block_read{(int) (mx.size())};
+  int64_t max_N{mx[1] * my[1] * mz[1]};
+  for (int b = 1; b < n_block_read; ++b) {
+    int64_t N = mx[b] * my[b] * mz[b];
+    if (N > max_N) {
+      max_N = N;
+      max_blk_idx = b;
     }
   }
 }

@@ -14,43 +14,24 @@ range real coreRegion = {  // The core region of computation. Only grids in core
 }
 
 // controls
-int initial = 1     // 0 - new case, 1 - continue from a previous case.
+int initial = 0          // 0 - new case, 1 - continue from a previous case.
 int total_step = 10  // total number of steps
-int output_file = 10  // frequency of output files
+int output_file = 1000  // frequency of output files
 int output_screen = 5 // frequency of screen output
 int output_time_series = 0 // frequency of output time series data. 0 - Not output, else - output every output_time_series steps.
 bool limit_flow = 0     // 0 - no limit, 1 - limit the flow field.
-
-// numerics
-// temporal scheme
-bool    steady = 0                         // 0 - unsteady, 1 - steady
-real    cfl = 1.0                         // CFL number
-int     implicit_method = 1             	// How to implicitly treat the ODE. 0 - Explicit integration; 1 - DPLUR
-int     DPLUR_inner_step = 3 		// If we use DPLUR, then we need a specified number of inner iterations.
-real    convergence_criteria = 1e-6 	// The criteria of convergence
-
-int     temporal_scheme = 3                // Temporal scheme for transient sims: 2-Dual-time iteration with DPLUR; 3-SSPRK
-bool    fixed_time_step   = 0              // If the time step is fixed(1), then the time step should be given; otherwise(0), the time step is determined by CFL number.
-real    dt = 5e-9                          // In unsteady simulation, the time step should be given
-real     n_flowThroughTime = 2               // The number of flow-through time for the unsteady simulation
-real    domain_length   = 0.065            // The length of the domain in the x direction, which is used to compute the flow-through time
-
-// only for transient simulation, specify if the steady simulation is conducted before the transient simulation to
-// accelerate the development of the flow field.
-bool steady_before_transient = 0
-real cfl_steady = 0.2
-int total_step_steady = 100
 
 // flow info.
 // for mixing layer computations(problem type=1), specify the following info.
 real ma_c = 0.3            // the convective Mach number Ma_c
 real delta_omega = 1e-4     // the inlet vorticity thickness(m)
 real velocity_ratio = 1.5   // the velocity ratio between the two streams
+bool compatible_mixing_layer = 0 // 1 - the mixing layer compatible as the Chen Qian's PhD thesis
 struct upper_stream = {
     real mach = 1.1
-    real temperature = 230
+    real temperature = 210
     real pressure = 100000
-    real H2 = 1.0
+    real H2 = 1
     real mixture_fraction = 1
     real turb_viscosity_ratio =	1
     real turbulence_intensity = 0.01
@@ -60,7 +41,7 @@ struct upper_stream = {
     real ps4 = 1
 }
 struct lower_stream = {
-    real temperature = 230
+    real temperature = 3017.15625
     real pressure = 100000
     real O2 = 0.232
     real N2 = 0.768
@@ -73,15 +54,25 @@ struct lower_stream = {
     real ps4 = 0
 }
 bool upper_faster = 0   // 1 - upper stream has larger mach number, 0 - lower stream has larger mach number.
-int characteristic_velocity_ml = 0 // 0 - convective velocity, 1 - velocity delta.
+
+// numerics
+// temporal scheme
+bool steady = 0                         // 0 - unsteady, 1 - steady
+real cfl = 1                            // CFL number
+int    temporal_scheme = 3                // Temporal scheme for transient sims: 2-Dual-time iteration with DPLUR; 3-SSPRK
+bool fixed_time_step   = 0              // If the time step is fixed(1), then the time step should be given; otherwise(0), the time step is determined by CFL number.
+real dt = 1.8e-9                          // In unsteady simulation, the time step should be given
+// real total_simulation_time = 2.233875e-4   // In unsteady simulation, how long physical time to be simulated 2.2154e-3
+real     n_flowThroughTime = 3               // The number of flow-through time for the unsteady simulation
+real    domain_length   = 0.06            // The length of the domain in the x direction, which is used to compute the flow-through time
 
 // spatial discretization
-int inviscid_scheme = 72               // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
+int inviscid_scheme = 72                // 2 - Roe, 3 - AUSM+, 4 - HLLC, 51 - WENOZ5-cp, 52 - WENOZ5-ch
 bool positive_preserving = 1            // If the Positive-preserving limiter is activated, only implemented for 51/52
 int viscous_order = 2                   // Default: 2nd order central discretization. Other choices: 0(inviscid)
 
 // chemical info
-int species = 0  // If there is species involved. 0 - Air as perfect gas; 1 - Species involved; 2 - Species + mixture fraction + mixture fraction variance are solved
+int species = 1  // If there is species involved. 0 - Air as perfect gas; 1 - Species involved; 2 - Species + mixture fraction + mixture fraction variance are solved
 int reaction = 0 //0-No reaction; 1-Finite rate chemistry; 2-Flamelet model. Even no reactions are involved, the mechanism file should exit to clarify the species
 string mechanism_file = chemistry/H2_mech_mixing.inp  // H2_mech_mixing.inp
 
@@ -103,14 +94,14 @@ array real df_reynolds_gaussian_peak {
 
 // bc info
 array string boundary_conditions {
- freestream outflow periodic
+ freestream outflow  periodic
 }
 string  reference_state =   freestream  // Specify the reference state for the simulation. The reference state is used to calculate the stagnation enthalpy and the stagnation pressure.
 struct  freestream {
     string  type            =   inflow
     int     label           =   5
     int     inflow_type     =   1 // 0 for constant inflow, 1 for mixing-layer-type inflow, other types may be added(such as 2 for self-similar inflow)
-    int     fluctuation_type    =  11       // Specify the type of fluctuation. 0 for no fluctuation, 1 for fluctuation in velocity with white noise.
+    int     fluctuation_type    =  1       // Specify the type of fluctuation. 0 for no fluctuation, 1 for fluctuation in velocity with white noise.
     real    fluctuation_intensity    =   0.01    // Specify the intensity of fluctuation in velocity. The intensity is defined as the ratio of the standard deviation of the fluctuation to the mean value of the velocity.
     real    turb_viscosity_ratio	=	1
     real    turbulence_intensity               =   0.01

@@ -96,9 +96,10 @@ struct Field {
 
   void
   initialize_basic_variables(const Parameter &parameter, const std::vector<Inflow> &inflows,
-                             const std::vector<real> &xs, const std::vector<real> &xe, const std::vector<real> &ys,
-                             const std::vector<real> &ye, const std::vector<real> &zs,
-                             const std::vector<real> &ze, const Species &species) const;
+                             const std::vector<real> &xs, const std::vector<real> &xe,
+                             const std::vector<real> &ys, const std::vector<real> &ye,
+                             const std::vector<real> &zs, const std::vector<real> &ze,
+                             const cfd::Species &species) const;
 
   void setup_device_memory(const Parameter &parameter);
 

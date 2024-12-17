@@ -3,6 +3,7 @@
 #include <fstream>
 #include "gxl_lib/MyString.h"
 #include "gxl_lib/MyAlgorithm.h"
+#include "MixingLayer.cuh"
 // This file should not include "algorithm", which will result in an error for gcc.
 // This persuades me to write a new function "exists" in MyAlgorithm.h and MyAlgorithm.cpp.
 
@@ -159,7 +160,8 @@ register_bc<BackPressure>(BackPressure *&bc, int n_bc, std::vector<int> &indices
   }
 }
 
-void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter) {
+void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter,
+                                      DParameter *param) {
   std::vector<int> bc_labels;
   // Count the number of distinct boundary conditions
   for (auto i = 0; i < mesh.n_block; i++) {
@@ -269,7 +271,7 @@ void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Spe
 
   MpiParallel::barrier();
 
-  initialize_profile_and_rng(parameter, mesh, species, field);
+  initialize_profile_and_rng(parameter, mesh, species, field, param);
 
   df_label.resize(n_inflow, -1);
   initialize_digital_filter(parameter, mesh);
@@ -594,13 +596,143 @@ void initialize_profile_with_inflow(const Boundary &boundary, const Block &block
              cudaMemcpyHostToDevice);
 }
 
-void read_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
-                  const Species &species, ggxl::VectorField3D<real> &profile,
-                  const std::string &profile_related_bc_name) {
+__global__ void
+init_mixingLayer_prof_compatible(DZone *zone, const int *range_x, const int *range_y, const int *range_z,
+                                 const real *var_info, real delta_omega, int n_turb, int n_fl, DParameter *param,
+                                 ggxl::VectorField3D<real> *profile, int profile_idx) {
+  int i = range_x[0] + (int) (blockIdx.x * blockDim.x + threadIdx.x);
+  int j = range_y[0] + (int) (blockIdx.y * blockDim.y + threadIdx.y);
+  int k = range_z[0] + (int) (blockIdx.z * blockDim.z + threadIdx.z);
+  if (i > range_x[1] || j > range_y[1] || k > range_z[1]) {
+    return;
+  }
+
+  auto y = zone->y(i, j, k);
+
+  int n_spec = param->n_spec, n_ps = param->n_ps;
+  const real u_upper = var_info[1], u_lower = var_info[8 + n_spec];
+  real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / delta_omega);
+  real p = var_info[4];
+  real density, t;
+  const real t_upper = var_info[5], t_lower = var_info[12 + n_spec];
+  real yk[MAX_SPEC_NUMBER + MAX_PASSIVE_SCALAR_NUMBER + 4];
+  memset(yk, 0, sizeof(yk));
+
+  real y_upper = (u - u_lower) / (u_upper - u_lower);
+  real y_lower = 1 - y_upper;
+
+  if (n_spec > 0) {
+    // multi-species
+    auto sv_upper = &var_info[6];
+    auto sv_lower = &var_info[7 + n_spec + 6];
+
+    for (int l = 0; l < n_spec; ++l) {
+      yk[l] = y_upper * sv_upper[l] + y_lower * sv_lower[l];
+    }
+
+    // compute the total enthalpy of upper and lower streams
+    real h0_upper{0.5 * u_upper * u_upper}, h0_lower{0.5 * u_lower * u_lower};
+
+    real h_upper[MAX_SPEC_NUMBER], h_lower[MAX_SPEC_NUMBER];
+    compute_enthalpy(t_upper, h_upper, param);
+    compute_enthalpy(t_lower, h_lower, param);
+
+    real mw_inv = 0;
+    for (int l = 0; l < n_spec; ++l) {
+      h0_upper += yk[l] * h_upper[l];
+      h0_lower += yk[l] * h_lower[l];
+      mw_inv += yk[l] / param->mw[l];
+    }
+
+    real h = y_upper * h0_upper + y_lower * h0_lower;
+    h -= 0.5 * u * u;
+
+    auto hs = h_upper, cps = h_lower;
+    real err{1};
+    t = t_upper * y_upper + t_lower * y_lower;
+    constexpr int max_iter{1000};
+    constexpr real eps{1e-3};
+    int iter = 0;
+
+    while (err > eps && iter++ < max_iter) {
+      compute_enthalpy_and_cp(t, hs, cps, param);
+      real cp{0}, h_new{0};
+      for (int l = 0; l < n_spec; ++l) {
+        cp += yk[l] * cps[l];
+        h_new += yk[l] * hs[l];
+      }
+      const real t1 = t - (h_new - h) / cp;
+      err = abs(1 - t1 / t);
+      t = t1;
+    }
+    density = p / (R_u * mw_inv * t);
+
+    if (n_fl > 0) {
+      yk[param->i_fl] = var_info[6 + n_spec] * y_upper + var_info[13 + n_spec + n_spec] * y_lower;
+      yk[param->i_fl + 1] = 0;
+    }
+    if (n_ps > 0) {
+      for (int l = 0; l < n_ps; ++l) {
+        yk[param->i_ps + l] =
+            var_info[14 + 2 * n_spec + 4 + 2 * l] * y_upper + var_info[14 + 2 * n_spec + 4 + 2 * l + 1] * y_lower;
+      }
+    }
+  } else {
+    // Air
+    constexpr real cp = gamma_air * R_air / (gamma_air - 1);
+    real h0_upper = 0.5 * u_upper * u_upper + cp * var_info[5];
+    real h0_lower = 0.5 * u_lower * u_lower + cp * var_info[12 + n_spec];
+    real h = y_upper * h0_upper + y_lower * h0_lower - 0.5 * u * u;
+    t = h / cp;
+    density = p / (R_air * t);
+
+    if (n_ps > 0) {
+      if (y > 0) {
+        for (int l = 0; l < n_ps; ++l) {
+          yk[param->i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l];
+        }
+      } else {
+        for (int l = 0; l < n_ps; ++l) {
+          yk[param->i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l + 1];
+        }
+      }
+    }
+  }
+  if (n_turb > 0) {
+    if (y > 0) {
+      for (int l = 0; l < n_turb; ++l) {
+        yk[l + n_spec] = var_info[13 + 2 * n_spec + 1 + l];
+      }
+    } else {
+      for (int l = 0; l < n_turb; ++l) {
+        yk[l + n_spec] = var_info[13 + 2 * n_spec + n_turb + 1 + l];
+      }
+    }
+  }
+
+  auto &prof = profile[profile_idx];
+  prof(i, j, k, 0) = density;
+  prof(i, j, k, 1) = u;
+  prof(i, j, k, 2) = 0;
+  prof(i, j, k, 3) = 0;
+  prof(i, j, k, 4) = p;
+  prof(i, j, k, 5) = t;
+  for (int l = 0; l < param->n_scalar; ++l) {
+    prof(i, j, k, 6 + l) = yk[l];
+  }
+}
+
+int read_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
+                 const Species &species, ggxl::VectorField3D<real> &profile,
+                 const std::string &profile_related_bc_name) {
   if (file == "MYSELF") {
     // The profile is initialized by the inflow condition.
     initialize_profile_with_inflow(boundary, block, parameter, species, profile, profile_related_bc_name);
-    return;
+    return 0;
+  }
+  if (file == "mixingLayerCompatible") {
+    // The profile is initialized by the inflow condition.
+    return 1;
   }
   auto dot = file.find_last_of('.');
   auto suffix = file.substr(dot + 1, file.size());
@@ -609,6 +741,7 @@ void read_profile(const Boundary &boundary, const std::string &file, const Block
   } else if (suffix == "plt") {
 //    read_plt_profile();
   }
+  return 0;
 }
 
 std::vector<int>
@@ -1373,9 +1506,11 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
 }
 
 void
-DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field) {
+DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field,
+                                       DParameter *param) {
   if (const int n_profile = parameter.get_int("n_profile"); n_profile > 0) {
     profile_hPtr_withGhost.resize(n_profile);
+    std::vector<int> special_treatment;
     for (int i = 0; i < n_profile; ++i) {
       const auto file_name = parameter.get_string_array("profile_file_names")[i];
       const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[i];
@@ -1385,9 +1520,31 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
         auto &bs = mesh[blk].boundary;
         for (auto &b: bs) {
           if (b.type_label == label) {
-            read_profile(b, file_name, mesh[blk], parameter, species, profile_hPtr_withGhost[i],
-                         profile_related_bc_name);
+            int type = read_profile(b, file_name, mesh[blk], parameter, species, profile_hPtr_withGhost[i],
+                                    profile_related_bc_name);
+            if (type == 1) {
+              // mixing layer
+              special_treatment.push_back(i);
+            }
             break;
+          }
+        }
+      }
+    }
+    for (int ll: special_treatment) {
+      // Currently, only mixing layer is treated here.
+      // This part allocates the memory for the d_ptr of the profile.
+      const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[ll];
+      const auto &nn = parameter.get_struct(profile_related_bc_name);
+      const auto label = std::get<int>(nn.at("label"));
+      for (int blk = 0; blk < mesh.n_block; ++blk) {
+        auto &bs = mesh[blk].boundary;
+        for (auto &b: bs) {
+          if (b.type_label == label) {
+            int extent[3]{mesh[blk].mx, mesh[blk].my, mesh[blk].mz};
+            extent[b.face] = 1;
+            profile_hPtr_withGhost[ll].allocate_memory(extent[0], extent[1], extent[2], parameter.get_int("n_var") + 1,
+                                                       mesh[blk].ngg);
           }
         }
       }
@@ -1395,6 +1552,62 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
     cudaMalloc(&profile_dPtr_withGhost, sizeof(ggxl::VectorField3D<real>) * n_profile);
     cudaMemcpy(profile_dPtr_withGhost, profile_hPtr_withGhost.data(), sizeof(ggxl::VectorField3D<real>) * n_profile,
                cudaMemcpyHostToDevice);
+    for (int ll: special_treatment) {
+      // Currently, only mixing layer is treated here.
+      // This part computes the profile.
+      const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[ll];
+      const auto &nn = parameter.get_struct(profile_related_bc_name);
+      const auto label = std::get<int>(nn.at("label"));
+      for (int blk = 0; blk < mesh.n_block; ++blk) {
+        auto &bs = mesh[blk].boundary;
+        for (auto &b: bs) {
+          if (b.type_label == label) {
+            const int direction = b.face;
+            const int ngg = mesh[blk].ngg;
+            int range_0[2]{-ngg, mesh[blk].mx + ngg - 1}, range_1[2]{-ngg, mesh[blk].my + ngg - 1},
+                range_2[2]{-ngg, mesh[blk].mz + ngg - 1};
+            int n0 = mesh[blk].mx + 2 * ngg, n1 = mesh[blk].my + 2 * ngg, n2 = mesh[blk].mz + 2 * ngg;
+            if (direction == 0) {
+              n0 = 1 + ngg;
+              range_0[0] = 0;
+              range_0[1] = ngg;
+            } else if (direction == 1) {
+              n1 = 1 + ngg;
+              range_1[0] = 0;
+              range_1[1] = ngg;
+            } else if (direction == 2) {
+              n2 = 1 + ngg;
+              range_2[0] = 0;
+              range_2[1] = ngg;
+            }
+
+            std::vector<real> var_info;
+            get_mixing_layer_info(parameter, species, var_info);
+
+            real *var_info_dev;
+            cudaMalloc(&var_info_dev, sizeof(real) * var_info.size());
+            cudaMemcpy(var_info_dev, var_info.data(), sizeof(real) * var_info.size(), cudaMemcpyHostToDevice);
+
+            uint tpb[3], bpg[3];
+            tpb[0] = n0 <= (2 * ngg + 1) ? 1 : 16;
+            tpb[1] = n1 <= (2 * ngg + 1) ? 1 : 16;
+            tpb[2] = n2 <= (2 * ngg + 1) ? 1 : 16;
+            bpg[0] = (n0 - 1) / tpb[0];
+            bpg[1] = (n1 - 1) / tpb[1];
+            bpg[2] = (n2 - 1) / tpb[2];
+            dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
+            int n_fl{0};
+            if ((species.n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2)
+              n_fl = 2;
+            init_mixingLayer_prof_compatible<<<BPG, TPB>>>(field[blk].d_ptr, range_0, range_1, range_2, var_info_dev,
+                                                           parameter.get_real("delta_omega"),
+                                                           parameter.get_int("n_turb"),
+                                                           n_fl, param,
+                                                           profile_dPtr_withGhost, ll);
+          }
+        }
+      }
+    }
   }
 
   // Count the max number of rng needed

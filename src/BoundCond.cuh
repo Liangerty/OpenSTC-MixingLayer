@@ -17,9 +17,9 @@ struct BCInfo {
   int2 *boundary = nullptr;
 };
 
-void read_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
-                  const Species &species, ggxl::VectorField3D<real> &profile,
-                  const std::string &profile_related_bc_name);
+int read_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
+                 const Species &species, ggxl::VectorField3D<real> &profile,
+                 const std::string &profile_related_bc_name);
 
 void read_lst_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
                       const Species &species, ggxl::VectorField3D<real> &profile,
@@ -32,7 +32,8 @@ void read_dat_profile(const Boundary &boundary, const std::string &file, const B
 struct DBoundCond {
   DBoundCond() = default;
 
-  void initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter);
+  void initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter,
+                            DParameter *param);
 
   void link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) const;
 
@@ -112,7 +113,8 @@ private:
 
   void apply_convolution(int iFace, int my, int mz, int ngg) const;
 
-  void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field);
+  void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field,
+                                  DParameter *param);
 
   void
   compute_fluctuations(DParameter *param, DZone *zone, Inflow *inflowHere, int iFace, int my, int mz,
@@ -275,6 +277,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
     vel = sqrt(u * u + v * v + w * w);
 
     real bv_fluc_real[6], bv_fluc_imag[6];
+    real uf{0}, vf{0};
     if (inflow->fluctuation_type == 1) {
       // White noise fluctuation
       // We assume it obeying a N(0,rms^2) distribution
@@ -296,7 +299,10 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
 
       real rms = inflow->fluctuation_intensity;
 
-      u += curand_normal_double(&rng_state) * rms * vel;
+      uf = curand_normal_double(&rng_state) * rms * vel;
+      vf = curand_normal_double(&rng_state) * rms * vel;
+      u += uf;
+      v += vf;
       vel = sqrt(u * u + v * v + w * w);
     } else if (inflow->fluctuation_type == 2) {
       // LST fluctuation
@@ -355,8 +361,8 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       idx[b.face] = b.direction == 1 ? g : ngg - g;
 
       density = prof(idx[0], idx[1], idx[2], 0);
-      u = prof(idx[0], idx[1], idx[2], 1);
-      v = prof(idx[0], idx[1], idx[2], 2);
+      u = prof(idx[0], idx[1], idx[2], 1) + uf;
+      v = prof(idx[0], idx[1], idx[2], 2) + vf;
       w = prof(idx[0], idx[1], idx[2], 3);
       p = prof(idx[0], idx[1], idx[2], 4);
       T = prof(idx[0], idx[1], idx[2], 5);
@@ -368,30 +374,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       }
       vel = sqrt(u * u + v * v + w * w);
 
-      if (inflow->fluctuation_type == 1) {
-        // White noise fluctuation
-        // We assume it obeying a N(0,rms^2) distribution
-        // The fluctuation is added to the velocity
-        auto index{0};
-        switch (b.face) {
-          case 1:
-            index = (k + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
-            break;
-          case 2:
-            index = (j + ngg) * (zone->mx + 2 * ngg) + (i + ngg);
-            break;
-          case 0:
-          default:
-            index = (k + ngg) * (zone->my + 2 * ngg) + (j + ngg);
-            break;
-        }
-        auto &rng_state = rng_states_d_ptr[index];
-
-        real rms = inflow->fluctuation_intensity;
-
-        u += curand_normal_double(&rng_state) * rms * vel;
-        vel = sqrt(u * u + v * v + w * w);
-      } else if (inflow->fluctuation_type == 2) {
+      if (inflow->fluctuation_type == 2) {
         // LST fluctuation
         // int idx_fluc[3]{i, j, k};
         // idx_fluc[b.face] = 0;

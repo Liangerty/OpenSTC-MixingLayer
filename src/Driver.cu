@@ -35,10 +35,10 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     field[blk].setup_device_memory(parameter);
   }
   printf("\tProcess [[%d]] has finished setting up device memory.\n", myid);
-  bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter);
+  bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter, param);
 //  initialize_digital_filter(parameter, mesh_, bound_cond);
 
-  initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec);
+  initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec, bound_cond.profile_dPtr_withGhost);
 
   if (parameter.get_bool("sponge_layer")) {
     initialize_sponge_layer(parameter, mesh, field, spec);

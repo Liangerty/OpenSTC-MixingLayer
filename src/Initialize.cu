@@ -3,15 +3,32 @@
 #include "Thermo.cuh"
 #include "Parallel.h"
 #include "MixingLayer.cuh"
+#include "DParameter.cuh"
 
 namespace cfd {
-void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species) {
+void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
+                           ggxl::VectorField3D<real> *profile_dPtr) {
   // We need to first find out the problem type.
   // For problem_type == 1, a mixing layer is required.
   if (parameter.get_int("problem_type") == 1) {
-    initialize_mixing_layer(parameter, mesh, field, species);
-    if (parameter.get_bool("turbulence")==0){
-      // DNS
+    if (parameter.get_bool("compatible_mixing_layer")) {
+      const std::string default_init = parameter.get_string("default_init");
+      Inflow default_inflow(default_init, species, parameter);
+      int profile_idx = default_inflow.profile_idx;
+
+      for (int blk = 0; blk < mesh.n_block; ++blk) {
+        dim3 tpb{8, 8, 4};
+        if (mesh[blk].mz == 1) {
+          tpb = {16, 16, 1};
+        }
+        const int ngg{mesh[blk].ngg};
+        dim3 bpg = {(mesh[blk].mx + 2 * ngg - 1) / tpb.x + 1, (mesh[blk].my + 2 * ngg - 1) / tpb.y + 1,
+                    (mesh[blk].mz + 2 * ngg - 1) / tpb.z + 1};
+        initialize_mixing_layer_with_profile<<<bpg, tpb>>>(profile_dPtr, profile_idx, field[blk].d_ptr,
+                                                           parameter.get_int("n_scalar"));
+      }
+    } else {
+      initialize_mixing_layer(parameter, mesh, field, species);
     }
   } else {
     // For other cases, we initialize by the usual way.
@@ -320,6 +337,29 @@ initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec,
         sv(i, j, k, n_spec + n_turb + n_fl + l) = var[14 + 2 * n_spec + 4 + 2 * l + 1];
       }
     }
+  }
+}
+
+__global__ void
+initialize_mixing_layer_with_profile(ggxl::VectorField3D<real> *profile_dPtr, int profile_idx, DZone *zone,
+                                     int n_scalar) {
+  const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
+  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
+  if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
+
+  auto &prof = profile_dPtr[profile_idx];
+  // Here, we assume the profile is in constant x direction.
+  auto &bv = zone->bv, &sv = zone->sv;
+  bv(i, j, k, 0) = prof(i, j, 0, 0);
+  bv(i, j, k, 1) = prof(i, j, 0, 1);
+  bv(i, j, k, 2) = prof(i, j, 0, 2);
+  bv(i, j, k, 3) = prof(i, j, 0, 3);
+  bv(i, j, k, 4) = prof(i, j, 0, 4);
+  bv(i, j, k, 5) = prof(i, j, 0, 5);
+  for (int l = 0; l < n_scalar; ++l) {
+    sv(i, j, k, l) = prof(i, j, 0, 6 + l);
   }
 }
 

@@ -309,9 +309,10 @@ read_profile_to_init(gxl::VectorField3D<real> &profile, int profile_idx, const c
   if (suffix == "dat") {
     auto extent = read_dat_profile_for_init(profile, file, parameter, species, profile_idx);
     return extent;
-  } else if (suffix == "plt") {
+  } /*else if (suffix == "plt") {
 //    read_plt_profile();
-  }
+  }*/
+  return {0, 0, 0};
 }
 
 __global__ void initialize_bv_with_inflow(real *var_info, int n_inflow, cfd::DZone *zone, const real *coordinate_ranges,
@@ -390,7 +391,7 @@ void cfd::Field::initialize_basic_variables(const Parameter &parameter, const st
                                             const std::vector<real> &ys, const std::vector<real> &ye,
                                             const std::vector<real> &zs, const std::vector<real> &ze,
                                             const cfd::Species &species) const {
-  const auto n = inflows.size();
+  const int n = (int) inflows.size();
   const int n_scalar = parameter.get_int("n_scalar");
   std::vector<real> var_info((6 + n_scalar) * n, 0);
   real *rho = var_info.data(), *u = rho + n, *v = u + n, *w = v + n, *p = w + n, *T = p + n;

@@ -494,6 +494,8 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["n_ps"] = 0;
 
   int_parameters["n_profile"] = 0;
+  string_array["profile_related_bc_names"] = {};
+  string_array["profile_file_names"] = {};
 
   int_parameters["groups_init"] = 1;
   string_parameters["default_init"] = "freestream";
@@ -546,6 +548,7 @@ void cfd::Parameter::setup_default_settings() {
   real_parameters["spongeZPlusEnd"] = 0;
 
   int_parameters["characteristic_velocity_ml"] = 1;
+  bool_parameters["compatible_mixing_layer"] = false;
 
   int_parameters["output_time_series"] = 0;
   bool_parameters["limit_flow"] = false;

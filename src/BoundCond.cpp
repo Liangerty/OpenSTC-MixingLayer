@@ -16,7 +16,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
   if (parameter.get_int("problem_type") == 0 && inflow_type == 2)
     inflow_type = 0;
   if (info.find("fluctuation_type") != info.end()) fluctuation_type = std::get<int>(info.at("fluctuation_type"));
-  if (inflow_type !=2 && fluctuation_type == 11){
+  if (inflow_type != 2 && fluctuation_type == 11) {
     // The digital filter is only for mixing layers.
     fluctuation_type = 0;
   }
@@ -129,6 +129,30 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       for (int i = 0; i < n_ps; ++i) {
         sv[i_ps + i] = var_info[14 + 2 * n_spec + 4 + 2 * i];
         sv_lower[i_ps + i] = var_info[14 + 2 * n_spec + 4 + 2 * i + 1];
+      }
+    }
+
+    if (parameter.get_bool("compatible_mixing_layer")) {
+      // If we use the compatible mixing layer, then we initialize the profiles.
+      auto profile_related_bc_names = parameter.get_string_array("profile_related_bc_names");
+      bool find{false};
+      for (int i = 0; i < profile_related_bc_names.size(); ++i) {
+        if (profile_related_bc_names[i] == inflow_name) {
+          inflow_type = 1;
+          profile_idx = i;
+          find = true;
+          break;
+        }
+      }
+      if (!find) {
+        profile_related_bc_names.push_back(inflow_name);
+        inflow_type = 1;
+        profile_idx = (int) profile_related_bc_names.size() - 1;
+        parameter.update_parameter("profile_related_bc_names", profile_related_bc_names);
+        parameter.update_parameter("n_profile", (int) profile_related_bc_names.size());
+        auto nameArray=parameter.get_string_array("profile_file_names");
+        nameArray.emplace_back("mixingLayerCompatible");
+        parameter.update_parameter("profile_file_names", nameArray);
       }
     }
   } else {
