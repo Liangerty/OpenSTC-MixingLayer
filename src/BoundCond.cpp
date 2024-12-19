@@ -151,7 +151,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
         parameter.update_parameter("profile_related_bc_names", profile_related_bc_names);
         parameter.update_parameter("n_profile", (int) profile_related_bc_names.size());
         auto nameArray=parameter.get_string_array("profile_file_names");
-        nameArray.emplace_back("mixingLayerCompatible");
+        nameArray.emplace_back("mixingLayerProfile.dat");
         parameter.update_parameter("profile_file_names", nameArray);
       }
     }

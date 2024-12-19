@@ -8,26 +8,8 @@ void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<F
                            ggxl::VectorField3D<real> *profile_dPtr) {
   // We need to first find out the problem type.
   // For problem_type == 1, a mixing layer is required.
-  if (parameter.get_int("problem_type") == 1) {
-    if (parameter.get_bool("compatible_mixing_layer")) {
-      const std::string default_init = parameter.get_string("default_init");
-      Inflow default_inflow(default_init, species, parameter);
-      int profile_idx = default_inflow.profile_idx;
-
-      for (int blk = 0; blk < mesh.n_block; ++blk) {
-        dim3 tpb{8, 8, 4};
-        if (mesh[blk].mz == 1) {
-          tpb = {16, 16, 1};
-        }
-        const int ngg{mesh[blk].ngg};
-        dim3 bpg = {(mesh[blk].mx + 2 * ngg - 1) / tpb.x + 1, (mesh[blk].my + 2 * ngg - 1) / tpb.y + 1,
-                    (mesh[blk].mz + 2 * ngg - 1) / tpb.z + 1};
-        initialize_mixing_layer_with_profile<<<bpg, tpb>>>(profile_dPtr, profile_idx, field[blk].d_ptr,
-                                                           parameter.get_int("n_scalar"));
-      }
-    } else {
-      initialize_mixing_layer(parameter, mesh, field, species);
-    }
+  if (parameter.get_int("problem_type") == 1 && !(parameter.get_bool("compatible_mixing_layer"))) {
+    initialize_mixing_layer(parameter, mesh, field, species);
   } else {
     // For other cases, we initialize by the usual way.
     // First, find out how many groups of initial conditions are needed.
@@ -213,7 +195,7 @@ void initialize_mixture_fraction_from_species(Parameter &parameter, const Mesh &
   }
   if (parameter.get_int("myid") == 0) {
     printf(
-        "Previous results contain only species mass fraction info, the mixture fraction is computed via the Bilger's definition.\n");
+      "Previous results contain only species mass fraction info, the mixture fraction is computed via the Bilger's definition.\n");
   }
 }
 
@@ -255,8 +237,10 @@ void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector
       tpb = {16, 16, 1};
     }
     const int ngg{field[blk].block.ngg};
-    dim3 bpg = {(field[blk].block.mx + 2 * ngg - 1) / tpb.x + 1, (field[blk].block.my + 2 * ngg - 1) / tpb.y + 1,
-                (field[blk].block.mz + 2 * ngg - 1) / tpb.z + 1};
+    dim3 bpg = {
+      (field[blk].block.mx + 2 * ngg - 1) / tpb.x + 1, (field[blk].block.my + 2 * ngg - 1) / tpb.y + 1,
+      (field[blk].block.mz + 2 * ngg - 1) / tpb.z + 1
+    };
     int n_fl{0};
     if ((species.n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2)
       n_fl = 2;
@@ -360,5 +344,4 @@ initialize_mixing_layer_with_profile(ggxl::VectorField3D<real> *profile_dPtr, in
     sv(i, j, k, l) = prof(i, j, 0, 6 + l);
   }
 }
-
 }

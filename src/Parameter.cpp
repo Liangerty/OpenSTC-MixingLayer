@@ -774,6 +774,21 @@ void cfd::Parameter::deduce_sim_info(const Species &spec) {
 void cfd::Parameter::get_variable_names(const Species &spec) {
   // First, basic variables.
   std::vector<std::string> var_name{"density", "u", "v", "w", "pressure", "temperature"};
+  VNs = {
+      {"X",           -3},
+      {"Y",           -2},
+      {"Z",           -1},
+      // Basic variables
+      {"RHO",         0},
+      {"DENSITY",     0},
+      {"U",           1},
+      {"V",           2},
+      {"W",           3},
+      {"P",           4},
+      {"PRESSURE",    4},
+      {"T",           5},
+      {"TEMPERATURE", 5},
+  };
   int nv = (int) var_name.size();
   if (get_int("species") != 0) {
     int ns = spec.n_spec;
@@ -781,6 +796,9 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
     auto &names = spec.spec_list;
     for (auto &[name, ind]: names) {
       var_name[ind + nv] = name;
+      auto nn = name;
+      nn = gxl::to_upper(nn);
+      VNs[nn] = 1000 + ind;
     }
     nv += ns;
   }
@@ -792,12 +810,19 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
       var_name.emplace_back("tke");
       var_name.emplace_back("omega");
 
+      VNs["K"] = VNsDefault.at("K");
+      VNs["TKE"] = VNsDefault.at("TKE");
+      VNs["OMEGA"] = VNsDefault.at("OMEGA");
+
       // The flamelet model must be used with RANS or DES, thus the if is contained in this branch.
       if (get_int("species") != 0 && get_int("reaction") == 2) {
         // Flamelet model
         nv += 2;
         var_name.emplace_back("MixtureFraction");
         var_name.emplace_back("MixtureFractionVariance");
+
+        VNs["MIXTUREFRACTION"] = VNsDefault.at("MIXTUREFRACTION");
+        VNs["MIXTUREFRACTIONVARIANCE"] = VNsDefault.at("MIXTUREFRACTIONVARIANCE");
       }
     }
   }
@@ -805,6 +830,8 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
     nv += n_ps;
     for (int i = 0; i < n_ps; ++i) {
       var_name.emplace_back("PS" + std::to_string(i + 1));
+
+      VNs["PS" + std::to_string(i + 1)] = 100 + i;
     }
   }
 
@@ -835,4 +862,71 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
   }
 
   update_parameter("var_name", var_name);
+}
+
+std::vector<int>
+cfd::Parameter::identify_variable_labels(std::vector<std::string> &var_name, const cfd::Species &species) {
+  std::vector<int> labels;
+
+  for (auto &name: var_name) {
+    int l = 999;
+    auto NAME = gxl::to_upper(name);
+
+    bool found = false;
+    for (const auto &kk: VNs) {
+      if (NAME == kk.first) {
+        l = kk.second;
+        found = true;
+        break;
+      }
+    }
+    if (!found && species.n_spec > 0) {
+      const auto &spec_name = species.spec_list;
+      for (const auto &[spec, sp_label]: spec_name) {
+        if (NAME == gxl::to_upper(spec)) {
+          l = 1000 + sp_label;
+          break;
+        }
+      }
+    }
+    labels.emplace_back(l);
+  }
+  return labels;
+}
+
+std::vector<int>
+cfd::identify_variable_labels(std::vector<std::string> &var_name, const Species &species) {
+  // When identifying the variable labels, all read variables are assigned a label.
+  // However, at this stage, we do not know if they are actually used in the simulation.
+  // Therefore, it is the responsibility of the user to ensure that the variables are correctly assigned.
+
+  // E.g., when we compute a laminar flow with a turbulence modeled simulation result, the turbulent variables
+  // tke, and omega are assigned labels, but when we use them in the read_flowfield, we do not even need them.
+
+  std::vector<int> labels;
+
+//  for (auto &name: var_name) {
+//    int l = 999;
+//    auto NAME = gxl::to_upper(name);
+//
+//    bool found = false;
+//    for (const auto &kk: VNs) {
+//      if (NAME == kk.first) {
+//        l = kk.second;
+//        found = true;
+//        break;
+//      }
+//    }
+//    if (!found && species.n_spec > 0) {
+//      const auto &spec_name = species.spec_list;
+//      for (const auto &[spec, sp_label]: spec_name) {
+//        if (NAME == gxl::to_upper(spec)) {
+//          l = 1000 + sp_label;
+//          break;
+//        }
+//      }
+//    }
+//    labels.emplace_back(l);
+//  }
+  return labels;
 }

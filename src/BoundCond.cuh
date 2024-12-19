@@ -16,7 +16,7 @@ struct BCInfo {
   int2 *boundary = nullptr;
 };
 
-int read_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
+int read_profile(const Boundary &boundary, const std::string &file, const Block &block, Parameter &parameter,
                  const Species &species, ggxl::VectorField3D<real> &profile,
                  const std::string &profile_related_bc_name);
 
@@ -24,7 +24,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
                       const Species &species, ggxl::VectorField3D<real> &profile,
                       const std::string &profile_related_bc_name);
 
-void read_dat_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
+void read_dat_profile(const Boundary &boundary, const std::string &file, const Block &block, Parameter &parameter,
                       const Species &species, ggxl::VectorField3D<real> &profile,
                       const std::string &profile_related_bc_name);
 
@@ -264,7 +264,8 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
 
     const auto &prof = profile_d_ptr[inflow->profile_idx];
     int idx[3] = {i, j, k};
-    idx[b.face] = b.direction == 1 ? 0 : ngg;
+    idx[b.face] = 0;
+    // idx[b.face] = b.direction == 1 ? 0 : ngg;
 
     density = prof(idx[0], idx[1], idx[2], 0);
     u = prof(idx[0], idx[1], idx[2], 1);
@@ -362,7 +363,9 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
     // For ghost grids
     for (int g = 1; g <= ngg; g++) {
       const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
-      idx[b.face] = b.direction == 1 ? g : ngg - g;
+      idx[0] = gi, idx[1] = gj, idx[2] = gk;
+      idx[b.face] = 0 + g * dir[b.face];
+      // idx[b.face] = b.direction == 1 ? g : ngg - g;
 
       density = prof(idx[0], idx[1], idx[2], 0);
       u = prof(idx[0], idx[1], idx[2], 1) + uf;

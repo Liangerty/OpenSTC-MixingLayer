@@ -10,7 +10,6 @@
 #include <variant>
 
 namespace cfd {
-
 template<typename T>
 struct Range {
   T xs, xe, ys, ye, zs, ze;
@@ -29,6 +28,8 @@ class Parameter {
   std::unordered_map<std::string, std::map<std::string, std::variant<std::string, int, real>>> struct_array;
   std::unordered_map<std::string, Range<int>> int_range{};
   std::unordered_map<std::string, Range<real>> real_range{};
+  std::map<std::string, int> VNs;
+
 public:
   explicit Parameter(int *argc, char ***argv);
 
@@ -93,11 +94,13 @@ public:
  */
   void deduce_sim_info(const cfd::Species &spec);
 
+  std::vector<int> identify_variable_labels(std::vector<std::string> &var_name, const Species &species);
+
   ~Parameter() = default;
 
 private:
   const std::array<std::string, 1> file_names{
-      "./input/setup.txt"
+    "./input/setup.txt"
   };
 
   void read_param_from_file();
@@ -121,4 +124,32 @@ private:
   void diagnose_parallel_info();
 };
 
+// name labels for my program
+// PASSIVE SCALARS are labeled from 100
+// Species names are not included, and they will be labeled from 1000
+static const std::map<std::string, int> VNsDefault /*short for Variable Names*/{
+  {"X", -3},
+  {"Y", -2},
+  {"Z", -1},
+  // Basic variables
+  {"RHO", 0},
+  {"DENSITY", 0},
+  {"U", 1},
+  {"V", 2},
+  {"W", 3},
+  {"P", 4},
+  {"PRESSURE", 4},
+  {"T", 5},
+  {"TEMPERATURE", 5},
+  // TURBULENCE MODEL RELATED
+  {"K", 6},
+  {"TKE", 6},
+  {"OMEGA", 7},
+  // FLAMELET RELATED
+  {"MIXTUREFRACTION", 8},
+  {"MIXTUREFRACTIONVARIANCE", 9},
+};
+
+std::vector<int>
+identify_variable_labels(std::vector<std::string> &var_name, const Species &species);
 }

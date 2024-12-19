@@ -15,6 +15,10 @@ struct Species {
 
   void compute_cp(real temp, real *cp) const &;
 
+  void compute_enthalpy(real temp, real *h) const &;
+
+  void compute_enthalpy_and_cp(real t, real *h, real *cp) const &;
+
   // The properties of the species. Some previously private derived variables will appear in the corresponding function classes.
   std::map<std::string, int> elem_list; // element list
   gxl::MatrixDyn<int> elem_comp;        // the element composition of the species

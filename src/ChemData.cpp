@@ -149,6 +149,55 @@ void cfd::Species::compute_cp(real temp, real *cp) const & {
 #endif
 }
 
+void cfd::Species::compute_enthalpy(real t, real *h) const & {
+  const real t2{t * t}, t3{t2 * t}, t4{t3 * t}, t5{t4 * t};
+#ifdef HighTempMultiPart
+  // undefined
+#else
+  for (int i = 0; i < n_spec; ++i) {
+    if (t < t_low[i]) {
+      const real tt = t_low[i];
+      const real tt2 = tt * tt, tt3 = tt2 * tt, tt4 = tt3 * tt, tt5 = tt4 * tt;
+      auto &coeff = low_temp_coeff;
+      h[i] = coeff(i, 0) * tt + 0.5 * coeff(i, 1) * tt2 + coeff(i, 2) * tt3 / 3 + 0.25 * coeff(i, 3) * tt4 +
+                    0.2 * coeff(i, 4) * tt5 + coeff(i, 5);
+      const real cp = coeff(i, 0) + coeff(i, 1) * tt + coeff(i, 2) * tt2 + coeff(i, 3) * tt3 + coeff(i, 4) * tt4;
+      h[i] += cp * (t - tt); // Do a linear interpolation for enthalpy
+    } else {
+      auto &coeff = t < t_mid[i] ? low_temp_coeff : high_temp_coeff;
+      h[i] = coeff(i, 0) * t + 0.5 * coeff(i, 1) * t2 + coeff(i, 2) * t3 / 3 + 0.25 * coeff(i, 3) * t4 +
+                    0.2 * coeff(i, 4) * t5 + coeff(i, 5);
+    }
+    h[i] *= R_u / mw[i];
+  }
+#endif
+}
+
+void cfd::Species::compute_enthalpy_and_cp(real t, real *h, real *cp) const & {
+  const real t2{t * t}, t3{t2 * t}, t4{t3 * t}, t5{t4 * t};
+#ifdef HighTempMultiPart
+#else
+  for (int i = 0; i < n_spec; ++i) {
+    if (t < t_low[i]) {
+      const double tt = t_low[i];
+      const double tt2 = tt * tt, tt3 = tt2 * tt, tt4 = tt3 * tt, tt5 = tt4 * tt;
+      auto &coeff = low_temp_coeff;
+      h[i] = coeff(i, 0) * tt + 0.5 * coeff(i, 1) * tt2 + coeff(i, 2) * tt3 / 3 + 0.25 * coeff(i, 3) * tt4 +
+                    0.2 * coeff(i, 4) * tt5 + coeff(i, 5);
+      cp[i] = coeff(i, 0) + coeff(i, 1) * tt + coeff(i, 2) * tt2 + coeff(i, 3) * tt3 + coeff(i, 4) * tt4;
+      h[i] += cp[i] * (t - tt); // Do a linear interpolation for enthalpy
+    } else {
+      auto &coeff = t < t_mid[i] ? low_temp_coeff : high_temp_coeff;
+      h[i] = coeff(i, 0) * t + 0.5 * coeff(i, 1) * t2 + coeff(i, 2) * t3 / 3 + 0.25 * coeff(i, 3) * t4 +
+                    0.2 * coeff(i, 4) * t5 + coeff(i, 5);
+      cp[i] = coeff(i, 0) + coeff(i, 1) * t + coeff(i, 2) * t2 + coeff(i, 3) * t3 + coeff(i, 4) * t4;
+    }
+    h[i] *= R_u / mw[i];
+    cp[i] *= R_u / mw[i];
+  }
+#endif
+}
+
 void cfd::Species::set_nspec(int n_sp, int n_elem) {
   n_spec = n_sp;
   elem_comp.resize(n_sp, n_elem);

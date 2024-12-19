@@ -597,133 +597,146 @@ void initialize_profile_with_inflow(const Boundary &boundary, const Block &block
              cudaMemcpyHostToDevice);
 }
 
-__global__ void
-init_mixingLayer_prof_compatible(DZone *zone, const int *range_x, const int *range_y, const int *range_z,
-                                 const real *var_info, real delta_omega, int n_turb, int n_fl, DParameter *param,
-                                 ggxl::VectorField3D<real> *profile, int profile_idx) {
-  int i = range_x[0] + (int) (blockIdx.x * blockDim.x + threadIdx.x);
-  int j = range_y[0] + (int) (blockIdx.y * blockDim.y + threadIdx.y);
-  int k = range_z[0] + (int) (blockIdx.z * blockDim.z + threadIdx.z);
-  if (i > range_x[1] || j > range_y[1] || k > range_z[1]) {
-    return;
-  }
+// __global__ void
+// init_mixingLayer_prof_compatible(DZone *zone, const int *range_x, const int *range_y, const int *range_z,
+//                                  const real *var_info, real delta_omega, int n_spec, int n_turb, int n_fl, int n_ps,
+//                                  ggxl::VectorField3D<real> *profile, int profile_idx) {
+//   const int i = range_x[0] + static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
+//   const int j = range_y[0] + static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y);
+//   const int k = range_z[0] + static_cast<int>(blockIdx.z * blockDim.z + threadIdx.z);
+//   if (i > range_x[1] || j > range_y[1] || k > range_z[1]) {
+//     return;
+//   }
+//
+//   bool pp = false;
+//   if (k == 0) {
+//     printf("i=%d, j=%d, k=%d\n", i, j, k);
+//     pp = true;
+//   }
+//   __syncthreads();
+//
+//   auto y = zone->y(i, j, k);
+//
+//   const real u_upper = var_info[1], u_lower = var_info[8 + n_spec];
+//   real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / delta_omega);
+//   real p = var_info[4];
+//   real density, t;
+//   const real t_upper = var_info[5], t_lower = var_info[12 + n_spec];
+//   real yk[MAX_SPEC_NUMBER + MAX_PASSIVE_SCALAR_NUMBER + 4] = {};
+//
+//   real y_upper = (u - u_lower) / (u_upper - u_lower);
+//   real y_lower = 1 - y_upper;
+//   if (k == 0) {
+//     printf("(%d,%d,%d), ns=%d,y=%f, u=%f, tu=%f, tl=%f, yu=%f, yl=%f\n", i, j, k, n_spec, y, u, t_upper, t_lower,
+//            y_upper, y_lower);
+//   }
+//   // if (n_spec > 0) {
+//   //   // multi-species
+//   //   auto sv_upper = &var_info[6];
+//   //   auto sv_lower = &var_info[7 + n_spec + 6];
+//   //
+//   //   for (int l = 0; l < n_spec; ++l) {
+//   //     yk[l] = y_upper * sv_upper[l] + y_lower * sv_lower[l];
+//   //   }
+//   //
+//   //   // compute the total enthalpy of upper and lower streams
+//   //   real h0_upper{0.5 * u_upper * u_upper}, h0_lower{0.5 * u_lower * u_lower};
+//   //
+//   //   real h_upper[MAX_SPEC_NUMBER], h_lower[MAX_SPEC_NUMBER];
+//   //   compute_enthalpy(t_upper, h_upper, param);
+//   //   compute_enthalpy(t_lower, h_lower, param);
+//   //
+//   //   real mw_inv = 0;
+//   //   for (int l = 0; l < n_spec; ++l) {
+//   //     h0_upper += yk[l] * h_upper[l];
+//   //     h0_lower += yk[l] * h_lower[l];
+//   //     mw_inv += yk[l] / param->mw[l];
+//   //   }
+//   //
+//   //   real h = y_upper * h0_upper + y_lower * h0_lower;
+//   //   h -= 0.5 * u * u;
+//   //
+//   //   auto hs = h_upper, cps = h_lower;
+//   //   real err{1};
+//   //   t = t_upper * y_upper + t_lower * y_lower;
+//   //   constexpr int max_iter{1000};
+//   //   constexpr real eps{1e-3};
+//   //   int iter = 0;
+//   //
+//   //   while (err > eps && iter++ < max_iter) {
+//   //     compute_enthalpy_and_cp(t, hs, cps, param);
+//   //     real cp{0}, h_new{0};
+//   //     for (int l = 0; l < n_spec; ++l) {
+//   //       cp += yk[l] * cps[l];
+//   //       h_new += yk[l] * hs[l];
+//   //     }
+//   //     const real t1 = t - (h_new - h) / cp;
+//   //     err = abs(1 - t1 / t);
+//   //     t = t1;
+//   //   }
+//   //   density = p / (R_u * mw_inv * t);
+//   //
+//   //   if (n_fl > 0) {
+//   //     yk[param->i_fl] = var_info[6 + n_spec] * y_upper + var_info[13 + n_spec + n_spec] * y_lower;
+//   //     yk[param->i_fl + 1] = 0;
+//   //   }
+//   //   if (n_ps > 0) {
+//   //     for (int l = 0; l < n_ps; ++l) {
+//   //       yk[param->i_ps + l] =
+//   //           var_info[14 + 2 * n_spec + 4 + 2 * l] * y_upper + var_info[14 + 2 * n_spec + 4 + 2 * l + 1] * y_lower;
+//   //     }
+//   //   }
+//   // } else {
+//   //   // Air
+//   //   constexpr real cp = gamma_air * R_air / (gamma_air - 1);
+//   //   real h0_upper = 0.5 * u_upper * u_upper + cp * var_info[5];
+//   //   real h0_lower = 0.5 * u_lower * u_lower + cp * var_info[12 + n_spec];
+//   //   real h = y_upper * h0_upper + y_lower * h0_lower - 0.5 * u * u;
+//   //   t = h / cp;
+//   //   density = p / (R_air * t);
+//   //
+//   //   if (n_ps > 0) {
+//   //     if (y > 0) {
+//   //       for (int l = 0; l < n_ps; ++l) {
+//   //         yk[param->i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l];
+//   //       }
+//   //     } else {
+//   //       for (int l = 0; l < n_ps; ++l) {
+//   //         yk[param->i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l + 1];
+//   //       }
+//   //     }
+//   //   }
+//   // }
+//   // if (n_turb > 0) {
+//   //   if (y > 0) {
+//   //     for (int l = 0; l < n_turb; ++l) {
+//   //       yk[l + n_spec] = var_info[13 + 2 * n_spec + 1 + l];
+//   //     }
+//   //   } else {
+//   //     for (int l = 0; l < n_turb; ++l) {
+//   //       yk[l + n_spec] = var_info[13 + 2 * n_spec + n_turb + 1 + l];
+//   //     }
+//   //   }
+//   // }
+//
+//   // auto &prof = profile[profile_idx];
+//   // prof(i, j, k, 0) = density;
+//   // prof(i, j, k, 1) = u;
+//   // prof(i, j, k, 2) = 0;
+//   // prof(i, j, k, 3) = 0;
+//   // prof(i, j, k, 4) = p;
+//   // prof(i, j, k, 5) = t;
+//   // for (int l = 0; l < param->n_scalar; ++l) {
+//   //   prof(i, j, k, 6 + l) = yk[l];
+//   // }
+//   // if (k == 0) {
+//   //   printf("i=%d, j=%d, rho=%f, u=%f, p=%f, t=%f, h2=%f, o2=%f, n2=%f, prof={%f,%f,%f,%f,%f,%f,%f}\n", i, j, density, u,
+//   //          p, t, yk[0], yk[1], yk[2], prof(i, j, k, 0), prof(i, j, k, 1), prof(i, j, k, 4), prof(i, j, k, 5),
+//   //          prof(i, j, k, 6), prof(i, j, k, 7), prof(i, j, k, 8));
+//   // }
+// }
 
-  auto y = zone->y(i, j, k);
-
-  int n_spec = param->n_spec, n_ps = param->n_ps;
-  const real u_upper = var_info[1], u_lower = var_info[8 + n_spec];
-  real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / delta_omega);
-  real p = var_info[4];
-  real density, t;
-  const real t_upper = var_info[5], t_lower = var_info[12 + n_spec];
-  real yk[MAX_SPEC_NUMBER + MAX_PASSIVE_SCALAR_NUMBER + 4];
-  memset(yk, 0, sizeof(yk));
-
-  real y_upper = (u - u_lower) / (u_upper - u_lower);
-  real y_lower = 1 - y_upper;
-
-  if (n_spec > 0) {
-    // multi-species
-    auto sv_upper = &var_info[6];
-    auto sv_lower = &var_info[7 + n_spec + 6];
-
-    for (int l = 0; l < n_spec; ++l) {
-      yk[l] = y_upper * sv_upper[l] + y_lower * sv_lower[l];
-    }
-
-    // compute the total enthalpy of upper and lower streams
-    real h0_upper{0.5 * u_upper * u_upper}, h0_lower{0.5 * u_lower * u_lower};
-
-    real h_upper[MAX_SPEC_NUMBER], h_lower[MAX_SPEC_NUMBER];
-    compute_enthalpy(t_upper, h_upper, param);
-    compute_enthalpy(t_lower, h_lower, param);
-
-    real mw_inv = 0;
-    for (int l = 0; l < n_spec; ++l) {
-      h0_upper += yk[l] * h_upper[l];
-      h0_lower += yk[l] * h_lower[l];
-      mw_inv += yk[l] / param->mw[l];
-    }
-
-    real h = y_upper * h0_upper + y_lower * h0_lower;
-    h -= 0.5 * u * u;
-
-    auto hs = h_upper, cps = h_lower;
-    real err{1};
-    t = t_upper * y_upper + t_lower * y_lower;
-    constexpr int max_iter{1000};
-    constexpr real eps{1e-3};
-    int iter = 0;
-
-    while (err > eps && iter++ < max_iter) {
-      compute_enthalpy_and_cp(t, hs, cps, param);
-      real cp{0}, h_new{0};
-      for (int l = 0; l < n_spec; ++l) {
-        cp += yk[l] * cps[l];
-        h_new += yk[l] * hs[l];
-      }
-      const real t1 = t - (h_new - h) / cp;
-      err = abs(1 - t1 / t);
-      t = t1;
-    }
-    density = p / (R_u * mw_inv * t);
-
-    if (n_fl > 0) {
-      yk[param->i_fl] = var_info[6 + n_spec] * y_upper + var_info[13 + n_spec + n_spec] * y_lower;
-      yk[param->i_fl + 1] = 0;
-    }
-    if (n_ps > 0) {
-      for (int l = 0; l < n_ps; ++l) {
-        yk[param->i_ps + l] =
-            var_info[14 + 2 * n_spec + 4 + 2 * l] * y_upper + var_info[14 + 2 * n_spec + 4 + 2 * l + 1] * y_lower;
-      }
-    }
-  } else {
-    // Air
-    constexpr real cp = gamma_air * R_air / (gamma_air - 1);
-    real h0_upper = 0.5 * u_upper * u_upper + cp * var_info[5];
-    real h0_lower = 0.5 * u_lower * u_lower + cp * var_info[12 + n_spec];
-    real h = y_upper * h0_upper + y_lower * h0_lower - 0.5 * u * u;
-    t = h / cp;
-    density = p / (R_air * t);
-
-    if (n_ps > 0) {
-      if (y > 0) {
-        for (int l = 0; l < n_ps; ++l) {
-          yk[param->i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l];
-        }
-      } else {
-        for (int l = 0; l < n_ps; ++l) {
-          yk[param->i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l + 1];
-        }
-      }
-    }
-  }
-  if (n_turb > 0) {
-    if (y > 0) {
-      for (int l = 0; l < n_turb; ++l) {
-        yk[l + n_spec] = var_info[13 + 2 * n_spec + 1 + l];
-      }
-    } else {
-      for (int l = 0; l < n_turb; ++l) {
-        yk[l + n_spec] = var_info[13 + 2 * n_spec + n_turb + 1 + l];
-      }
-    }
-  }
-
-  auto &prof = profile[profile_idx];
-  prof(i, j, k, 0) = density;
-  prof(i, j, k, 1) = u;
-  prof(i, j, k, 2) = 0;
-  prof(i, j, k, 3) = 0;
-  prof(i, j, k, 4) = p;
-  prof(i, j, k, 5) = t;
-  for (int l = 0; l < param->n_scalar; ++l) {
-    prof(i, j, k, 6 + l) = yk[l];
-  }
-}
-
-int read_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
+int read_profile(const Boundary &boundary, const std::string &file, const Block &block, Parameter &parameter,
                  const Species &species, ggxl::VectorField3D<real> &profile,
                  const std::string &profile_related_bc_name) {
   if (file == "MYSELF") {
@@ -731,7 +744,7 @@ int read_profile(const Boundary &boundary, const std::string &file, const Block 
     initialize_profile_with_inflow(boundary, block, parameter, species, profile, profile_related_bc_name);
     return 0;
   }
-  if (file == "mixingLayerCompatible") {
+  if (file == "mixingLayerProfile.dat") {
     // The profile is initialized by the inflow condition.
     return 1;
   }
@@ -811,7 +824,7 @@ identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::strin
 }
 
 void
-read_dat_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
+read_dat_profile(const Boundary &boundary, const std::string &file, const Block &block, Parameter &parameter,
                  const Species &species, ggxl::VectorField3D<real> &profile,
                  const std::string &profile_related_bc_name) {
   std::ifstream file_in(file);
@@ -820,6 +833,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
     MpiParallel::exit();
   }
   const int direction = boundary.face;
+  const int n_spec = species.n_spec;
 
   std::string input;
   std::vector<std::string> var_name;
@@ -837,8 +851,12 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
     }
     gxl::getline(file_in, input, gxl::Case::upper);
   }
-  bool has_pressure{false}, has_temperature{false}, has_tke{false};
-  auto label_order = identify_variable_labels(parameter, var_name, species, has_pressure, has_temperature, has_tke);
+  auto label_order = parameter.identify_variable_labels(var_name, species);
+
+  bool has_pressure = gxl::exists(label_order, 4);
+  bool has_temperature = gxl::exists(label_order, 5);
+  bool has_tke = gxl::exists(label_order, 6 + n_spec);
+
   if ((!has_temperature) && (!has_pressure)) {
     printf("The temperature or pressure is not given in the profile, please provide at least one of them!\n");
     MpiParallel::exit();
@@ -916,6 +934,8 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
   }
 
   const int n_var = parameter.get_int("n_var");
+  const int n_scalar = parameter.get_int("n_scalar");
+
   const auto ngg = block.ngg;
   int range_i[2]{-ngg, block.mx + ngg - 1},
       range_j[2]{-ngg, block.my + ngg - 1},
@@ -962,26 +982,35 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
 
           // Assign the values in 0th order
           for (int l = 3; l < nv_read; ++l) {
-            if (label_order[l] < n_var + 1 + 3) {
+            if (label_order[l] < 6) {
+              // Basic variables
               profile_to_match(ic, j, k, label_order[l]) = profile_read(i0, j0, k0, l);
+            } else if (label_order[l] >= 1000 && label_order[l] < 1000 + n_spec) {
+              // Species variables
+              int ls = label_order[l] - 1000;
+              profile_to_match(ic, j, k, 6 + ls) = profile_read(i0, j0, k0, l);
+            } else if (label_order[l] < 6 + n_scalar - n_spec) {
+              // Turbulence variables or mixture fraction variables
+              int ls = label_order[l] + n_spec;
+              profile_to_match(ic, j, k, ls) = profile_read(i0, j0, k0, l);
             }
           }
 
           // If T or p is not given, compute it.
           if (!has_temperature) {
             real mw{mw_air};
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               mw = 0;
-              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
+              for (int l = 0; l < n_spec; ++l) mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
               mw = 1 / mw;
             }
             profile_to_match(ic, j, k, 5) = profile_to_match(ic, j, k, 4) * mw / (R_u * profile_to_match(ic, j, k, 0));
           }
           if (!has_pressure) {
             real mw{mw_air};
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               mw = 0;
-              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
+              for (int l = 0; l < n_spec; ++l) mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
               mw = 1 / mw;
             }
             profile_to_match(ic, j, k, 4) = profile_to_match(ic, j, k, 5) * R_u * profile_to_match(ic, j, k, 0) / mw;
@@ -989,10 +1018,10 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
           if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
             // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
             real mu{};
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               real mw = 0;
               std::vector<real> Y;
-              for (int l = 0; l < species.n_spec; ++l) {
+              for (int l = 0; l < n_spec; ++l) {
                 mw += profile_to_match(ic, j, k, 6 + l) / species.mw[l];
                 Y.push_back(profile_to_match(ic, j, k, 6 + l));
               }
@@ -1005,9 +1034,9 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
             const real vel2 = profile_to_match(ic, j, k, 1) * profile_to_match(ic, j, k, 1) +
                               profile_to_match(ic, j, k, 2) * profile_to_match(ic, j, k, 2) +
                               profile_to_match(ic, j, k, 3) * profile_to_match(ic, j, k, 3);
-            profile_to_match(ic, j, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
-            profile_to_match(ic, j, k, 6 + species.n_spec + 1) =
-                profile_to_match(ic, j, k, 0) * profile_to_match(ic, j, k, 6 + species.n_spec) / mut;
+            profile_to_match(ic, j, k, 6 + n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
+            profile_to_match(ic, j, k, 6 + n_spec + 1) =
+                profile_to_match(ic, j, k, 0) * profile_to_match(ic, j, k, 6 + n_spec) / mut;
           }
         }
       }
@@ -1057,26 +1086,35 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
 
           // Assign the values in 0th order
           for (int l = 3; l < nv_read; ++l) {
-            if (label_order[l] < n_var + 1 + 3) {
+            if (label_order[l] < 6) {
+              // Basic variables
               profile_to_match(i, jc, k, label_order[l]) = profile_read(i0, j0, k0, l);
+            } else if (label_order[l] >= 1000 && label_order[l] < 1000 + n_spec) {
+              // Species variables
+              int ls = label_order[l] - 1000;
+              profile_to_match(i, jc, k, 6 + ls) = profile_read(i0, j0, k0, l);
+            } else if (label_order[l] < 6 + n_scalar - n_spec) {
+              // Turbulence variables or mixture fraction variables
+              int ls = label_order[l] + n_spec;
+              profile_to_match(i, jc, k, ls) = profile_read(i0, j0, k0, l);
             }
           }
 
           // If T or p is not given, compute it.
           if (!has_temperature) {
             real mw{mw_air};
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               mw = 0;
-              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, jc, k, 6 + l) / species.mw[l];
+              for (int l = 0; l < n_spec; ++l) mw += profile_to_match(i, jc, k, 6 + l) / species.mw[l];
               mw = 1 / mw;
             }
             profile_to_match(i, jc, k, 5) = profile_to_match(i, jc, k, 4) * mw / (R_u * profile_to_match(i, jc, k, 0));
           }
           if (!has_pressure) {
             real mw{mw_air};
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               mw = 0;
-              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, jc, k, 6 + l) / species.mw[l];
+              for (int l = 0; l < n_spec; ++l) mw += profile_to_match(i, jc, k, 6 + l) / species.mw[l];
               mw = 1 / mw;
             }
             profile_to_match(i, jc, k, 4) = profile_to_match(i, jc, k, 5) * R_u * profile_to_match(i, jc, k, 0) / mw;
@@ -1084,10 +1122,10 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
           if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
             // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
             real mu;
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               real mw = 0;
               std::vector<real> Y;
-              for (int l = 0; l < species.n_spec; ++l) {
+              for (int l = 0; l < n_spec; ++l) {
                 mw += profile_to_match(i, jc, k, 6 + l) / species.mw[l];
                 Y.push_back(profile_to_match(i, jc, k, 6 + l));
               }
@@ -1100,9 +1138,9 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
             const real vel2 = profile_to_match(i, jc, k, 1) * profile_to_match(i, jc, k, 1) +
                               profile_to_match(i, jc, k, 2) * profile_to_match(i, jc, k, 2) +
                               profile_to_match(i, jc, k, 3) * profile_to_match(i, jc, k, 3);
-            profile_to_match(i, jc, k, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
-            profile_to_match(i, jc, k, 6 + species.n_spec + 1) =
-                profile_to_match(i, jc, k, 0) * profile_to_match(i, jc, k, 6 + species.n_spec) / mut;
+            profile_to_match(i, jc, k, 6 + n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
+            profile_to_match(i, jc, k, 6 + n_spec + 1) =
+                profile_to_match(i, jc, k, 0) * profile_to_match(i, jc, k, 6 + n_spec) / mut;
           }
         }
       }
@@ -1152,26 +1190,35 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
 
           // Assign the values in 0th order
           for (int l = 3; l < nv_read; ++l) {
-            if (label_order[l] < n_var + 1 + 3) {
+            if (label_order[l] < 6) {
+              // Basic variables
               profile_to_match(i, j, kc, label_order[l]) = profile_read(i0, j0, k0, l);
+            } else if (label_order[l] >= 1000 && label_order[l] < 1000 + n_spec) {
+              // Species variables
+              int ls = label_order[l] - 1000;
+              profile_to_match(i, j, kc, 6 + ls) = profile_read(i0, j0, k0, l);
+            } else if (label_order[l] < 6 + n_scalar - n_spec) {
+              // Turbulence variables or mixture fraction variables
+              int ls = label_order[l] + n_spec;
+              profile_to_match(i, j, kc, ls) = profile_read(i0, j0, k0, l);
             }
           }
 
           // If T or p is not given, compute it.
           if (!has_temperature) {
             real mw{mw_air};
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               mw = 0;
-              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, j, kc, 6 + l) / species.mw[l];
+              for (int l = 0; l < n_spec; ++l) mw += profile_to_match(i, j, kc, 6 + l) / species.mw[l];
               mw = 1 / mw;
             }
             profile_to_match(i, j, kc, 5) = profile_to_match(i, j, kc, 4) * mw / (R_u * profile_to_match(i, j, kc, 0));
           }
           if (!has_pressure) {
             real mw{mw_air};
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               mw = 0;
-              for (int l = 0; l < species.n_spec; ++l) mw += profile_to_match(i, j, kc, 6 + l) / species.mw[l];
+              for (int l = 0; l < n_spec; ++l) mw += profile_to_match(i, j, kc, 6 + l) / species.mw[l];
               mw = 1 / mw;
             }
             profile_to_match(i, j, kc, 4) = profile_to_match(i, j, kc, 5) * R_u * profile_to_match(i, j, kc, 0) / mw;
@@ -1179,10 +1226,10 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
           if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
             // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
             real mu;
-            if (species.n_spec > 0) {
+            if (n_spec > 0) {
               real mw = 0;
               std::vector<real> Y;
-              for (int l = 0; l < species.n_spec; ++l) {
+              for (int l = 0; l < n_spec; ++l) {
                 mw += profile_to_match(i, j, kc, 6 + l) / species.mw[l];
                 Y.push_back(profile_to_match(i, j, kc, 6 + l));
               }
@@ -1195,9 +1242,9 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
             const real vel2 = profile_to_match(i, j, kc, 1) * profile_to_match(i, j, kc, 1) +
                               profile_to_match(i, j, kc, 2) * profile_to_match(i, j, kc, 2) +
                               profile_to_match(i, j, kc, 3) * profile_to_match(i, j, kc, 3);
-            profile_to_match(i, j, kc, 6 + species.n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
-            profile_to_match(i, j, kc, 6 + species.n_spec + 1) =
-                profile_to_match(i, j, kc, 0) * profile_to_match(i, j, kc, 6 + species.n_spec) / mut;
+            profile_to_match(i, j, kc, 6 + n_spec) = 1.5 * vel2 * turb_intensity * turb_intensity;
+            profile_to_match(i, j, kc, 6 + n_spec + 1) =
+                profile_to_match(i, j, kc, 0) * profile_to_match(i, j, kc, 6 + n_spec) / mut;
           }
         }
       }
@@ -1506,6 +1553,139 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
   }
 }
 
+void init_mixingLayer_prof_compatible_cpu(Parameter &parameter, Block &b, Species &species,
+                                          ggxl::VectorField3DHost<real> &profile,
+                                          const int *range_x, const int *range_y, const int *range_z,
+                                          const real *var_info) {
+  const int n_spec = species.n_spec;
+  const real delta_omega = parameter.get_real("delta_omega");
+  int n_fl{0};
+  if ((species.n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2)
+    n_fl = 2;
+  const int i_fl = parameter.get_int("i_fl");
+  const int n_ps = parameter.get_int("n_ps");
+  const int i_ps = parameter.get_int("i_ps");
+  const int n_turb = parameter.get_int("n_turb");
+  const int n_scalar = parameter.get_int("n_scalar");
+
+  for (int j = range_y[0]; j <= range_y[1]; ++j) {
+    real y = b.y(0, j, 0);
+    const real u_upper = var_info[1], u_lower = var_info[8 + n_spec];
+    real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / delta_omega);
+    real p = var_info[4];
+    real density, t;
+    const real t_upper = var_info[5], t_lower = var_info[12 + n_spec];
+    real yk[MAX_SPEC_NUMBER + MAX_PASSIVE_SCALAR_NUMBER + 4] = {};
+
+    real y_upper = (u - u_lower) / (u_upper - u_lower);
+    real y_lower = 1 - y_upper;
+
+    if (n_spec > 0) {
+      // multi-species
+      auto sv_upper = &var_info[6];
+      auto sv_lower = &var_info[7 + n_spec + 6];
+
+      for (int l = 0; l < n_spec; ++l) {
+        yk[l] = y_upper * sv_upper[l] + y_lower * sv_lower[l];
+      }
+
+      // compute the total enthalpy of upper and lower streams
+      real h0_upper{0.5 * u_upper * u_upper}, h0_lower{0.5 * u_lower * u_lower};
+
+      real h_upper[MAX_SPEC_NUMBER], h_lower[MAX_SPEC_NUMBER];
+      species.compute_enthalpy(t_upper, h_upper);
+      species.compute_enthalpy(t_lower, h_lower);
+
+      real mw_inv = 0;
+      for (int l = 0; l < n_spec; ++l) {
+        h0_upper += yk[l] * h_upper[l];
+        h0_lower += yk[l] * h_lower[l];
+        mw_inv += yk[l] / species.mw[l];
+      }
+
+      real h = y_upper * h0_upper + y_lower * h0_lower;
+      h -= 0.5 * u * u;
+
+      auto hs = h_upper, cps = h_lower;
+      real err{1};
+      t = t_upper * y_upper + t_lower * y_lower;
+      constexpr int max_iter{1000};
+      constexpr real eps{1e-3};
+      int iter = 0;
+
+      while (err > eps && iter++ < max_iter) {
+        species.compute_enthalpy_and_cp(t, hs, cps);
+        real cp{0}, h_new{0};
+        for (int l = 0; l < n_spec; ++l) {
+          cp += yk[l] * cps[l];
+          h_new += yk[l] * hs[l];
+        }
+        const real t1 = t - (h_new - h) / cp;
+        err = abs(1 - t1 / t);
+        t = t1;
+      }
+      density = p / (R_u * mw_inv * t);
+
+      if (n_fl > 0) {
+        yk[i_fl] = var_info[6 + n_spec] * y_upper + var_info[13 + n_spec + n_spec] * y_lower;
+        yk[i_fl + 1] = 0;
+      }
+      if (n_ps > 0) {
+        for (int l = 0; l < n_ps; ++l) {
+          yk[i_ps + l] =
+              var_info[14 + 2 * n_spec + 4 + 2 * l] * y_upper + var_info[14 + 2 * n_spec + 4 + 2 * l + 1] * y_lower;
+        }
+      }
+    } else {
+      // Air
+      constexpr real cp = gamma_air * R_air / (gamma_air - 1);
+      real h0_upper = 0.5 * u_upper * u_upper + cp * var_info[5];
+      real h0_lower = 0.5 * u_lower * u_lower + cp * var_info[12 + n_spec];
+      real h = y_upper * h0_upper + y_lower * h0_lower - 0.5 * u * u;
+      t = h / cp;
+      density = p / (R_air * t);
+
+      if (n_ps > 0) {
+        if (y > 0) {
+          for (int l = 0; l < n_ps; ++l) {
+            yk[i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l];
+          }
+        } else {
+          for (int l = 0; l < n_ps; ++l) {
+            yk[i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l + 1];
+          }
+        }
+      }
+    }
+    if (n_turb > 0) {
+      if (y > 0) {
+        for (int l = 0; l < n_turb; ++l) {
+          yk[l + n_spec] = var_info[13 + 2 * n_spec + 1 + l];
+        }
+      } else {
+        for (int l = 0; l < n_turb; ++l) {
+          yk[l + n_spec] = var_info[13 + 2 * n_spec + n_turb + 1 + l];
+        }
+      }
+    }
+
+    auto &prof = profile;
+    for (int k = range_z[0]; k <= range_z[1]; ++k) {
+      for (int i = range_x[0]; i <= range_x[1]; ++i) {
+        prof(i, j, k, 0) = density;
+        prof(i, j, k, 1) = u;
+        prof(i, j, k, 2) = 0;
+        prof(i, j, k, 3) = 0;
+        prof(i, j, k, 4) = p;
+        prof(i, j, k, 5) = t;
+        for (int l = 0; l < n_scalar; ++l) {
+          prof(i, j, k, 6 + l) = yk[l];
+        }
+      }
+    }
+  }
+}
+
 void
 DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field,
                                        DParameter *param) {
@@ -1565,51 +1745,264 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
           if (b.type_label == label) {
             const int direction = b.face;
             const int ngg = mesh[blk].ngg;
-            int range_0[2]{-ngg, mesh[blk].mx + ngg - 1}, range_1[2]{-ngg, mesh[blk].my + ngg - 1},
-                range_2[2]{-ngg, mesh[blk].mz + ngg - 1};
-            int n0 = mesh[blk].mx + 2 * ngg, n1 = mesh[blk].my + 2 * ngg, n2 = mesh[blk].mz + 2 * ngg;
+            const int mx = mesh[blk].mx, my = mesh[blk].my, mz = mesh[blk].mz;
+            int range_0[2]{-ngg, mx + ngg - 1}, range_1[2]{-ngg, my + ngg - 1},
+                range_2[2]{-ngg, mz + ngg - 1};
+            int n0 = mx + 2 * ngg, n1 = my + 2 * ngg, n2 = mz + 2 * ngg;
             if (direction == 0) {
               n0 = 1 + ngg;
-              range_0[0] = 0;
-              range_0[1] = ngg;
+              range_0[0] = -ngg;
+              range_0[1] = 0;
             } else if (direction == 1) {
               n1 = 1 + ngg;
-              range_1[0] = 0;
-              range_1[1] = ngg;
+              range_1[0] = -ngg;
+              range_1[1] = 0;
             } else if (direction == 2) {
               n2 = 1 + ngg;
-              range_2[0] = 0;
-              range_2[1] = ngg;
+              range_2[0] = -ngg;
+              range_2[1] = 0;
             }
 
             std::vector<real> var_info;
             get_mixing_layer_info(parameter, species, var_info);
 
-            real *var_info_dev;
-            cudaMalloc(&var_info_dev, sizeof(real) * var_info.size());
-            cudaMemcpy(var_info_dev, var_info.data(), sizeof(real) * var_info.size(), cudaMemcpyHostToDevice);
+            ggxl::VectorField3DHost<real> profile_hPtr;
+            int extent[3]{mx, my, mz};
+            extent[b.face] = 1;
+            int nv = parameter.get_int("n_var");
+            profile_hPtr.resize(extent[0], extent[1], extent[2], nv + 1, ngg);
+            init_mixingLayer_prof_compatible_cpu(parameter, mesh[blk], species, profile_hPtr, range_0,
+                                                 range_1, range_2, var_info.data());
 
-            uint tpb[3], bpg[3];
-            tpb[0] = n0 <= (2 * ngg + 1) ? 1 : 16;
-            tpb[1] = n1 <= (2 * ngg + 1) ? 1 : 16;
-            tpb[2] = n2 <= (2 * ngg + 1) ? 1 : 16;
-            bpg[0] = (n0 - 1) / tpb[0];
-            bpg[1] = (n1 - 1) / tpb[1];
-            bpg[2] = (n2 - 1) / tpb[2];
-            dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
+            // cudaDeviceSynchronize();
+            // if (auto err = cudaGetLastError(); err != cudaSuccess) {
+            //   printf("Error in proc %d before var_info_dev: %s\n", parameter.get_int("myid"), cudaGetErrorString(err));
+            //   MpiParallel::exit();
+            // }
+            // real *var_info_dev;
+            // cudaMalloc(&var_info_dev, sizeof(real) * var_info.size());
+            // cudaMemcpy(var_info_dev, var_info.data(), sizeof(real) * var_info.size(), cudaMemcpyHostToDevice);
+            // cudaDeviceSynchronize();
+            // if (auto err = cudaGetLastError(); err != cudaSuccess) {
+            //   printf("Error in proc %d after var_info_dev: %s\n", parameter.get_int("myid"), cudaGetErrorString(err));
+            //   MpiParallel::exit();
+            // }
+            //
+            // uint tpb[3], bpg[3];
+            // tpb[0] = n0 <= (2 * ngg + 1) ? 1 : 16;
+            // tpb[1] = n1 <= (2 * ngg + 1) ? 1 : 16;
+            // tpb[2] = n2 <= (2 * ngg + 1) ? 1 : 16;
+            // bpg[0] = (n0 - 1) / tpb[0] + 1;
+            // bpg[1] = (n1 - 1) / tpb[1] + 1;
+            // bpg[2] = (n2 - 1) / tpb[2] + 1;
+            // printf("proc %d, tpb: %d,%d,%d, bpg: %d,%d,%d, n0:n2= %d,%d,%d\n", parameter.get_int("myid"), tpb[0],
+            //        tpb[1], tpb[2],
+            //        bpg[0], bpg[1], bpg[2], n0, n1, n2);
+            // dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
             int n_fl{0};
             if ((species.n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2)
               n_fl = 2;
-            init_mixingLayer_prof_compatible<<<BPG, TPB>>>(field[blk].d_ptr, range_0, range_1, range_2, var_info_dev,
-                                                           parameter.get_real("delta_omega"),
-                                                           parameter.get_int("n_turb"),
-                                                           n_fl, param,
-                                                           profile_dPtr_withGhost, ll);
+            // printf("6\n");
+            // cudaDeviceSynchronize();
+            // if (auto err = cudaGetLastError(); err != cudaSuccess) {
+            //   printf("Error in proc %d before init_mixingLayer_prof_compatible: %s\n", parameter.get_int("myid"),
+            //          cudaGetErrorString(err));
+            //   MpiParallel::exit();
+            // }
+            // int *range_x, *range_y, *range_z;
+            // cudaMalloc(&range_x, sizeof(int) * 2);
+            // cudaMalloc(&range_y, sizeof(int) * 2);
+            // cudaMalloc(&range_z, sizeof(int) * 2);
+            // cudaMemcpy(range_x, range_0, sizeof(int) * 2, cudaMemcpyHostToDevice);
+            // cudaMemcpy(range_y, range_1, sizeof(int) * 2, cudaMemcpyHostToDevice);
+            // cudaMemcpy(range_z, range_2, sizeof(int) * 2, cudaMemcpyHostToDevice);
+            // printf("range_x=%d,%d, range_y=%d,%d, range_z=%d,%d\n", range_0[0], range_0[1], range_1[0], range_1[1],
+            //        range_2[0], range_2[1]);
+            // init_mixingLayer_prof_compatible<<<BPG, TPB>>>(field[blk].d_ptr, range_x, range_y, range_z, var_info_dev,
+            //                                                parameter.get_real("delta_omega"),
+            //                                                parameter.get_int("n_spec"),
+            //                                                parameter.get_int("n_turb"),
+            //                                                n_fl, parameter.get_int("n_ps"),
+            //                                                profile_dPtr_withGhost, ll);
+            // cudaDeviceSynchronize();
+            // if (auto err = cudaGetLastError(); err != cudaSuccess) {
+            //   printf("Error in proc %d after init_mixingLayer_prof_compatible: %s\n", parameter.get_int("myid"),
+            //          cudaGetErrorString(err));
+            //   MpiParallel::exit();
+            // }
+
+            // print the profile out to file
+            // Here, we assume the profile is 1D in y direction, that is, the same for x and z.
+            // ggxl::VectorField3DHost<real> profile_hPtr;
+            // int extent[3]{mx, my, mz};
+            // extent[b.face] = 1;
+            // int nv = parameter.get_int("n_var");
+            // cudaDeviceSynchronize();
+            // if (auto err = cudaGetLastError(); err != cudaSuccess) {
+            //   printf("Error in proc %d before profile_hPtr: %s\n", parameter.get_int("myid"), cudaGetErrorString(err));
+            //   MpiParallel::exit();
+            // }
+            // profile_hPtr.resize(extent[0], extent[1], extent[2], nv + 1, ngg);
+            cudaDeviceSynchronize();
+            if (auto err = cudaGetLastError(); err != cudaSuccess) {
+              printf("Error in proc %d before profile_hPtr cudaMemcpy: %s\n", parameter.get_int("myid"),
+                     cudaGetErrorString(err));
+              MpiParallel::exit();
+            }
+            cudaMemcpy(profile_hPtr_withGhost[ll].data(), profile_hPtr.data(),
+                       sizeof(real) * profile_hPtr.size() * (nv + 1), cudaMemcpyHostToDevice);
+            // cudaMemcpy(profile_hPtr.data(), profile_hPtr_withGhost[ll].data(),
+            //            sizeof(real) * profile_hPtr.size() * (nv + 1), cudaMemcpyDeviceToHost);
+            cudaDeviceSynchronize();
+            if (auto err = cudaGetLastError(); err != cudaSuccess) {
+              printf("Error in proc %d after profile_hPtr cudaMemcpy: %s\n", parameter.get_int("myid"),
+                     cudaGetErrorString(err));
+              MpiParallel::exit();
+            }
+            printf("Before writing\n");
+            FILE *fp = fopen("./mixingLayerProfile.dat", "w");
+            if (fp == nullptr) {
+              printf("Cannot open file %s\n", "./mixingLayerProfile.dat");
+              MpiParallel::exit();
+            }
+            fprintf(fp, "VARIABLES = \"X\"\n\"Y\"\n\"Z\"\n\"RHO\"\n\"U\"\n\"V\"\n\"W\"\n\"p\"\n\"T\"\n");
+            if (species.n_spec > 0) {
+              for (int l = 0; l < species.n_spec; ++l) {
+                fprintf(fp, "\"%s\"\n", species.spec_name[l].c_str());
+              }
+            }
+            if (parameter.get_int("n_turb") == 2) {
+              fprintf(fp, "\"TKE\"\n\"omega\"\n");
+            }
+            if (n_fl > 0) {
+              fprintf(fp, "\"MixtureFraction\"\n\"MixtureFractionVariance\"\n");
+            }
+            fprintf(fp, "ZONE T=\"INFLOW\"\n");
+            fprintf(fp, "I=%d, J=%d, K=%d, f=BLOCK\n", n0, n1, n2);
+            // Print nv DOUBLE in DT=(...) into a char array
+            std::string temp = "DT=(";
+            for (int l = 0; l < nv + 4; ++l) {
+              temp += "DOUBLE ";
+            }
+            temp += ")\n";
+            fprintf(fp, "%s", temp.c_str());
+            // First, x, y, z
+            int everyFour = 0;
+            constexpr int numberToChangeLine = 4;
+            if (direction == 0) {
+              range_0[0] = -ngg;
+              range_0[1] = 0;
+            } else if (direction == 1) {
+              range_1[0] = -ngg;
+              range_1[1] = 0;
+            } else if (direction == 2) {
+              range_2[0] = -ngg;
+              range_2[1] = 0;
+            }
+            for (int k = range_2[0]; k <= range_2[1]; ++k) {
+              for (int j = range_1[0]; j <= range_1[1]; ++j) {
+                for (int i = range_0[0]; i <= range_0[1]; ++i) {
+                  fprintf(fp, " %.15e", mesh[blk].x(i, j, k));
+                  everyFour++;
+                  if (everyFour == numberToChangeLine) {
+                    fprintf(fp, "\n");
+                    everyFour = 0;
+                  }
+                }
+              }
+            }
+            if (everyFour != 0) {
+              fprintf(fp, "\n");
+            }
+            everyFour = 0;
+            for (int k = range_2[0]; k <= range_2[1]; ++k) {
+              for (int j = range_1[0]; j <= range_1[1]; ++j) {
+                for (int i = range_0[0]; i <= range_0[1]; ++i) {
+                  fprintf(fp, " %.15e", mesh[blk].y(i, j, k));
+                  everyFour++;
+                  if (everyFour == numberToChangeLine) {
+                    fprintf(fp, "\n");
+                    everyFour = 0;
+                  }
+                }
+              }
+            }
+            if (everyFour != 0) {
+              fprintf(fp, "\n");
+            }
+            everyFour = 0;
+            for (int k = range_2[0]; k <= range_2[1]; ++k) {
+              for (int j = range_1[0]; j <= range_1[1]; ++j) {
+                for (int i = range_0[0]; i <= range_0[1]; ++i) {
+                  fprintf(fp, " %.15e", mesh[blk].z(i, j, k));
+                  everyFour++;
+                  if (everyFour == numberToChangeLine) {
+                    fprintf(fp, "\n");
+                    everyFour = 0;
+                  }
+                }
+              }
+            }
+            if (everyFour != 0) {
+              fprintf(fp, "\n");
+            }
+            // Then, the variables
+            for (int l = 0; l < nv + 1; ++l) {
+              everyFour = 0;
+              for (int k = range_2[0]; k <= range_2[1]; ++k) {
+                for (int j = range_1[0]; j <= range_1[1]; ++j) {
+                  for (int i = range_0[0]; i <= range_0[1]; ++i) {
+                    fprintf(fp, " %.15e", profile_hPtr(i, j, k, l));
+                    everyFour++;
+                    if (everyFour == numberToChangeLine) {
+                      fprintf(fp, "\n");
+                      everyFour = 0;
+                    }
+                  }
+                }
+              }
+              if (everyFour != 0) {
+                fprintf(fp, "\n");
+              }
+            }
+            fclose(fp);
+            printf("After writing\nBefore updating file name\n");
+            // auto arr = parameter.get_string_array("profile_file_names");
+            // for (auto &s: arr) {
+            //   printf("name: %s\n", s.c_str());
+            // }
+            // arr[ll] = "mixingLayerProfile.dat";
+            // printf("After updating file name\n");
+            // parameter.update_parameter("profile_file_names", arr);
+            // for (auto &s: arr) {
+            //   printf("name: %s\n", s.c_str());
+            // }
+            cudaDeviceSynchronize();
+            if (auto err = cudaGetLastError(); err != cudaSuccess) {
+              printf("Error in proc %d before profile_hPtr deallocate_memory: %s\n", parameter.get_int("myid"),
+                     cudaGetErrorString(err));
+              MpiParallel::exit();
+            }
+            profile_hPtr.deallocate_memory();
+            cudaDeviceSynchronize();
+            if (auto err = cudaGetLastError(); err != cudaSuccess) {
+              printf("Error in proc %d after profile_hPtr deallocate_memory: %s\n", parameter.get_int("myid"),
+                     cudaGetErrorString(err));
+              MpiParallel::exit();
+            }
+            printf("7\n");
+            break;
           }
         }
       }
     }
   }
+  cudaDeviceSynchronize();
+  if (auto err = cudaGetLastError(); err != cudaSuccess) {
+    printf("Error in proc %d after profile_hPtr big part: %s\n", parameter.get_int("myid"), cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
+  printf("8\n");
 
   // Count the max number of rng needed
   auto size{0};
