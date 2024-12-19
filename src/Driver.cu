@@ -8,17 +8,23 @@
 #include "DigitalFilter.cuh"
 
 namespace cfd {
-
 template<MixtureModel mix_model, class turb>
-Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
-    myid(parameter.get_int("myid")), time(), mesh(mesh_), parameter(parameter),
-    spec(parameter), reac(parameter, spec), flameletLib(parameter), stat_collector(parameter, mesh, field, spec) {
-  // Allocate the memory for every block
+Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_): myid(parameter.get_int("myid")),
+  mesh(mesh_), parameter(parameter), spec(parameter), reac(parameter, spec), flameletLib(parameter),
+  stat_collector(parameter, mesh, field, spec) {
+  // This function initializes the driver, including the mesh, field, species, reactions, flamelet library,
+  // and statistics collector
+
+  // First, deduce some simulation information from the parameter file
   parameter.deduce_sim_info(spec);
 
+  MPI_Barrier(MPI_COMM_WORLD);
   if (myid == 0)
     printf("\n*****************************Driver initialization******************************\n");
 
+  // Allocate the memory for every block
+  // This function allocates the memory for host for every block, as well as the device pointers,
+  // which will be allocated later
   for (int blk = 0; blk < mesh.n_block; ++blk) {
     field.emplace_back(parameter, mesh[blk]);
   }
@@ -31,28 +37,77 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_):
     res_scale_in.close();
   }
 
+  // Allocate device memory.
   for (int blk = 0; blk < mesh.n_block; ++blk) {
     field[blk].setup_device_memory(parameter);
   }
   printf("\tProcess [[%d]] has finished setting up device memory.\n", myid);
-  bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter, param);
-//  initialize_digital_filter(parameter, mesh_, bound_cond);
-
-  initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec, bound_cond.profile_dPtr_withGhost);
-
-  if (parameter.get_bool("sponge_layer")) {
-    initialize_sponge_layer(parameter, mesh, field, spec);
+  cudaDeviceSynchronize();
+  auto err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after setup_device_memory: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
   }
 
-  write_reference_state(parameter, spec);
+  // Initialize the boundary conditions, read in the profiles.
+  bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter, param);
+  MPI_Barrier(MPI_COMM_WORLD);
+  cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after initialize_bc_on_GPU: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
 
-  DParameter d_param(parameter, spec, &reac, &flameletLib);
+  // Initialize the basic variables.
+  initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec, bound_cond.profile_dPtr_withGhost);
+  cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after initialize_basic_variables: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
+
+  // If we use sponge layer, initialize it here.
+  if (parameter.get_bool("sponge_layer")) {
+    initialize_sponge_layer(parameter, mesh, field, spec);
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+      printf("Error in proc %d after initialize_sponge_layer: %s\n", myid, cudaGetErrorString(err));
+      MpiParallel::exit();
+    }
+  }
+
+  // Print the info of the simulation.
+  write_reference_state(parameter, spec);
+  cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after write_reference_state: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
+
+  // Transfer the parameters to GPU.
+  const DParameter d_param(parameter, spec, &reac, &flameletLib);
   cudaMalloc(&param, sizeof(DParameter));
   cudaMemcpy(param, &d_param, sizeof(DParameter), cudaMemcpyHostToDevice);
+  cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after DParameter: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
 
+  // If unsteady, we may need to collect some statistical data.
   if (parameter.get_bool("steady") == 0 && parameter.get_bool("if_collect_statistics")) {
-//    stat_collector.initialize_statistics_collector<mix_model, turb>(spec);
     stat_collector.initialize_statistics_collector();
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+      printf("Error in proc %d after initialize_statistics_collector: %s\n", myid, cudaGetErrorString(err));
+      MpiParallel::exit();
+    }
   }
 }
 
@@ -64,6 +119,7 @@ void Driver<mix_model, turb>::initialize_computation() {
   }
   const auto ng_1 = 2 * mesh[0].ngg - 1;
 
+  MPI_Barrier(MPI_COMM_WORLD);
   if (myid == 0)
     printf("\n******************************Prepare to compute********************************\n");
 
@@ -85,34 +141,57 @@ void Driver<mix_model, turb>::initialize_computation() {
     }
   }
 
-  // Second, apply boundary conditions to all boundaries, including face communication between faces
+  // First, apply boundary conditions to all boundaries; all ghost grids will have reasonable values.
   for (int b = 0; b < mesh.n_block; ++b) {
     bound_cond.apply_boundary_conditions<mix_model, turb>(mesh[b], field[b], param, 0);
   }
   printf("\tProcess [[%d]] has finished applying boundary conditions for initialization\n", myid);
+  cudaDeviceSynchronize();
+  auto err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after apply_boundary_conditions: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
 
-
-  // First, compute the conservative variables from basic variables
+  // Second, if RAS, initialize the turbulence quantities
   if constexpr (TurbMethod<turb>::hasMut == true) {
     for (auto i = 0; i < mesh.n_block; ++i) {
-      int mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
+      const int mx{mesh[i].mx}, my{mesh[i].my}, mz{mesh[i].mz};
       dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
       initialize_mut<mix_model, turb><<<bpg, tpb>>>(field[i].d_ptr, param);
     }
   }
   cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after initialize_mut: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
+
   // Third, communicate values between processes
   printf("\tProcess [[%d]] is going to transfer data\n", myid);
   data_communication<mix_model, turb>(mesh, field, parameter, 0, param);
   printf("\tProcess [[%d]] has finished data transfer\n", myid);
   cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after data_communication: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
 
+  // Fourth, compute the physical properties
   for (auto b = 0; b < mesh.n_block; ++b) {
-    int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+    const int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
     dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
     update_physical_properties<mix_model><<<bpg, tpb>>>(field[b].d_ptr, param);
   }
   cudaDeviceSynchronize();
+  err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    printf("Error in proc %d after data_communication: %s\n", myid, cudaGetErrorString(err));
+    MpiParallel::exit();
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
   if (myid == 0) {
     printf("\tThe driver is completely initialized on GPU.\n");
   }
@@ -120,9 +199,9 @@ void Driver<mix_model, turb>::initialize_computation() {
 
 __global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, int n_point_times3) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - ngg;
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   const real x{zone->x(i, j, k)}, y{zone->y(i, j, k)}, z{zone->z(i, j, k)};
@@ -150,11 +229,11 @@ void write_reference_state(Parameter &parameter, const Species &species) {
   if (parameter.get_int("problem_type") == 1) {
     // For mixing layers, we need to output info about both streams.
     std::vector<real> var_info;
-    cfd::get_mixing_layer_info(parameter, species, var_info);
+    get_mixing_layer_info(parameter, species, var_info);
 
-    real u1{std::sqrt(var_info[1] * var_info[1] + var_info[2] * var_info[2] + var_info[3] * var_info[3])};
-    int ns{species.n_spec};
-    real mu, gamma{gamma_air}, mw{mw_air};
+    const real u1{std::sqrt(var_info[1] * var_info[1] + var_info[2] * var_info[2] + var_info[3] * var_info[3])};
+    const int ns{species.n_spec};
+    real gamma{gamma_air}, mw{mw_air};
     if (ns > 0) {
       real cp_i[MAX_SPEC_NUMBER];
       species.compute_cp(var_info[5], cp_i);
@@ -167,9 +246,12 @@ void write_reference_state(Parameter &parameter, const Species &species) {
       gamma = cp / (cp - R_u * mw);
       mw = 1 / mw;
     }
-    real c1{std::sqrt(gamma * R_u / mw * var_info[5])};
-    real u2{std::sqrt(var_info[8 + ns] * var_info[8 + ns] + var_info[9 + ns] * var_info[9 + ns] +
-                      var_info[10 + ns] * var_info[10 + ns])};
+    const real c1{std::sqrt(gamma * R_u / mw * var_info[5])};
+    const real u2{
+      std::sqrt(var_info[8 + ns] * var_info[8 + ns]
+                + var_info[9 + ns] * var_info[9 + ns]
+                + var_info[10 + ns] * var_info[10 + ns])
+    };
     if (ns > 0) {
       real cp_i[MAX_SPEC_NUMBER];
       species.compute_cp(var_info[12 + ns], cp_i);
@@ -182,17 +264,18 @@ void write_reference_state(Parameter &parameter, const Species &species) {
       gamma = cp / (cp - R_u * mw);
       mw = 1 / mw;
     }
-    real c2 = std::sqrt(gamma * R_u / mw * var_info[12 + ns]);
+    const real c2 = std::sqrt(gamma * R_u / mw * var_info[12 + ns]);
 
     // Compute the convective velocity
-    real uc = (u1 * c2 + u2 * c1) / (c1 + c2);
+    const real uc = (u1 * c2 + u2 * c1) / (c1 + c2);
     // Velocity ratio and density ratio
-    real density_ratio = var_info[0] / var_info[7 + ns];
-    real velocity_ratio = u1 / u2;
+    const real density_ratio = var_info[0] / var_info[7 + ns];
+    const real velocity_ratio = u1 / u2;
     // Compute the velocity delta
-    real DeltaU = abs(u1 - u2);
+    const real DeltaU = abs(u1 - u2);
 
     if (myid == 0) {
+      real mu;
       std::filesystem::path out_dir("output/message");
       if (!exists(out_dir)) {
         create_directories(out_dir);
@@ -311,7 +394,7 @@ void write_reference_state(Parameter &parameter, const Species &species) {
     parameter.update_parameter("density_ratio", density_ratio);
     parameter.update_parameter("velocity_ratio", velocity_ratio);
     parameter.update_parameter("DeltaU", DeltaU);
-  }else{
+  } else {
     std::filesystem::path out_dir("output/message");
     if (!exists(out_dir)) {
       create_directories(out_dir);
@@ -380,5 +463,4 @@ template
 struct Driver<MixtureModel::FL, SST<TurbSimLevel::RANS>>;
 template
 struct Driver<MixtureModel::FL, SST<TurbSimLevel::DES>>;
-
 } // cfd
