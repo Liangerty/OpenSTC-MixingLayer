@@ -7,8 +7,7 @@
 #include "Transport.cuh"
 
 namespace cfd {
-
-void get_mixing_layer_info(const Parameter &parameter, const Species &species, std::vector<real> &var_info) {
+void get_mixing_layer_info(Parameter &parameter, const Species &species, std::vector<real> &var_info) {
   // If we initialize a mixing layer problem, we need to know the following parameters:
   // 1. The convective Mach number Ma_c
   // 2. The vortex thickness at the entrance delta_omega
@@ -101,10 +100,10 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
     real convective_mach = abs(ma_upper * c_upper - ma_lower * c_lower) / (c_upper + c_lower);
     if (abs(ma_c - convective_mach) > 1e-3) {
       printf(
-          "The convective mach number with given streams = %e, which is not consistent with the given convective mach number %e.\n",
-          convective_mach, ma_c);
+        "The convective mach number with given streams = %e, which is not consistent with the given convective mach number %e.\n",
+        convective_mach, ma_c);
       printf(
-          "The computation is continued with the given streams, where the given convective mach number is ignored.\n");
+        "The computation is continued with the given streams, where the given convective mach number is ignored.\n");
     }
   } else if (ma_upper > 0) {
     if (parameter.get_bool("upper_faster")) {
@@ -182,7 +181,7 @@ void get_mixing_layer_info(const Parameter &parameter, const Species &species, s
     }
   }
 
-  if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
+  if (int n_ps = parameter.get_int("n_ps"); n_ps > 0) {
     for (int i = 1; i <= n_ps; ++i) {
       if (upper.find("ps" + std::to_string(i)) != upper.cend()) {
         var_info.push_back(std::get<real>(upper.at("ps" + std::to_string(i))));

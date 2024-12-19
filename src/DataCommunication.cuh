@@ -68,7 +68,7 @@ __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DP
 
   int idx[3], idx_tar[3], d_idx[3];
   for (int i = 0; i < 3; ++i) {
-    d_idx[i] = f.loop_dir[i] * (int) (n[i]);
+    d_idx[i] = f.loop_dir[i] * static_cast<int>(n[i]);
     idx[i] = f.range_start[i] + d_idx[i];
   }
   for (int i = 0; i < 3; ++i) {
@@ -80,7 +80,7 @@ __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DP
 
   if (idx[f.face] == face_dir) {
     // If this is the corresponding face, then average the values from both blocks
-#pragma unroll
+    #pragma unroll
     for (int l = 0; l < 6; ++l) {
       const real ave{0.5 * (tar_zone->bv(idx_tar[0], idx_tar[1], idx_tar[2], l) + zone->bv(idx[0], idx[1], idx[2], l))};
       zone->bv(idx[0], idx[1], idx[2], l) = ave;
@@ -93,7 +93,7 @@ __global__ void inner_communication(DZone *zone, DZone *tar_zone, int i_face, DP
     }
   } else {
     // Else, get the inner value for this block's ghost grid
-#pragma unroll
+    #pragma unroll
     for (int l = 0; l < 6; ++l) {
       zone->bv(idx[0], idx[1], idx[2], l) = tar_zone->bv(idx_tar[0], idx_tar[1], idx_tar[2], l);
     }
@@ -118,10 +118,10 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
 
   //A 2-D array which is the cache used when using MPI to send/recv messages. The first dimension is the face index
   //while the second dimension is the coordinate of that face, 3 consecutive number represents one position.
-  /*static*/ const auto temp_s = new real *[total_face], temp_r = new real *[total_face];
-  /*static*/ const auto length = new int[total_face];
+  const auto temp_s = new real *[total_face], temp_r = new real *[total_face];
+  const auto length = new int[total_face];
 
-  //Added with iterate through faces and will equal to the total face number when the loop ends
+  //Added with iterating through faces and will equal to the total face number when the loop ends
   int fc_num = 0;
   //Compute the array size of different faces and allocate them. Different for different faces.
   for (int blk = 0; blk < n_block; ++blk) {
@@ -163,7 +163,7 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
       setup_data_to_be_sent<<<BPG, TPB>>>(field[m].d_ptr, f, &temp_s[fc_num][0], param);
       cudaDeviceSynchronize();
       //Send and receive. Take care of the first address!
-      // The buffer is on GPU, thus we require a CUDA-aware MPI, such as OpenMPI.
+      // The buffer is on GPU; thus we require a CUDA-aware MPI, such as OpenMPI.
       MPI_Isend(&temp_s[fc_num][0], length[fc_num], MPI_DOUBLE, fc.target_process, fc.flag_send, MPI_COMM_WORLD,
                 &s_request[fc_num]);
       MPI_Irecv(&temp_r[fc_num][0], length[fc_num], MPI_DOUBLE, fc.target_process, fc.flag_receive, MPI_COMM_WORLD,
@@ -208,7 +208,6 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
   delete[]temp_s;
   delete[]temp_r;
   delete[]length;
-
 }
 
 template<MixtureModel mix_model, class turb>
@@ -224,15 +223,12 @@ __global__ void assign_data_received(DZone *zone, int i_face, const real *data, 
   idx[0] = f.range_start[0] + n[0] * f.loop_dir[0];
   idx[1] = f.range_start[1] + n[1] * f.loop_dir[1];
   idx[2] = f.range_start[2] + n[2] * f.loop_dir[2];
-//  for (int ijk: f.loop_order) {
-//    idx[ijk] = f.range_start[ijk] + n[ijk] * f.loop_dir[ijk];
-//  }
 
   const int n_var{param->n_scalar + 6}, ngg{zone->ngg};
   int bias = n_var * (ngg + 1) * (n[f.loop_order[1]] * f.n_point[f.loop_order[2]] + n[f.loop_order[2]]);
 
   auto &bv = zone->bv;
-#pragma unroll
+  #pragma unroll
   for (int l = 0; l < 6; ++l) {
     bv(idx[0], idx[1], idx[2], l) = 0.5 * (bv(idx[0], idx[1], idx[2], l) + data[bias + l]);
   }
@@ -245,7 +241,7 @@ __global__ void assign_data_received(DZone *zone, int i_face, const real *data, 
   for (int ig = 1; ig <= ngg; ++ig) {
     idx[f.face] += f.direction;
     bias += n_var;
-#pragma unroll
+    #pragma unroll
     for (int l = 0; l < 6; ++l) {
       bv(idx[0], idx[1], idx[2], l) = data[bias + l];
     }
@@ -254,6 +250,5 @@ __global__ void assign_data_received(DZone *zone, int i_face, const real *data, 
     }
     compute_cv_from_bv_1_point<mix_model, turb>(zone, param, idx[0], idx[1], idx[2]);
   }
-
 }
 }

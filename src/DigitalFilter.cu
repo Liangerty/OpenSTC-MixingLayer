@@ -2,6 +2,7 @@
 #include "BoundCond.cuh"
 #include <ctime>
 #include "mpi.h"
+#include "Parallel.h"
 
 namespace cfd {
 void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
@@ -140,8 +141,8 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
       offset += 4;
       if (my != my_read || mz != mz_read) {
         printf(
-            "Error: the grid size in the file %s is not consistent with the current grid size, the df states will be restarted.\n",
-            filename.c_str());
+          "Error: the grid size in the file %s is not consistent with the current grid size, the df states will be restarted.\n",
+          filename.c_str());
         initialized = false;
         break;
       }
@@ -366,8 +367,10 @@ void DBoundCond::get_digital_filter_convolution_kernel(Parameter &parameter, std
 void DBoundCond::generate_random_numbers(int iFace, int my, int mz, int ngg) const {
   // 1. Generate random numbers
   dim3 TPB(32, 32);
-  dim3 BPG{((my + 2 * DBoundCond::DF_N + 2 * ngg + TPB.x - 1) / TPB.x),
-           ((mz + 2 * DBoundCond::DF_N + 2 * ngg + TPB.y - 1) / TPB.y)};
+  dim3 BPG{
+    ((my + 2 * DBoundCond::DF_N + 2 * ngg + TPB.x - 1) / TPB.x),
+    ((mz + 2 * DBoundCond::DF_N + 2 * ngg + TPB.y - 1) / TPB.y)
+  };
   generate_random_numbers_kernel<<<BPG, TPB>>>(rng_states_dPtr, random_values_dPtr, iFace, my, mz, ngg);
 
   // 2. remove the mean spanwise
@@ -383,8 +386,10 @@ void DBoundCond::generate_random_numbers(int iFace, int my, int mz, int ngg) con
 
 void DBoundCond::apply_convolution(int iFace, int my, int mz, int ngg) const {
   dim3 TPB(32, 8);
-  dim3 BPG{((my + 2 * ngg + TPB.x - 1) / TPB.x),
-           ((mz + 2 * ngg + 2 * DBoundCond::DF_N + TPB.y - 1) / TPB.y)};
+  dim3 BPG{
+    ((my + 2 * ngg + TPB.x - 1) / TPB.x),
+    ((mz + 2 * ngg + 2 * DBoundCond::DF_N + TPB.y - 1) / TPB.y)
+  };
   perform_convolution_y<<<BPG, TPB>>>(random_values_dPtr, df_by_dPtr, df_fy_dPtr, iFace, my, mz, ngg);
 
   BPG = {((my + 2 * ngg + TPB.x - 1) / TPB.x), ((mz + 2 * ngg + TPB.y - 1) / TPB.y)};
@@ -423,12 +428,12 @@ compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij, ggxl::Vec
   real R33_y = Rij[5] * gaussian_y;
 //  printf("R(%d, 0:5) = (%e, %e, %e, %e, %e, %e)\n", j, R11_y, R12_y, R22_y, R13_y, R23_y, R33_y);
 
-  mat(j, 0) = sqrt(abs(R11_y)); // a(1, 1)
-  mat(j, 1) = mat(j, 0) < 1e-40 ? 0 : R12_y / mat(j, 0); // a(2, 1)
-  mat(j, 2) = sqrt(abs(R22_y - mat(j, 1) * mat(j, 1))); // a(2, 2)
-  mat(j, 3) = mat(j, 0) < 1e-40 ? 0 : R13_y / mat(j, 0); // a(3, 1)
+  mat(j, 0) = sqrt(abs(R11_y));                                                    // a(1, 1)
+  mat(j, 1) = mat(j, 0) < 1e-40 ? 0 : R12_y / mat(j, 0);                           // a(2, 1)
+  mat(j, 2) = sqrt(abs(R22_y - mat(j, 1) * mat(j, 1)));                            // a(2, 2)
+  mat(j, 3) = mat(j, 0) < 1e-40 ? 0 : R13_y / mat(j, 0);                           // a(3, 1)
   mat(j, 4) = mat(j, 2) < 1e-40 ? 0 : (R23_y - mat(j, 3) * mat(j, 1)) / mat(j, 2); // a(3, 2)
-  mat(j, 5) = sqrt(abs(R33_y - mat(j, 3) * mat(j, 3) - mat(j, 4) * mat(j, 4))); // a(3, 3)
+  mat(j, 5) = sqrt(abs(R33_y - mat(j, 3) * mat(j, 3) - mat(j, 4) * mat(j, 4)));    // a(3, 3)
 //  printf("Lund(%d, 0:5) = (%e, %e, %e, %e, %e, %e)\n", j, mat(j, 0), mat(j, 1), mat(j, 2), mat(j, 3), mat(j, 4),
 //         mat(j, 5));
 }
@@ -724,5 +729,4 @@ void DBoundCond::write_df(cfd::Parameter &parameter, const Mesh &mesh) {
     fclose(fp);
   }
 }
-
 } // namespace cfd

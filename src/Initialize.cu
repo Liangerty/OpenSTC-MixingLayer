@@ -1,7 +1,5 @@
 #include "Initialize.cuh"
 #include "MixtureFraction.h"
-#include "Thermo.cuh"
-#include "Parallel.h"
 #include "MixingLayer.cuh"
 #include "DParameter.cuh"
 

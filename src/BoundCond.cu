@@ -8,7 +8,6 @@
 // This persuades me to write a new function "exists" in MyAlgorithm.h and MyAlgorithm.cpp.
 
 namespace cfd {
-
 template<typename BCType>
 void register_bc(BCType *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_info, Species &species,
                  Parameter &parameter) {
@@ -180,7 +179,8 @@ void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Spe
     }
   }
   // Initialize the inflow and wall conditions which are different among cases.
-  std::vector<int> wall_idx, symmetry_idx, inflow_idx, outflow_idx, farfield_idx, subsonic_inflow_idx, back_pressure_idx, periodic_idx;
+  std::vector<int> wall_idx, symmetry_idx, inflow_idx, outflow_idx, farfield_idx, subsonic_inflow_idx, back_pressure_idx
+    , periodic_idx;
   auto &bcs = parameter.get_string_array("boundary_conditions");
   for (auto &bc_name: bcs) {
     auto &bc = parameter.get_struct(bc_name);
@@ -203,9 +203,9 @@ void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Spe
         inflow_idx.push_back(label);
         ++n_inflow;
       }
-        // Note: Normally, this would not happen for outflow, symmetry, and periodic conditions.
-        // Because the above-mentioned conditions normally do not need to specify special treatments.
-        // If we need to add support for these conditions, then we add them here.
+      // Note: Normally, this would not happen for outflow, symmetry, and periodic conditions.
+      // Because the above-mentioned conditions normally do not need to specify special treatments.
+      // If we need to add support for these conditions, then we add them here.
       else if (type == "outflow") {
         outflow_idx.push_back(label);
         ++n_outflow;
@@ -386,25 +386,25 @@ void DBoundCond::link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) co
     link_boundary_and_condition(mesh[i].boundary, back_pressure_info, n_back_pressure, i_back_pressure, i);
     link_boundary_and_condition(mesh[i].boundary, periodic_info, n_periodic, i_periodic, i);
   }
-//  for (auto i = 0; i < n_block; i++) {
-//    for (size_t l = 0; l < n_wall; l++) {
-//      const auto nb = wall_info[l].n_boundary;
-//      for (size_t m = 0; m < nb; m++) {
-//        auto i_zone = wall_info[l].boundary[m].x;
-//        if (i_zone != i) {
-//          continue;
-//        }
-//        auto &b = mesh[i].boundary[wall_info[l].boundary[m].y];
-//        for (int q = 0; q < 3; ++q) {
-//          if (q == b.face) continue;
-//          b.range_start[q] += ngg;
-//          b.range_end[q] -= ngg;
-//        }
-//      }
-//    }
-//    cudaMemcpy(field[i].h_ptr->boundary, mesh[i].boundary.data(), mesh[i].boundary.size() * sizeof(Boundary),
-//               cudaMemcpyHostToDevice);
-//  }
+  //  for (auto i = 0; i < n_block; i++) {
+  //    for (size_t l = 0; l < n_wall; l++) {
+  //      const auto nb = wall_info[l].n_boundary;
+  //      for (size_t m = 0; m < nb; m++) {
+  //        auto i_zone = wall_info[l].boundary[m].x;
+  //        if (i_zone != i) {
+  //          continue;
+  //        }
+  //        auto &b = mesh[i].boundary[wall_info[l].boundary[m].y];
+  //        for (int q = 0; q < 3; ++q) {
+  //          if (q == b.face) continue;
+  //          b.range_start[q] += ngg;
+  //          b.range_end[q] -= ngg;
+  //        }
+  //      }
+  //    }
+  //    cudaMemcpy(field[i].h_ptr->boundary, mesh[i].boundary.data(), mesh[i].boundary.size() * sizeof(Boundary),
+  //               cudaMemcpyHostToDevice);
+  //  }
   for (int i = 0; i < n_wall; i++) {
     delete[]i_wall[i];
   }
@@ -467,7 +467,8 @@ void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, int n_bc, 
   delete[]n;
 }
 
-void link_boundary_and_condition(const std::vector<Boundary> &boundary, BCInfo *bc, int n_bc, int **sep, int i_zone) {
+void link_boundary_and_condition(const std::vector<Boundary> &boundary, const BCInfo *bc, int n_bc, int **sep,
+                                 int i_zone) {
   const auto n_boundary{boundary.size()};
   for (size_t l = 0; l < n_bc; l++) {
     int label = bc[l].label;
@@ -546,18 +547,18 @@ void initialize_profile_with_inflow(const Boundary &boundary, const Block &block
   const int direction = boundary.face;
   const int extent[3]{block.mx, block.my, block.mz};
   const int ngg = block.ngg;
-  int range_0[2]{-ngg, block.mx + ngg - 1}, range_1[2]{-ngg, block.my + ngg - 1}, range_2[2]{-ngg,
-                                                                                             block.mz + ngg - 1};
+  int range_0[2]{-ngg, block.mx + ngg - 1}, range_1[2]{-ngg, block.my + ngg - 1},
+      range_2[2]{-ngg, block.mz + ngg - 1};
   int n0 = extent[0], n1 = extent[1], n2 = extent[2];
-//  if (direction == 1) {
-//    n1 = extent[0];
-//    range_1[1] = block.mx + ngg - 1;
-//  } else if (direction == 2) {
-//    n1 = extent[0];
-//    n2 = extent[1];
-//    range_1[1] = block.mx + ngg - 1;
-//    range_2[1] = block.my + ngg - 1;
-//  }
+  //  if (direction == 1) {
+  //    n1 = extent[0];
+  //    range_1[1] = block.mx + ngg - 1;
+  //  } else if (direction == 2) {
+  //    n1 = extent[0];
+  //    n2 = extent[1];
+  //    range_1[1] = block.mx + ngg - 1;
+  //    range_2[1] = block.my + ngg - 1;
+  //  }
   if (direction == 0) {
     n0 = 1 + ngg;
     range_0[0] = 0;
@@ -739,7 +740,7 @@ int read_profile(const Boundary &boundary, const std::string &file, const Block 
   if (suffix == "dat") {
     read_dat_profile(boundary, file, block, parameter, species, profile, profile_related_bc_name);
   } else if (suffix == "plt") {
-//    read_plt_profile();
+    //    read_plt_profile();
   }
   return 0;
 }
@@ -752,7 +753,7 @@ identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::strin
   const int n_turb = parameter.get_int("n_turb");
   for (auto &name: var_name) {
     int l = 999;
-    // The first three names are x, y and z, they are assigned value 0 and no match would be found.
+    // The first three names are x, y and z, they are assigned value 0, and no match would be found.
     auto n = gxl::to_upper(name);
     if (n == "DENSITY" || n == "ROE" || n == "RHO") {
       l = 0;
@@ -847,7 +848,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
     auto &info = parameter.get_struct(profile_related_bc_name);
     if (info.find("turb_viscosity_ratio") == info.end() || info.find("turbulence_intensity") == info.end()) {
       printf(
-          "The turbulence intensity or turbulent viscosity ratio is not given in the profile, please provide both of them!\n");
+        "The turbulence intensity or turbulent viscosity ratio is not given in the profile, please provide both of them!\n");
       MpiParallel::exit();
     }
     turb_viscosity_ratio = std::get<real>(info.at("turb_viscosity_ratio"));
@@ -888,7 +889,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
   int extent[3]{mx, my, mz};
 
   // Then we read the variables.
-  auto nv_read = (int) var_name.size();
+  auto nv_read = static_cast<int>(var_name.size());
   gxl::VectorField3D<real> profile_read;
   profile_read.resize(extent[0], extent[1], extent[2], nv_read, 0);
 
@@ -1211,7 +1212,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
 
 __global__ void
 initialize_rng(curandState *rng_states, int size, int64_t time_stamp) {
-  auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
   if (i >= size)
     return;
 
@@ -1250,7 +1251,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
   const int n_spec = species.n_spec;
   for (auto &name: var_name) {
     int l = 999;
-    // The first three names are x, y and z, they are assigned value 0 and no match would be found.
+    // The first three names are x, y and z, they are assigned value 0, and no match would be found.
     auto n = gxl::to_upper(name);
     if (n == "RHOR") {
       l = 0;
@@ -1295,17 +1296,17 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
     }
     label_order.emplace_back(l);
   }
-  // At least 2 of the 3 variables, pressure, temperature and density, should be given.
+  // At least 2 of the 3 variables, pressure, temperature and density should be given.
   if (!has_rho) {
     if (!has_pressure || !has_temperature) {
       printf(
-          "The fluctuation of density, temperature or pressure is not given in the profile, please provide at least two of them!\n");
+        "The fluctuation of density, temperature or pressure is not given in the profile, please provide at least two of them!\n");
       MpiParallel::exit();
     }
   } else if (!has_pressure) {
     if (!has_temperature) {
       printf(
-          "The fluctuation of temperature or pressure is not given in the profile when rho is given, please provide at least one of them!\n");
+        "The fluctuation of temperature or pressure is not given in the profile when rho is given, please provide at least one of them!\n");
       MpiParallel::exit();
     }
   }
@@ -1344,7 +1345,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
   int extent[3]{mx, my, mz};
 
   // Then we read the variables.
-  auto nv_read = (int) var_name.size();
+  auto nv_read = static_cast<int>(var_name.size());
   gxl::VectorField3D<real> profile_read;
   profile_read.resize(extent[0], extent[1], extent[2], nv_read, 0);
 
@@ -1646,7 +1647,7 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
   const auto need_fluctuation_profile = parameter.get_int_array("need_fluctuation_profile");
   if (!need_fluctuation_profile.empty()) {
     std::vector<ggxl::VectorField3D<real>> fluctuation_hPtr;
-    const int n_fluc_profile = (int) need_fluctuation_profile.size();
+    const int n_fluc_profile = static_cast<int>(need_fluctuation_profile.size());
     fluctuation_hPtr.resize(n_fluc_profile);
     for (int i = 0; i < n_fluc_profile; ++i) {
       const auto file_name = parameter.get_string_array("fluctuation_profile_file")[i];
@@ -1672,8 +1673,8 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
 __global__ void
 initialize_rest_rng(ggxl::VectorField2D<curandState> *rng_states, int iFace, int64_t time_stamp, int dy, int dz,
                     int ngg, int my, int mz) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
-  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
+  int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
   if (j >= my + DBoundCond::DF_N + ngg || k >= mz + DBoundCond::DF_N + ngg) {
     return;
   }
@@ -1689,5 +1690,4 @@ initialize_rest_rng(ggxl::VectorField2D<curandState> *rng_states, int iFace, int
     curand_init(time_stamp + i, i, 0, &rng_states[iFace](j, k, 2));
   }
 }
-
 }

@@ -55,7 +55,7 @@ real cfd::global_time_step(const Mesh &mesh, const Parameter &parameter, std::ve
 
   if (parameter.get_bool("parallel")) {
     // Parallel reduction
-    real dt_temp{dt};
+    const real dt_temp{dt};
     MPI_Allreduce(&dt_temp, &dt, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
   }
 

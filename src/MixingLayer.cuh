@@ -10,5 +10,5 @@ struct Field;
 struct Species;
 
 void
-get_mixing_layer_info(const Parameter &parameter, const Species &species, std::vector<real> &var_info);
+get_mixing_layer_info(Parameter &parameter, const Species &species, std::vector<real> &var_info);
 }

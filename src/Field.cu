@@ -175,7 +175,7 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
     auto &info = parameter.get_struct(parameter.get_string_array("profile_related_bc_names")[profile_idx]);
     if (info.find("turb_viscosity_ratio") == info.end() || info.find("turbulence_intensity") == info.end()) {
       printf(
-          "The turbulence intensity or turbulent viscosity ratio is not given in the profile, please provide both of them!\n");
+        "The turbulence intensity or turbulent viscosity ratio is not given in the profile, please provide both of them!\n");
       cfd::MpiParallel::exit();
     }
     turb_viscosity_ratio = std::get<real>(info.at("turb_viscosity_ratio"));
@@ -244,7 +244,6 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
   for (int k = 0; k < extent[2]; ++k) {
     for (int j = 0; j < extent[1]; ++j) {
       for (int i = 0; i < extent[0]; ++i) {
-
         for (int l = 0; l < nv_read; ++l) {
           if (label_order[l] < n_var + 1 + 3) {
             profile(i, j, k, label_order[l]) = profile_read(i, j, k, l);
@@ -293,7 +292,6 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
           profile(i, j, k, 6 + species.n_spec + 1 + 3) =
               profile(i, j, k, 0 + 3) * profile(i, j, k, 6 + species.n_spec + 3) / mut;
         }
-
       }
     }
   }
@@ -346,13 +344,13 @@ __global__ void initialize_bv_with_inflow(real *var_info, int n_inflow, cfd::DZo
     const auto xx = x(i, j, k), yy = y(i, j, k), zz = z(i, j, k);
     const auto extent = &extents[i_init * 3];
     real d_mix = 1e+6;
-    int i0, j0, k0;
+    int i0{0}, j0{0}, k0{0};
     for (int kk = 0; kk < extent[2]; ++kk) {
       for (int jj = 0; jj < extent[1]; ++jj) {
         for (int ii = 0; ii < extent[0]; ++ii) {
-          real d = sqrt((xx - profile(ii, jj, kk, 0)) * (xx - profile(ii, jj, kk, 0)) +
-                        (yy - profile(ii, jj, kk, 1)) * (yy - profile(ii, jj, kk, 1)) +
-                        (zz - profile(ii, jj, kk, 2)) * (zz - profile(ii, jj, kk, 2)));
+          const real d = sqrt((xx - profile(ii, jj, kk, 0)) * (xx - profile(ii, jj, kk, 0)) +
+                              (yy - profile(ii, jj, kk, 1)) * (yy - profile(ii, jj, kk, 1)) +
+                              (zz - profile(ii, jj, kk, 2)) * (zz - profile(ii, jj, kk, 2)));
           if (d < d_mix) {
             d_mix = d;
             i0 = ii;
@@ -457,8 +455,9 @@ void cfd::Field::initialize_basic_variables(const Parameter &parameter, const st
     tpb = {16, 16, 1};
   }
   const int ngg{block.ngg};
-  dim3 bpg = {(block.mx + 2 * ngg - 1) / tpb.x + 1, (block.my + 2 * ngg - 1) / tpb.y + 1,
-              (block.mz + 2 * ngg - 1) / tpb.z + 1};
+  dim3 bpg = {
+    (block.mx + 2 * ngg - 1) / tpb.x + 1, (block.my + 2 * ngg - 1) / tpb.y + 1, (block.mz + 2 * ngg - 1) / tpb.z + 1
+  };
   initialize_bv_with_inflow<<<bpg, tpb>>>(var_info_device, n, d_ptr, coordinate_ranges_device,
                                           n_scalar, if_profile_device,
                                           profiles_device, extent_device);
@@ -519,7 +518,7 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
     h_ptr->cp.allocate_memory(mx, my, mz, ngg);
     if (parameter.get_int("reaction") == 1) {
       // Finite rate chemistry
-      if (const int chemSrcMethod = parameter.get_int("chemSrcMethod");chemSrcMethod == 1) {
+      if (const int chemSrcMethod = parameter.get_int("chemSrcMethod"); chemSrcMethod == 1) {
         // EPI
         h_ptr->chem_src_jac.allocate_memory(mx, my, mz, n_spec * n_spec, 0);
       } else if (chemSrcMethod == 2) {
@@ -621,11 +620,11 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
     if (n_scalar_stat > 0) {
       if (parameter.get_bool("stat_species_velocity_correlation")) {
         h_ptr->collect_spec_vel_correlation.allocate_memory(
-            mx, my, mz, SpeciesVelocityCorrelation::n_collect * n_scalar_stat, SpeciesVelocityCorrelation::ngg);
+          mx, my, mz, SpeciesVelocityCorrelation::n_collect * n_scalar_stat, SpeciesVelocityCorrelation::ngg);
       }
       if (parameter.get_bool("stat_species_dissipation_rate")) {
         h_ptr->collect_spec_diss_rate.allocate_memory(
-            mx, my, mz, SpeciesDissipationRate::n_collect * n_scalar_stat, SpeciesDissipationRate::ngg);
+          mx, my, mz, SpeciesDissipationRate::n_collect * n_scalar_stat, SpeciesDissipationRate::ngg);
       }
     }
   }
@@ -689,7 +688,7 @@ void cfd::Field::deallocate_memory(const Parameter &parameter) {
     h_ptr->cp.deallocate_memory();
     if (parameter.get_int("reaction") == 1) {
       // Finite rate chemistry
-      if (const int chemSrcMethod = parameter.get_int("chemSrcMethod");chemSrcMethod == 1) {
+      if (const int chemSrcMethod = parameter.get_int("chemSrcMethod"); chemSrcMethod == 1) {
         // EPI
         h_ptr->chem_src_jac.deallocate_memory();
       } else if (chemSrcMethod == 2) {

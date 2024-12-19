@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include "gxl_lib/Math.hpp"
+#include "Parallel.h"
 
 namespace cfd {
 

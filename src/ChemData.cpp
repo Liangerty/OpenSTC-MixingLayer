@@ -34,7 +34,7 @@ cfd::Species::Species(Parameter &parameter) {
         continue;
       }
       gxl::to_upper(input);
-      if (input == "END") continue;// If this line is "END", there must be a "SPECIES" or "SPEC" followed.
+      if (input == "END") continue; // If this line is "END", there must be a "SPECIES" or "SPEC" followed.
       if (input == "SPECIES" || input == "SPEC") break;
       elem_list.emplace(input, n_elem++);
     }
@@ -49,7 +49,7 @@ cfd::Species::Species(Parameter &parameter) {
         continue;
       }
       gxl::to_upper(input);
-      if (input == "END") continue;// If this line is "END", there must be a "REACTIONS" or "THERMO" followed.
+      if (input == "END") continue; // If this line is "END", there must be a "REACTIONS" or "THERMO" followed.
       if (input == "REACTIONS" || input == "REAC") break;
       if (input == "THERMO") {
         // The thermodynamic info is in this mechanism file
@@ -62,8 +62,8 @@ cfd::Species::Species(Parameter &parameter) {
     set_nspec(num_spec, n_elem);
     if (num_spec > MAX_SPEC_NUMBER) {
       fmt::print(
-          "The number of species in this simulation is {}, larger than the allowed species number {}. Please modify the CMakeLists.txt to increase the MAX_SPEC_NUMBER.\n",
-          num_spec, MAX_SPEC_NUMBER);
+        "The number of species in this simulation is {}, larger than the allowed species number {}. Please modify the CMakeLists.txt to increase the MAX_SPEC_NUMBER.\n",
+        num_spec, MAX_SPEC_NUMBER);
       MpiParallel::exit();
     }
     parameter.update_parameter("n_spec", num_spec);
@@ -105,7 +105,7 @@ cfd::Species::Species(Parameter &parameter) {
   }
 }
 
-void cfd::Species::compute_cp(real temp, real *cp) const &{
+void cfd::Species::compute_cp(real temp, real *cp) const & {
   const real t2{temp * temp}, t3{t2 * temp}, t4{t3 * temp};
 #ifdef HighTempMultiPart
   const auto &c = therm_poly_coeff;

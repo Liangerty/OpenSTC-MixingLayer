@@ -6,6 +6,7 @@
 #include "MixingLayer.cuh"
 #include "SpongeLayer.cuh"
 #include "DigitalFilter.cuh"
+#include "Parallel.h"
 
 namespace cfd {
 template<MixtureModel mix_model, class turb>

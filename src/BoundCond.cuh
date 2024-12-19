@@ -7,10 +7,9 @@
 #include "DParameter.cuh"
 #include "FieldOperation.cuh"
 #include "SST.cuh"
-#include "Parallel.h"
+#include "gxl_lib/Array.cuh"
 
 namespace cfd {
-
 struct BCInfo {
   int label = 0;
   int n_boundary = 0;
@@ -50,7 +49,8 @@ struct DBoundCond {
   //  void
   //  time_dependent_bc_update(const Mesh &mesh, std::vector<Field> &field, DParameter *param, Parameter &parameter) const;
 
-  int n_wall = 0, n_symmetry = 0, n_inflow = 0, n_outflow = 0, n_farfield = 0, n_subsonic_inflow = 0, n_back_pressure = 0, n_periodic = 0;
+  int n_wall = 0, n_symmetry = 0, n_inflow = 0, n_outflow = 0, n_farfield = 0, n_subsonic_inflow = 0, n_back_pressure =
+          0, n_periodic = 0;
   BCInfo *wall_info = nullptr;
   BCInfo *symmetry_info = nullptr;
   BCInfo *inflow_info = nullptr;
@@ -80,11 +80,13 @@ struct DBoundCond {
   std::vector<int> df_label;
   std::vector<int> df_related_block;
   constexpr static int DF_N = 50;
+  // Random values for digital filter. E.g. the dimensions are often like (ny,nz,3), where 3 is for 3 components of velocity.
   ggxl::VectorField2D<real> *random_values_hPtr = nullptr;
-  ggxl::VectorField2D<real> *random_values_dPtr = nullptr; // Random values for digital filter. E.g. the dimensions are often like (ny,nz,3), where 3 is for 3 components of velocity.
+  ggxl::VectorField2D<real> *random_values_dPtr = nullptr;
   ggxl::VectorField1D<real> *df_lundMatrix_dPtr = nullptr; // Lund matrix for digital filter
-  ggxl::VectorField2D<real> *df_by_dPtr = nullptr; // (0:my-1, 0:2*DF_N, 0:2): my*(2N+1)*3, the second index jj corresponds to jj-N
-  ggxl::VectorField2D<real> *df_bz_dPtr = nullptr; // (0:my-1, 0:2*DF_N, 0:2): my*(2N+1)*3, the second index jj corresponds to jj-N
+  // (0:my-1, 0:2*DF_N, 0:2): my*(2N+1)*3, the second index jj corresponds to jj-N
+  ggxl::VectorField2D<real> *df_by_dPtr = nullptr;
+  ggxl::VectorField2D<real> *df_bz_dPtr = nullptr;
   ggxl::VectorField2D<curandState> *rng_states_hPtr = nullptr; // Random number generator states for digital filter
   ggxl::VectorField2D<curandState> *rng_states_dPtr = nullptr; // Random number generator states for digital filter
   ggxl::VectorField2D<real> *df_fy_dPtr = nullptr;
@@ -124,7 +126,8 @@ private:
 void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, int n_bc, int **sep, int blk_idx, int n_block,
                                BCInfo *bc_info);
 
-void link_boundary_and_condition(const std::vector<Boundary> &boundary, BCInfo *bc, int n_bc, int **sep, int i_zone);
+void link_boundary_and_condition(const std::vector<Boundary> &boundary, const BCInfo *bc, int n_bc, int **sep,
+                                 int i_zone);
 
 __global__ void
 initialize_rng(curandState *rng_states, int size, int64_t time_stamp);
@@ -157,7 +160,8 @@ __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
 
   auto &bv = zone->bv;
   real u1{bv(inner_idx[0], inner_idx[1], inner_idx[2], 1)}, v1{bv(inner_idx[0], inner_idx[1], inner_idx[2], 2)}, w1{
-      bv(inner_idx[0], inner_idx[1], inner_idx[2], 3)};
+    bv(inner_idx[0], inner_idx[1], inner_idx[2], 3)
+  };
   real u_k{k_x * u1 + k_y * v1 + k_z * w1};
   const real u_t{u1 - k_x * u_k}, v_t{v1 - k_y * u_k}, w_t{w1 - k_z * u_k};
 
@@ -517,19 +521,19 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       vel = sqrt(u * u + v * v + w * w);
     } else if (inflow->fluctuation_type == 3) {
       //S mode waves with wide band frequencies and spanwise wavenumbers are induced
-      constexpr real CL = 3.953e-4;
-      constexpr real CU = 126.5e6;
-      real delta_f = 5000;
       real t = param->physical_time;
 
       real x = zone->x(i, j, k), z = zone->z(i, j, k);
       for (int m = 0; m <= 198; ++m) {
+        constexpr real delta_f = 5000;
         real f = delta_f * m + 10000;
         real alpha = 2.0 * pi * f / (1.0 - 1.0 / param->mach_ref) / param->v_ref;
         real Am = 0;
         if (f <= 40000) {
+          constexpr real CL = 3.953e-4;
           Am = sqrt(CL / f * delta_f * 0.5) * param->p_ref;
         } else if (f > 40000) {
+          constexpr real CU = 126.5e6;
           Am = sqrt(CU / pow(f, 3.5) * delta_f * 0.5) * param->p_ref;
         }
         const real disturbance = Am * cos(alpha * x - 2.0 * pi * f * t + inflow->random_phase[m]);
@@ -538,7 +542,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
         v += 0;
         w += 0;
         T += disturbance * (gamma_air - 1.0) * param->mach_ref * param->mach_ref / param->rho_ref / param->v_ref /
-             param->v_ref * param->T_ref;
+            param->v_ref * param->T_ref;
         density = p * mw_air / (R_u * T);
       }
     }
@@ -563,19 +567,19 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
 
     if (inflow->fluctuation_type == 3) {
       //S mode waves with wide band frequencies and spanwise wavenumbers are induced
-      constexpr real CL = 3.953e-4;
-      constexpr real CU = 126.5e6;
-      real delta_f = 5000;
       real t = param->physical_time;
 
       real x = zone->x(gi, gj, gk), z = zone->z(gi, gj, gk);
       for (int m = 0; m <= 198; ++m) {
+        constexpr real delta_f = 5000;
         real f = delta_f * m + 10000;
         real alpha = 2.0 * pi * f / (1.0 - 1.0 / param->mach_ref) / param->v_ref;
         real Am = 0;
         if (f <= 40000) {
+          constexpr real CL = 3.953e-4;
           Am = sqrt(CL / f * delta_f * 0.5) * param->p_ref;
         } else if (f > 40000) {
+          constexpr real CU = 126.5e6;
           Am = sqrt(CU / pow(f, 3.5) * delta_f * 0.5) * param->p_ref;
         }
         const real disturbance = Am * cos(alpha * x - 2.0 * pi * f * t + inflow->random_phase[m]);
@@ -611,17 +615,17 @@ __global__ void
 apply_inflow_df(DZone *zone, Inflow *inflow, DParameter *param, ggxl::VectorField3D<real> *fluctuation_dPtr,
                 int df_iFace) {
   const int ngg = zone->ngg;
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
-  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  const int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
   if (j >= zone->my + ngg || k >= zone->mz + ngg) return;
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
   auto &cv = zone->cv;
 
-  int i = 0;
+  constexpr int i = 0;
   const real u_upper = inflow->u, u_lower = inflow->u_lower;
-  auto y = zone->y(i, j, k);
+  const auto y = zone->y(i, j, k);
   real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / inflow->delta_omega);
   real u_fluc = fluctuation_dPtr[df_iFace](0, j, k, 0) * param->delta_u;
   real v_fluc = fluctuation_dPtr[df_iFace](0, j, k, 1) * param->delta_u;
@@ -642,7 +646,7 @@ apply_inflow_df(DZone *zone, Inflow *inflow, DParameter *param, ggxl::VectorFiel
     c_p = gamma_air * R_u / mw_air / (gamma_air - 1);
   }
   real t_fluc = -u_fluc * u / c_p; // SRA
-  t_fluc *= 0.25; // StreamS multiplies a parameter "dftscaling=0.25" here
+  t_fluc *= 0.25;                  // StreamS multiplies a parameter "dftscaling=0.25" here
   real rho_fluc = -t_fluc * rho / T;
   u += u_fluc;
   rho += rho_fluc;
@@ -1015,7 +1019,6 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
       compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
     }
   }
-
 }
 
 template<MixtureModel mix_model, class turb>
@@ -1216,7 +1219,7 @@ apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *
     double t_g{t_i};
     if (wall->thermal_type == Wall::ThermalType::isothermal ||
         wall->thermal_type == Wall::ThermalType::equilibrium_radiation) {
-      t_g = 2 * t_wall - t_i;  // 0.5*(t_i+t_g)=t_w
+      t_g = 2 * t_wall - t_i;    // 0.5*(t_i+t_g)=t_w
       if (t_g <= 0.1 * t_wall) { // improve stability
         t_g = t_wall;
       }
@@ -1294,9 +1297,11 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
   const real acoustic_speed{sqrt(gamma_air * bv(i, j, k, 4) / bv(i, j, k, 0))};
   const real riemann_neg{abs(u_face) - 2 * acoustic_speed / (gamma_air - 1)};
   // compute the total enthalpy of the inflow.
-  const real hti{bv(i, j, k, 4) / bv(i, j, k, 0) * gamma_air / (gamma_air - 1) +
-                 0.5 * (bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) +
-                        bv(i, j, k, 3) * bv(i, j, k, 3))};
+  const real hti{
+    bv(i, j, k, 4) / bv(i, j, k, 0) * gamma_air / (gamma_air - 1) +
+    0.5 * (bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) +
+           bv(i, j, k, 3) * bv(i, j, k, 3))
+  };
   constexpr real qa{1 + 2.0 / (gamma_air - 1)};
   const real qb{2 * riemann_neg};
   const real qc{(gamma_air - 1) * (0.5 * riemann_neg * riemann_neg - hti)};
@@ -1311,9 +1316,11 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
   const real u_new{riemann_neg + 2 * a_new / (gamma_air - 1)};
   const real mach{u_new / a_new};
   const real pressure{
-      inflow->total_pressure * pow(1 + 0.5 * (gamma_air - 1) * mach * mach, -gamma_air / (gamma_air - 1))};
+    inflow->total_pressure * pow(1 + 0.5 * (gamma_air - 1) * mach * mach, -gamma_air / (gamma_air - 1))
+  };
   const real temperature{
-      inflow->total_temperature * pow(pressure / inflow->total_pressure, (gamma_air - 1) / gamma_air)};
+    inflow->total_temperature * pow(pressure / inflow->total_pressure, (gamma_air - 1) / gamma_air)
+  };
   const real density{pressure * mw_air / (temperature * cfd::R_u)};
 
   // assign values for ghost cells
@@ -1380,8 +1387,8 @@ __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DPa
   if (mach_b < 1) {
     p_b = backPressure->pressure;
     int i1 = i - dir[0], j1 = j - dir[1], k1 = k - dir[2];
-    real d1{bv(i1, j1, k1, 0)}, u1{bv(i1, j1, k1, 1)}, v1{bv(i1, j1, k1, 2)}, w1{bv(i1, j1, k1, 3)}, p1{
-        bv(i1, j1, k1, 4)};
+    real d1{bv(i1, j1, k1, 0)}, u1{bv(i1, j1, k1, 1)}, v1{bv(i1, j1, k1, 2)}, w1{bv(i1, j1, k1, 3)},
+        p1{bv(i1, j1, k1, 4)};
     real c1{sqrt(gamma_air * p1 / d1)};
     rho_b = d1 + (p_b - p1) / (c1 * c1);
     u_b = u1 + nx * (p1 - p_b) / (d1 * c1);
@@ -1474,7 +1481,6 @@ __global__ void apply_periodic(DZone *zone, DParameter *param, int i_face) {
     }
     compute_cv_from_bv_1_point<mix_model, turb>(zone, param, gi, gj, gk);
   }
-
 }
 
 template<MixtureModel mix_model, class turb>

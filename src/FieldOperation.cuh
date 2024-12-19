@@ -41,9 +41,9 @@ __device__ void compute_total_energy(int i, int j, int k, cfd::DZone *zone, cons
 template<MixtureModel mix_model, class turb_method>
 __global__ void compute_cv_from_bv(DZone *zone, DParameter *param) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - ngg;
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   const auto &bv = zone->bv;
@@ -377,5 +377,4 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param, real dt) {
 }
 
 __global__ void eliminate_k_gradient(cfd::DZone *zone, const DParameter *param);
-
 }

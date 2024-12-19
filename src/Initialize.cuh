@@ -99,7 +99,7 @@ void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vec
 }
 
 template<MixtureModel mix_model, class turb>
-void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vector<Field> &field, Species &species) {
+void read_flowfield(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species) {
   const std::filesystem::path out_dir("output");
   if (!exists(out_dir)) {
     printf("The directory to flowfield files does not exist!\n");
@@ -351,7 +351,7 @@ void read_flowfield(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vecto
 
 template<MixtureModel mix_model, class turb>
 std::vector<int>
-identify_variable_labels(cfd::Parameter &parameter, std::vector<std::string> &var_name, Species &species,
+identify_variable_labels(Parameter &parameter, std::vector<std::string> &var_name, Species &species,
                          std::array<int, 2> &old_data_info) {
   std::vector<int> labels;
   const int n_spec = species.n_spec;

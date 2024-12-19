@@ -4,9 +4,9 @@
 #include "FieldOperation.cuh"
 #include "Monitor.cuh"
 #include "SpongeLayer.cuh"
+#include "Parallel.h"
 
 namespace cfd {
-
 namespace SSPRK3 {
 __device__ constexpr real a[3]{1.0, 0.75, 1.0 / 3.0};
 __device__ constexpr real b[3]{0.0, 0.25, 2.0 / 3.0};
@@ -56,16 +56,16 @@ void RK3(Driver<mix_model, turb> &driver) {
   auto &parameter{driver.parameter};
   IOManager<mix_model, turb> ioManager(driver.myid, mesh, field, parameter, driver.spec, 0);
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
-  int output_time_series = parameter.get_int("output_time_series");
+  const int output_time_series = parameter.get_int("output_time_series");
 
   Monitor monitor(parameter, driver.spec, mesh);
   const int if_monitor{parameter.get_int("if_monitor")};
 
   int step{parameter.get_int("step")};
-  int total_step{parameter.get_int("total_step") + step};
+  const int total_step{parameter.get_int("total_step") + step};
   const int output_screen = parameter.get_int("output_screen");
   const int n_var{parameter.get_int("n_var")};
-  real total_simulation_time{parameter.get_real("total_simulation_time")};
+  const real total_simulation_time{parameter.get_real("total_simulation_time")};
   const int output_file = parameter.get_int("output_file");
 
   bool finished{false};
