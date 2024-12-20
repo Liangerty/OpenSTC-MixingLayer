@@ -5,8 +5,7 @@
 #include <fstream>
 
 namespace cfd {
-void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
-                           ggxl::VectorField3D<real> *profile_dPtr) {
+void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species) {
   // We need to first find out the problem type.
   // For problem_type == 1, a mixing layer is required.
   if (parameter.get_int("problem_type") == 1 && !parameter.get_bool("compatible_mixing_layer")) {

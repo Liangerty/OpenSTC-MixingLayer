@@ -25,7 +25,7 @@ class BilgerH : public MixtureFraction {
   real nuh_mwh{0}, half_nuo_mwo{0};
   int elem_label[2]{0, 1};
 public:
-  explicit BilgerH(Inflow &fuel, Inflow &oxidizer, const Species &chem_data, int myid = 0);
+  explicit BilgerH(Inflow &fuel, Inflow &oxidizer, const Species &spec, int myid = 0);
 
   real compute_mixture_fraction(std::vector<real> &yk) override;
 
@@ -37,7 +37,7 @@ class BilgerCH : public MixtureFraction {
   real nuc_mwc{0}, nuh_mwh{0}, half_nuo_mwo{0};
   int elem_label[3]{0, 1, 2};
 public:
-  explicit BilgerCH(Inflow &fuel, Inflow &oxidizer, const Species &chem_data, int myid = 0);
+  explicit BilgerCH(Inflow &fuel, Inflow &oxidizer, const Species &spec, int myid = 0);
 
   real compute_mixture_fraction(std::vector<real> &yk) override;
 

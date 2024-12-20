@@ -27,7 +27,7 @@ struct Inflow {
 
   [[nodiscard]] std::tuple<real, real, real, real, real, real> var_info() const;
 
-  void copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &parameter);
+  void copy_to_gpu(Inflow *d_inflow, const Parameter &parameter);
 
   int label = 5;
   // The type of the inflow
@@ -129,7 +129,7 @@ struct Symmetry {
 struct FarField {
   explicit FarField(const std::string &inflow_name, Species &spec, Parameter &parameter);
 
-  void copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter &parameter);
+  void copy_to_gpu(FarField *d_farfield, const Parameter &parameter);
 
   int label = 4;
   real mach = -1;
@@ -159,7 +159,7 @@ struct FarField {
 struct SubsonicInflow {
   explicit SubsonicInflow(const std::string &inflow_name, Parameter &parameter);
 
-  void copy_to_gpu(SubsonicInflow *d_inflow, Species &spec, const Parameter &parameter);
+  void copy_to_gpu(SubsonicInflow *d_inflow, const Parameter &parameter);
 
   int label = 7;
   real total_pressure = 101325;

@@ -550,7 +550,7 @@ void SinglePointStat::collect_data(DParameter *param) {
   }
 }
 
-void SinglePointStat::export_statistical_data(DParameter *param, bool perform_spanwise_average) {
+void SinglePointStat::export_statistical_data() {
   const std::filesystem::path out_dir("output/stat");
   MPI_File fp_rey1, fp_fav1, fp_rey2, fp_fav2;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/coll_rey_1st.bin").c_str(),

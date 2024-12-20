@@ -71,7 +71,7 @@ struct ParallelFace {
    * The first face is the matched face, the second one is the face with positive index,
    * and the last face is the one with negative face.
    */
-  void register_boundary(int dim, int ngg);
+  void register_boundary(int dim);
 
   int range_start[3]{0, 0, 0};  // The index of starting point in 3 directions of the current face.
   int range_end[3]{0, 0, 0};  // The index of ending point in 3 directions of the current face.
@@ -226,6 +226,6 @@ private:
   /**
    * \brief called by @init_ghost_grid, initialize the ghost grids of parallel communication faces
    */
-  void init_parallel_ghost_grid(int myid/*, int ngg*/);
+  void init_parallel_ghost_grid();
 };
 }

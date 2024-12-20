@@ -76,7 +76,7 @@ void register_bc<Inflow>(Inflow *&bc, int n_bc, std::vector<int> &indices, BCInf
       }
       bc_info[i].label = bc_label;
       Inflow inflow(bc_name, species, parameter);
-      inflow.copy_to_gpu(&(bc[i]), species, parameter);
+      inflow.copy_to_gpu(&bc[i], parameter);
       break;
     }
   }
@@ -102,7 +102,7 @@ register_bc<FarField>(FarField *&bc, int n_bc, std::vector<int> &indices, BCInfo
       }
       bc_info[i].label = bc_label;
       FarField farfield(bc_name, species, parameter);
-      farfield.copy_to_gpu(&(bc[i]), species, parameter);
+      farfield.copy_to_gpu(&bc[i], parameter);
       break;
     }
   }
@@ -127,7 +127,7 @@ void register_bc<SubsonicInflow>(SubsonicInflow *&bc, int n_bc, std::vector<int>
       }
       bc_info[i].label = bc_label;
       SubsonicInflow subsonic_inflow(bc_name, parameter);
-      subsonic_inflow.copy_to_gpu(&(bc[i]), species, parameter);
+      subsonic_inflow.copy_to_gpu(&bc[i], parameter);
       break;
     }
   }
@@ -159,8 +159,7 @@ register_bc<BackPressure>(BackPressure *&bc, int n_bc, std::vector<int> &indices
   }
 }
 
-void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter,
-                                      DParameter *param) {
+void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter) {
   std::vector<int> bc_labels;
   // Count the number of distinct boundary conditions
   for (auto i = 0; i < mesh.n_block; i++) {
@@ -271,7 +270,7 @@ void DBoundCond::initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Spe
 
   MpiParallel::barrier();
 
-  initialize_profile_and_rng(parameter, mesh, species, field, param);
+  initialize_profile_and_rng(parameter, mesh, species);
 
   df_label.resize(n_inflow, -1);
   initialize_digital_filter(parameter, mesh);
@@ -483,7 +482,7 @@ void link_boundary_and_condition(const std::vector<Boundary> &boundary, const BC
   }
 }
 
-void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &parameter) {
+void Inflow::copy_to_gpu(Inflow *d_inflow, const Parameter &parameter) {
   const int n_scalar{parameter.get_int("n_scalar")};
   const auto h_sv = new real[n_scalar];
   for (int l = 0; l < n_scalar; ++l) {
@@ -515,7 +514,7 @@ void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &param
   cudaMemcpy(d_inflow, this, sizeof(Inflow), cudaMemcpyHostToDevice);
 }
 
-void FarField::copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter &parameter) {
+void FarField::copy_to_gpu(FarField *d_farfield, const Parameter &parameter) {
   const int n_scalar{parameter.get_int("n_scalar")};
   const auto h_sv = new real[n_scalar];
   for (int l = 0; l < n_scalar; ++l) {
@@ -528,7 +527,7 @@ void FarField::copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter 
   cudaMemcpy(d_farfield, this, sizeof(FarField), cudaMemcpyHostToDevice);
 }
 
-void SubsonicInflow::copy_to_gpu(cfd::SubsonicInflow *d_inflow, cfd::Species &spec, const cfd::Parameter &parameter) {
+void SubsonicInflow::copy_to_gpu(SubsonicInflow *d_inflow, const Parameter &parameter) {
   const int n_scalar{parameter.get_int("n_scalar")};
   const auto h_sv = new real[n_scalar];
   for (int l = 0; l < n_scalar; ++l) {
@@ -1680,8 +1679,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
 }
 
 void
-DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field,
-                                       DParameter *param) {
+DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, const Species &species) {
   if (const int n_profile = parameter.get_int("n_profile"); n_profile > 0) {
     profile_hPtr_withGhost.resize(n_profile);
     for (int i = 0; i < n_profile; ++i) {

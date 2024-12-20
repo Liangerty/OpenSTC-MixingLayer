@@ -51,7 +51,7 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_): myid(paramet
   }
 
   // Initialize the boundary conditions, read in the profiles.
-  bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter, param);
+  bound_cond.initialize_bc_on_GPU(mesh_, field, spec, parameter);
   MPI_Barrier(MPI_COMM_WORLD);
   cudaDeviceSynchronize();
   err = cudaGetLastError();
@@ -61,7 +61,7 @@ Driver<mix_model, turb>::Driver(Parameter &parameter, Mesh &mesh_): myid(paramet
   }
 
   // Initialize the basic variables.
-  initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec, bound_cond.profile_dPtr_withGhost);
+  initialize_basic_variables<mix_model, turb>(parameter, mesh, field, spec);
   cudaDeviceSynchronize();
   err = cudaGetLastError();
   if (err != cudaSuccess) {

@@ -23,7 +23,7 @@ __device__ void
 compute_chem_src_jacobian(DZone *zone, int i, int j, int k, const DParameter *param, const real *q1, const real *q2);
 
 __device__ void
-compute_chem_src_jacobian_diagonal(DZone *zone, int i, int j, int k, const DParameter *param, const real *q1);
+compute_chem_src_jacobian_diagonal(DZone *zone, int i, int j, int k, const DParameter *param, const real *omega_d);
 
 __global__ void EPI(DZone *zone, int n_spec);
 

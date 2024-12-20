@@ -31,8 +31,7 @@ void read_dat_profile(const Boundary &boundary, const std::string &file, const B
 struct DBoundCond {
   DBoundCond() = default;
 
-  void initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter,
-                            DParameter *param);
+  void initialize_bc_on_GPU(Mesh &mesh, std::vector<Field> &field, Species &species, Parameter &parameter);
 
   void link_bc_to_boundaries(Mesh &mesh, std::vector<Field> &field) const;
 
@@ -115,8 +114,7 @@ private:
 
   void apply_convolution(int iFace, int my, int mz, int ngg) const;
 
-  void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field,
-                                  DParameter *param);
+  void initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, const Species &species);
 
   void
   compute_fluctuations(const DParameter *param, DZone *zone, const Inflow *inflowHere, int iFace, int my, int mz,
@@ -1025,7 +1023,7 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
 
 template<MixtureModel mix_model, class turb>
 __global__ void
-apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *rng_states_d_ptr, int step = -1) {
+apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, int step = -1) {
   const int ngg = zone->ngg;
   int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
@@ -1653,7 +1651,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-      apply_wall<mix_model, turb><<<BPG, TPB>>>(field.d_ptr, &wall[l], param, i_face, rng_d_ptr, step);
+      apply_wall<mix_model, turb><<<BPG, TPB>>>(field.d_ptr, &wall[l], param, i_face, step);
     }
   }
 

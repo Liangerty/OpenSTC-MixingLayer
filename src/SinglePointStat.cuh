@@ -20,7 +20,7 @@ public:
 
   void collect_data(DParameter *param);
 
-  void export_statistical_data(DParameter *param, bool perform_spanwise_average);
+  void export_statistical_data();
 
 private:
   int n_reyAve = 2;

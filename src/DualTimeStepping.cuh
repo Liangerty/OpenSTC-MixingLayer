@@ -218,7 +218,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
     if (step % output_file == 0 || finished) {
       ioManager.print_field(step, parameter, physical_time);
       if (if_collect_statistics && step > collect_statistics_iter_start)
-        stat_collector.export_statistical_data(param, parameter.get_bool("perform_spanwise_average"));
+        stat_collector.export_statistical_data();
       post_process(driver);
       if (if_monitor)
         monitor.output_data();

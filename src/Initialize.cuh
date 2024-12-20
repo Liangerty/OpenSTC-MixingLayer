@@ -13,11 +13,9 @@
 
 namespace cfd {
 template<MixtureModel mix_model, class turb>
-void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
-                                ggxl::VectorField3D<real> *profile_dPtr);
+void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
 
-void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
-                           ggxl::VectorField3D<real> *profile_dPtr);
+void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
 
 template<MixtureModel mix_model, class turb>
 void read_flowfield(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
@@ -76,8 +74,7 @@ void expand_2D_to_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> 
 
 // Implementations
 template<MixtureModel mix_model, class turb>
-void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,
-                                ggxl::VectorField3D<real> *profile_dPtr) {
+void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species) {
   const int init_method = parameter.get_int("initial");
   // No matter which method is used to initialize the flowfield,
   // the default inflow is first read and initialize the inf parameters.
@@ -88,7 +85,7 @@ void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vec
 
   switch (init_method) {
     case 0:
-      initialize_from_start(parameter, mesh, field, species, profile_dPtr);
+      initialize_from_start(parameter, mesh, field, species);
       break;
     case 1:
       read_flowfield<mix_model, turb>(parameter, mesh, field, species);
@@ -98,7 +95,7 @@ void initialize_basic_variables(Parameter &parameter, const Mesh &mesh, std::vec
       break;
     default:
       printf("\tThe initialization method is unknown, use freestream value to initialize by default.\n");
-      initialize_from_start(parameter, mesh, field, species, profile_dPtr);
+      initialize_from_start(parameter, mesh, field, species);
   }
 }
 
