@@ -4,38 +4,37 @@
 #include <filesystem>
 #include <fstream>
 
-cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reaction *reaction,
-                            FlameletLib *flamelet_lib) :
-    myid{parameter.get_int("myid")}, dim{parameter.get_int("dimension")},
-    problem_type{parameter.get_int("problem_type")}, inviscid_scheme{parameter.get_int("inviscid_scheme")},
-    reconstruction{parameter.get_int("reconstruction")}, limiter{parameter.get_int("limiter")},
-    entropy_fix_factor{parameter.get_real("entropy_fix_factor")},
-    positive_preserving{parameter.get_bool("positive_preserving")},
-    viscous_scheme{parameter.get_int("viscous_order")},
-    perform_spanwise_average{parameter.get_bool("perform_spanwise_average")},
-    rans_model{parameter.get_int("RANS_model")},
-    turb_implicit{parameter.get_int("turb_implicit")}, n_var{parameter.get_int("n_var")},
-    compressibility_correction{parameter.get_int("compressibility_correction")},
-    chemSrcMethod{parameter.get_int("chemSrcMethod")}, n_scalar_transported{parameter.get_int("n_scalar_transported")},
-    i_fl{parameter.get_int("i_fl")}, i_fl_cv{parameter.get_int("i_fl_cv")}, i_turb_cv{parameter.get_int("i_turb_cv")},
-    Pr(parameter.get_real("prandtl_number")), cfl(parameter.get_real("cfl")),
-    gradPInDiffusionFlux{parameter.get_bool("gradPInDiffusionFlux")},
-    Prt(parameter.get_real("turbulent_prandtl_number")), Sct(parameter.get_real("turbulent_schmidt_number")),
-    c_chi{parameter.get_real("c_chi")}, rho_ref{parameter.get_real("rho_inf")},
-    a_ref2{parameter.get_real("speed_of_sound") * parameter.get_real("speed_of_sound")},
-    v_ref{parameter.get_real("v_inf")}, T_ref{parameter.get_real("T_inf")},
-    p_ref{parameter.get_real("p_inf")}, weno_eps_scale{
+cfd::DParameter::DParameter(Parameter &parameter, const Species &species, Reaction *reaction,
+                            FlameletLib *flamelet_lib) : myid{parameter.get_int("myid")},
+  dim{parameter.get_int("dimension")}, problem_type{parameter.get_int("problem_type")},
+  n_var{parameter.get_int("n_var")}, n_scalar_transported{parameter.get_int("n_scalar_transported")},
+  i_fl{parameter.get_int("i_fl")}, i_fl_cv{parameter.get_int("i_fl_cv")},
+  i_turb_cv{parameter.get_int("i_turb_cv")}, inviscid_scheme{parameter.get_int("inviscid_scheme")},
+  reconstruction{parameter.get_int("reconstruction")}, limiter{parameter.get_int("limiter")},
+  viscous_scheme{parameter.get_int("viscous_order")}, positive_preserving{parameter.get_bool("positive_preserving")},
+  gradPInDiffusionFlux{parameter.get_bool("gradPInDiffusionFlux")},
+  entropy_fix_factor{parameter.get_real("entropy_fix_factor")}, rans_model{parameter.get_int("RANS_model")},
+  turb_implicit{parameter.get_int("turb_implicit")},
+  compressibility_correction{parameter.get_int("compressibility_correction")},
+  chemSrcMethod{parameter.get_int("chemSrcMethod")},
+  Pr(parameter.get_real("prandtl_number")), cfl(parameter.get_real("cfl")),
+  Prt(parameter.get_real("turbulent_prandtl_number")),
+  Sct(parameter.get_real("turbulent_schmidt_number")), c_chi{parameter.get_real("c_chi")},
+  rho_ref{parameter.get_real("rho_inf")},
+  a_ref2{parameter.get_real("speed_of_sound") * parameter.get_real("speed_of_sound")},
+  v_ref{parameter.get_real("v_inf")}, T_ref{parameter.get_real("T_inf")}, mach_ref{parameter.get_real("M_inf")},
+  p_ref{parameter.get_real("p_inf")}, weno_eps_scale{
     parameter.get_real("rho_inf") * parameter.get_real("v_inf") * parameter.get_real("rho_inf") *
-    parameter.get_real("v_inf")}, mach_ref{parameter.get_real("M_inf")},
-    sponge_layer{parameter.get_bool("sponge_layer")},
-    sponge_function{parameter.get_int("sponge_function")},
-    sponge_iter{parameter.get_int("sponge_iter")}, spongeXPlusStart{parameter.get_real("spongeXPlusStart")},
-    spongeXPlusEnd{parameter.get_real("spongeXPlusEnd")}, spongeXMinusStart{parameter.get_real("spongeXMinusStart")},
-    spongeXMinusEnd{parameter.get_real("spongeXMinusEnd")}, spongeYPlusStart{parameter.get_real("spongeYPlusStart")},
-    spongeYPlusEnd{parameter.get_real("spongeYPlusEnd")}, spongeYMinusStart{parameter.get_real("spongeYMinusStart")},
-    spongeYMinusEnd{parameter.get_real("spongeYMinusEnd")}, spongeZPlusStart{parameter.get_real("spongeZPlusStart")},
-    spongeZPlusEnd{parameter.get_real("spongeZPlusEnd")}, spongeZMinusStart{parameter.get_real("spongeZMinusStart")},
-    spongeZMinusEnd{parameter.get_real("spongeZMinusEnd")} {
+    parameter.get_real("v_inf")
+  }, perform_spanwise_average{parameter.get_bool("perform_spanwise_average")},
+  sponge_layer{parameter.get_bool("sponge_layer")}, sponge_function{parameter.get_int("sponge_function")},
+  sponge_iter{parameter.get_int("sponge_iter")}, spongeXMinusStart{parameter.get_real("spongeXMinusStart")},
+  spongeXMinusEnd{parameter.get_real("spongeXMinusEnd")}, spongeXPlusStart{parameter.get_real("spongeXPlusStart")},
+  spongeXPlusEnd{parameter.get_real("spongeXPlusEnd")}, spongeYMinusStart{parameter.get_real("spongeYMinusStart")},
+  spongeYMinusEnd{parameter.get_real("spongeYMinusEnd")}, spongeYPlusStart{parameter.get_real("spongeYPlusStart")},
+  spongeYPlusEnd{parameter.get_real("spongeYPlusEnd")}, spongeZMinusStart{parameter.get_real("spongeZMinusStart")},
+  spongeZMinusEnd{parameter.get_real("spongeZMinusEnd")}, spongeZPlusStart{parameter.get_real("spongeZPlusStart")},
+  spongeZPlusEnd{parameter.get_real("spongeZPlusEnd")} {
   if (parameter.get_int("myid") == 0) {
     if (inviscid_scheme == 51 || inviscid_scheme == 52 || inviscid_scheme == 71 || inviscid_scheme == 72)
       printf("\t->-> %-20e : WENO scale factor\n", weno_eps_scale);

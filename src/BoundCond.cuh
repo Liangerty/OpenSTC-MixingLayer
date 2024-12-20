@@ -16,9 +16,9 @@ struct BCInfo {
   int2 *boundary = nullptr;
 };
 
-int read_profile(const Boundary &boundary, const std::string &file, const Block &block, Parameter &parameter,
-                 const Species &species, ggxl::VectorField3D<real> &profile,
-                 const std::string &profile_related_bc_name);
+void read_profile(const Boundary &boundary, const std::string &file, const Block &block, Parameter &parameter,
+                  const Species &species, ggxl::VectorField3D<real> &profile,
+                  const std::string &profile_related_bc_name);
 
 void read_lst_profile(const Boundary &boundary, const std::string &file, const Block &block, const Parameter &parameter,
                       const Species &species, ggxl::VectorField3D<real> &profile,

@@ -862,18 +862,18 @@ void init_mixingLayer_prof_compatible_cpu(const Boundary &boundary, Parameter &p
   profile_host.deallocate_memory();
 }
 
-int read_profile(const Boundary &boundary, const std::string &file, const Block &block, Parameter &parameter,
-                 const Species &species, ggxl::VectorField3D<real> &profile,
-                 const std::string &profile_related_bc_name) {
+void read_profile(const Boundary &boundary, const std::string &file, const Block &block, Parameter &parameter,
+                  const Species &species, ggxl::VectorField3D<real> &profile,
+                  const std::string &profile_related_bc_name) {
   if (file == "MYSELF") {
     // The profile is initialized by the inflow condition.
     initialize_profile_with_inflow(boundary, block, parameter, species, profile, profile_related_bc_name);
-    return 0;
+    return;
   }
   if (file == "mixingLayerProfile.dat") {
     // The profile is initialized by the inflow condition.
     init_mixingLayer_prof_compatible_cpu(boundary, parameter, block, species, profile);
-    return 1;
+    return;
   }
   const auto dot = file.find_last_of('.');
   if (const auto suffix = file.substr(dot + 1, file.size()); suffix == "dat") {
@@ -881,7 +881,6 @@ int read_profile(const Boundary &boundary, const std::string &file, const Block 
   } else if (suffix == "plt") {
     //    read_plt_profile();
   }
-  return 0;
 }
 
 std::vector<int>
@@ -1694,301 +1693,16 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
         auto &bs = mesh[blk].boundary;
         for (auto &b: bs) {
           if (b.type_label == label) {
-            int type = read_profile(b, file_name, mesh[blk], parameter, species, profile_hPtr_withGhost[i],
-                                    profile_related_bc_name);
-            // if (type == 1) {
-            //   // mixing layer
-            //   special_treatment.push_back(i);
-            // }
+            read_profile(b, file_name, mesh[blk], parameter, species, profile_hPtr_withGhost[i],
+                         profile_related_bc_name);
             break;
           }
         }
       }
     }
-    // for (int ll: special_treatment) {
-    //   // Currently, only mixing layer is treated here.
-    //   // This part allocates the memory for the d_ptr of the profile.
-    //   const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[ll];
-    //   const auto &nn = parameter.get_struct(profile_related_bc_name);
-    //   const auto label = std::get<int>(nn.at("label"));
-    //   for (int blk = 0; blk < mesh.n_block; ++blk) {
-    //     auto &bs = mesh[blk].boundary;
-    //     for (auto &b: bs) {
-    //       if (b.type_label == label) {
-    //         int extent[3]{mesh[blk].mx, mesh[blk].my, mesh[blk].mz};
-    //         extent[b.face] = 1;
-    //         profile_hPtr_withGhost[ll].allocate_memory(extent[0], extent[1], extent[2], parameter.get_int("n_var") + 1,
-    //                                                    mesh[blk].ngg);
-    //       }
-    //     }
-    //   }
-    // }
     cudaMalloc(&profile_dPtr_withGhost, sizeof(ggxl::VectorField3D<real>) * n_profile);
     cudaMemcpy(profile_dPtr_withGhost, profile_hPtr_withGhost.data(), sizeof(ggxl::VectorField3D<real>) * n_profile,
                cudaMemcpyHostToDevice);
-    // for (int ll: special_treatment) {
-    //   // Currently, only mixing layer is treated here.
-    //   // This part computes the profile.
-    //   const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[ll];
-    //   const auto &nn = parameter.get_struct(profile_related_bc_name);
-    //   const auto label = std::get<int>(nn.at("label"));
-    //   for (int blk = 0; blk < mesh.n_block; ++blk) {
-    //     auto &bs = mesh[blk].boundary;
-    //     for (auto &b: bs) {
-    //       if (b.type_label == label) {
-    //         const int direction = b.face;
-    //         const int ngg = mesh[blk].ngg;
-    //         const int mx = mesh[blk].mx, my = mesh[blk].my, mz = mesh[blk].mz;
-    //         int range_0[2]{-ngg, mx + ngg - 1}, range_1[2]{-ngg, my + ngg - 1},
-    //             range_2[2]{-ngg, mz + ngg - 1};
-    //         int n0 = mx + 2 * ngg, n1 = my + 2 * ngg, n2 = mz + 2 * ngg;
-    //         if (direction == 0) {
-    //           n0 = 1 + ngg;
-    //           range_0[0] = -ngg;
-    //           range_0[1] = 0;
-    //         } else if (direction == 1) {
-    //           n1 = 1 + ngg;
-    //           range_1[0] = -ngg;
-    //           range_1[1] = 0;
-    //         } else if (direction == 2) {
-    //           n2 = 1 + ngg;
-    //           range_2[0] = -ngg;
-    //           range_2[1] = 0;
-    //         }
-    //
-    //         std::vector<real> var_info;
-    //         get_mixing_layer_info(parameter, species, var_info);
-    //
-    //         ggxl::VectorField3DHost<real> profile_hPtr;
-    //         int extent[3]{mx, my, mz};
-    //         extent[b.face] = 1;
-    //         int nv = parameter.get_int("n_var");
-    //         profile_hPtr.resize(extent[0], extent[1], extent[2], nv + 1, ngg);
-    //         init_mixingLayer_prof_compatible_cpu(parameter, mesh[blk], species, profile_hPtr, range_0,
-    //                                              range_1, range_2, var_info.data());
-    //
-    //         // cudaDeviceSynchronize();
-    //         // if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //         //   printf("Error in proc %d before var_info_dev: %s\n", parameter.get_int("myid"), cudaGetErrorString(err));
-    //         //   MpiParallel::exit();
-    //         // }
-    //         // real *var_info_dev;
-    //         // cudaMalloc(&var_info_dev, sizeof(real) * var_info.size());
-    //         // cudaMemcpy(var_info_dev, var_info.data(), sizeof(real) * var_info.size(), cudaMemcpyHostToDevice);
-    //         // cudaDeviceSynchronize();
-    //         // if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //         //   printf("Error in proc %d after var_info_dev: %s\n", parameter.get_int("myid"), cudaGetErrorString(err));
-    //         //   MpiParallel::exit();
-    //         // }
-    //         //
-    //         // uint tpb[3], bpg[3];
-    //         // tpb[0] = n0 <= (2 * ngg + 1) ? 1 : 16;
-    //         // tpb[1] = n1 <= (2 * ngg + 1) ? 1 : 16;
-    //         // tpb[2] = n2 <= (2 * ngg + 1) ? 1 : 16;
-    //         // bpg[0] = (n0 - 1) / tpb[0] + 1;
-    //         // bpg[1] = (n1 - 1) / tpb[1] + 1;
-    //         // bpg[2] = (n2 - 1) / tpb[2] + 1;
-    //         // printf("proc %d, tpb: %d,%d,%d, bpg: %d,%d,%d, n0:n2= %d,%d,%d\n", parameter.get_int("myid"), tpb[0],
-    //         //        tpb[1], tpb[2],
-    //         //        bpg[0], bpg[1], bpg[2], n0, n1, n2);
-    //         // dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
-    //         int n_fl{0};
-    //         if ((species.n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2)
-    //           n_fl = 2;
-    //         // printf("6\n");
-    //         // cudaDeviceSynchronize();
-    //         // if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //         //   printf("Error in proc %d before init_mixingLayer_prof_compatible: %s\n", parameter.get_int("myid"),
-    //         //          cudaGetErrorString(err));
-    //         //   MpiParallel::exit();
-    //         // }
-    //         // int *range_x, *range_y, *range_z;
-    //         // cudaMalloc(&range_x, sizeof(int) * 2);
-    //         // cudaMalloc(&range_y, sizeof(int) * 2);
-    //         // cudaMalloc(&range_z, sizeof(int) * 2);
-    //         // cudaMemcpy(range_x, range_0, sizeof(int) * 2, cudaMemcpyHostToDevice);
-    //         // cudaMemcpy(range_y, range_1, sizeof(int) * 2, cudaMemcpyHostToDevice);
-    //         // cudaMemcpy(range_z, range_2, sizeof(int) * 2, cudaMemcpyHostToDevice);
-    //         // printf("range_x=%d,%d, range_y=%d,%d, range_z=%d,%d\n", range_0[0], range_0[1], range_1[0], range_1[1],
-    //         //        range_2[0], range_2[1]);
-    //         // init_mixingLayer_prof_compatible<<<BPG, TPB>>>(field[blk].d_ptr, range_x, range_y, range_z, var_info_dev,
-    //         //                                                parameter.get_real("delta_omega"),
-    //         //                                                parameter.get_int("n_spec"),
-    //         //                                                parameter.get_int("n_turb"),
-    //         //                                                n_fl, parameter.get_int("n_ps"),
-    //         //                                                profile_dPtr_withGhost, ll);
-    //         // cudaDeviceSynchronize();
-    //         // if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //         //   printf("Error in proc %d after init_mixingLayer_prof_compatible: %s\n", parameter.get_int("myid"),
-    //         //          cudaGetErrorString(err));
-    //         //   MpiParallel::exit();
-    //         // }
-    //
-    //         // print the profile out to file
-    //         // Here, we assume the profile is 1D in y direction, that is, the same for x and z.
-    //         // ggxl::VectorField3DHost<real> profile_hPtr;
-    //         // int extent[3]{mx, my, mz};
-    //         // extent[b.face] = 1;
-    //         // int nv = parameter.get_int("n_var");
-    //         // cudaDeviceSynchronize();
-    //         // if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //         //   printf("Error in proc %d before profile_hPtr: %s\n", parameter.get_int("myid"), cudaGetErrorString(err));
-    //         //   MpiParallel::exit();
-    //         // }
-    //         // profile_hPtr.resize(extent[0], extent[1], extent[2], nv + 1, ngg);
-    //         cudaDeviceSynchronize();
-    //         if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //           printf("Error in proc %d before profile_hPtr cudaMemcpy: %s\n", parameter.get_int("myid"),
-    //                  cudaGetErrorString(err));
-    //           MpiParallel::exit();
-    //         }
-    //         cudaMemcpy(profile_hPtr_withGhost[ll].data(), profile_hPtr.data(),
-    //                    sizeof(real) * profile_hPtr.size() * (nv + 1), cudaMemcpyHostToDevice);
-    //         // cudaMemcpy(profile_hPtr.data(), profile_hPtr_withGhost[ll].data(),
-    //         //            sizeof(real) * profile_hPtr.size() * (nv + 1), cudaMemcpyDeviceToHost);
-    //         cudaDeviceSynchronize();
-    //         if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //           printf("Error in proc %d after profile_hPtr cudaMemcpy: %s\n", parameter.get_int("myid"),
-    //                  cudaGetErrorString(err));
-    //           MpiParallel::exit();
-    //         }
-    //         printf("Before writing\n");
-    //         FILE *fp = fopen("./mixingLayerProfile.dat", "w");
-    //         if (fp == nullptr) {
-    //           printf("Cannot open file %s\n", "./mixingLayerProfile.dat");
-    //           MpiParallel::exit();
-    //         }
-    //         fprintf(fp, "VARIABLES = \"X\"\n\"Y\"\n\"Z\"\n\"RHO\"\n\"U\"\n\"V\"\n\"W\"\n\"p\"\n\"T\"\n");
-    //         if (species.n_spec > 0) {
-    //           for (int l = 0; l < species.n_spec; ++l) {
-    //             fprintf(fp, "\"%s\"\n", species.spec_name[l].c_str());
-    //           }
-    //         }
-    //         if (parameter.get_int("n_turb") == 2) {
-    //           fprintf(fp, "\"TKE\"\n\"omega\"\n");
-    //         }
-    //         if (n_fl > 0) {
-    //           fprintf(fp, "\"MixtureFraction\"\n\"MixtureFractionVariance\"\n");
-    //         }
-    //         fprintf(fp, "ZONE T=\"INFLOW\"\n");
-    //         fprintf(fp, "I=%d, J=%d, K=%d, f=BLOCK\n", n0, n1, n2);
-    //         // Print nv DOUBLE in DT=(...) into a char array
-    //         std::string temp = "DT=(";
-    //         for (int l = 0; l < nv + 4; ++l) {
-    //           temp += "DOUBLE ";
-    //         }
-    //         temp += ")\n";
-    //         fprintf(fp, "%s", temp.c_str());
-    //         // First, x, y, z
-    //         int everyFour = 0;
-    //         constexpr int numberToChangeLine = 4;
-    //         if (direction == 0) {
-    //           range_0[0] = -ngg;
-    //           range_0[1] = 0;
-    //         } else if (direction == 1) {
-    //           range_1[0] = -ngg;
-    //           range_1[1] = 0;
-    //         } else if (direction == 2) {
-    //           range_2[0] = -ngg;
-    //           range_2[1] = 0;
-    //         }
-    //         for (int k = range_2[0]; k <= range_2[1]; ++k) {
-    //           for (int j = range_1[0]; j <= range_1[1]; ++j) {
-    //             for (int i = range_0[0]; i <= range_0[1]; ++i) {
-    //               fprintf(fp, " %.15e", mesh[blk].x(i, j, k));
-    //               everyFour++;
-    //               if (everyFour == numberToChangeLine) {
-    //                 fprintf(fp, "\n");
-    //                 everyFour = 0;
-    //               }
-    //             }
-    //           }
-    //         }
-    //         if (everyFour != 0) {
-    //           fprintf(fp, "\n");
-    //         }
-    //         everyFour = 0;
-    //         for (int k = range_2[0]; k <= range_2[1]; ++k) {
-    //           for (int j = range_1[0]; j <= range_1[1]; ++j) {
-    //             for (int i = range_0[0]; i <= range_0[1]; ++i) {
-    //               fprintf(fp, " %.15e", mesh[blk].y(i, j, k));
-    //               everyFour++;
-    //               if (everyFour == numberToChangeLine) {
-    //                 fprintf(fp, "\n");
-    //                 everyFour = 0;
-    //               }
-    //             }
-    //           }
-    //         }
-    //         if (everyFour != 0) {
-    //           fprintf(fp, "\n");
-    //         }
-    //         everyFour = 0;
-    //         for (int k = range_2[0]; k <= range_2[1]; ++k) {
-    //           for (int j = range_1[0]; j <= range_1[1]; ++j) {
-    //             for (int i = range_0[0]; i <= range_0[1]; ++i) {
-    //               fprintf(fp, " %.15e", mesh[blk].z(i, j, k));
-    //               everyFour++;
-    //               if (everyFour == numberToChangeLine) {
-    //                 fprintf(fp, "\n");
-    //                 everyFour = 0;
-    //               }
-    //             }
-    //           }
-    //         }
-    //         if (everyFour != 0) {
-    //           fprintf(fp, "\n");
-    //         }
-    //         // Then, the variables
-    //         for (int l = 0; l < nv + 1; ++l) {
-    //           everyFour = 0;
-    //           for (int k = range_2[0]; k <= range_2[1]; ++k) {
-    //             for (int j = range_1[0]; j <= range_1[1]; ++j) {
-    //               for (int i = range_0[0]; i <= range_0[1]; ++i) {
-    //                 fprintf(fp, " %.15e", profile_hPtr(i, j, k, l));
-    //                 everyFour++;
-    //                 if (everyFour == numberToChangeLine) {
-    //                   fprintf(fp, "\n");
-    //                   everyFour = 0;
-    //                 }
-    //               }
-    //             }
-    //           }
-    //           if (everyFour != 0) {
-    //             fprintf(fp, "\n");
-    //           }
-    //         }
-    //         fclose(fp);
-    //         printf("After writing\nBefore updating file name\n");
-    //         // auto arr = parameter.get_string_array("profile_file_names");
-    //         // for (auto &s: arr) {
-    //         //   printf("name: %s\n", s.c_str());
-    //         // }
-    //         // arr[ll] = "mixingLayerProfile.dat";
-    //         // printf("After updating file name\n");
-    //         // parameter.update_parameter("profile_file_names", arr);
-    //         // for (auto &s: arr) {
-    //         //   printf("name: %s\n", s.c_str());
-    //         // }
-    //         cudaDeviceSynchronize();
-    //         if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //           printf("Error in proc %d before profile_hPtr deallocate_memory: %s\n", parameter.get_int("myid"),
-    //                  cudaGetErrorString(err));
-    //           MpiParallel::exit();
-    //         }
-    //         profile_hPtr.deallocate_memory();
-    //         cudaDeviceSynchronize();
-    //         if (auto err = cudaGetLastError(); err != cudaSuccess) {
-    //           printf("Error in proc %d after profile_hPtr deallocate_memory: %s\n", parameter.get_int("myid"),
-    //                  cudaGetErrorString(err));
-    //           MpiParallel::exit();
-    //         }
-    //         printf("7\n");
-    //         break;
-    //       }
-    //     }
-    //   }
-    // }
   }
 
   // Count the max number of rng needed

@@ -40,12 +40,11 @@ private:
 template<MixtureModel mix_model, class turb_method, OutputTimeChoice output_time_choice>
 BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Parameter &parameter_, const Mesh &mesh_,
                                                                    const Species &species_, std::vector<Field> &_field)
-    : parameter(parameter_),
-      mesh(mesh_),
-      labels_to_output(parameter.get_int_array("output_bc")),
-      species(species_),
-      field(_field) {
-  const int myid{parameter.get_int("myid")};
+  : parameter(parameter_),
+  mesh(mesh_),
+  species(species_),
+  field(_field),
+  labels_to_output(parameter.get_int_array("output_bc")) {
   const auto n_labels{labels_to_output.size()};
   name_of_boundary.resize(n_labels);
   boundaries.resize(n_labels);

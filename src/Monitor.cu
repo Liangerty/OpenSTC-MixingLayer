@@ -8,10 +8,10 @@
 #include <fstream>
 
 namespace cfd {
-Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh &mesh_) : if_monitor{
-    parameter.get_int("if_monitor")}, output_file{parameter.get_int("output_file")}, n_block{
-    parameter.get_int("n_block")}, n_point(n_block, 0), mesh(mesh_) {
-  if (!if_monitor) {
+Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh &mesh_) : if_monitor
+  {parameter.get_int("if_monitor")}, output_file{parameter.get_int("output_file")},
+  n_block{parameter.get_int("n_block")}, n_point(n_block, 0), mesh(mesh_) {
+  if (!parameter.get_int("if_monitor")) {
     return;
   }
 
