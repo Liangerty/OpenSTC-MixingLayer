@@ -41,8 +41,8 @@ cfd::compute_temperature_and_pressure(int i, int j, int k, const DParameter *par
 
 __global__ void cfd::eliminate_k_gradient(cfd::DZone *zone, const DParameter *param) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - ngg;
   if (i >= mx + ngg || j >= my + ngg) return;
 
   auto &bv = zone->bv;

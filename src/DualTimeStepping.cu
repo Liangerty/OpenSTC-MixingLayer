@@ -2,9 +2,9 @@
 
 __global__ void cfd::compute_qn_star(DZone *zone, int n_var, real dt_global) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   const real factor = 0.5 * zone->jac(i, j, k) / dt_global;
@@ -16,9 +16,9 @@ __global__ void cfd::compute_qn_star(DZone *zone, int n_var, real dt_global) {
 __global__ void
 cfd::compute_modified_rhs(DZone *zone, int n_var, real dt_global) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   auto &dq = zone->dq;
@@ -136,9 +136,9 @@ bool cfd::inner_converged(const Mesh &mesh, const std::vector<Field> &field, con
 
 __global__ void cfd::compute_square_of_dbv_wrt_last_inner_iter(DZone *zone) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= mx || j >= my || k >= mz) return;
 
   auto &bv = zone->bv;
@@ -153,9 +153,9 @@ __global__ void cfd::compute_square_of_dbv_wrt_last_inner_iter(DZone *zone) {
 
 __global__ void cfd::store_last_iter(DZone *zone) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= mx || j >= my || k >= mz) return;
 
   zone->in_last_step(i, j, k, 0) = zone->bv(i, j, k, 0);

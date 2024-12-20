@@ -233,9 +233,9 @@ compute_chem_src_jacobian_diagonal(DZone *zone, int i, int j, int k, const DPara
 
 __global__ void EPI(DZone *zone, int n_spec) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const int i = blockDim.x * blockIdx.x + threadIdx.x;
-  const int j = blockDim.y * blockIdx.y + threadIdx.y;
-  const int k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   auto &chem_jac = zone->chem_src_jac;
@@ -420,9 +420,9 @@ __device__ void solve_chem_system(real *lhs, real *rhs, int dim) {
 
 __global__ void DA(DZone *zone, int n_spec) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const int i = blockDim.x * blockIdx.x + threadIdx.x;
-  const int j = blockDim.y * blockIdx.y + threadIdx.y;
-  const int k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   const real dt{zone->dt_local(i, j, k)};

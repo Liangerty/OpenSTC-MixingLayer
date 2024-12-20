@@ -261,9 +261,9 @@ __global__ void
 initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec, real delta_omega, int n_turb, int n_fl,
                                   int n_ps) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - ngg;
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   const auto y = zone->y(i, j, k);
@@ -329,9 +329,9 @@ __global__ void
 initialize_mixing_layer_with_profile(ggxl::VectorField3D<real> *profile_dPtr, int profile_idx, DZone *zone,
                                      int n_scalar) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - ngg;
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   auto &prof = profile_dPtr[profile_idx];

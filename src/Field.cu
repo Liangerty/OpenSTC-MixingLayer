@@ -213,7 +213,7 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
 
   std::array<int, 3> extent{mx, my, mz};
   // Then we read the variables.
-  auto nv_read = (int) var_name.size();
+  auto nv_read = static_cast<int>(var_name.size());
   gxl::VectorField3D<real> profile_read;
   profile_read.resize(extent[0], extent[1], extent[2], nv_read, 0);
 
@@ -317,9 +317,9 @@ __global__ void initialize_bv_with_inflow(const real *var_info, int n_inflow, cf
                                           const real *coordinate_ranges, int n_scalar, const int *if_profile,
                                           ggxl::VectorField3D<real> *profiles, const int *extents) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - ngg;
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   auto &x = zone->x, &y = zone->y, &z = zone->z;
@@ -389,8 +389,8 @@ void cfd::Field::initialize_basic_variables(const Parameter &parameter, const st
                                             const std::vector<real> &xs, const std::vector<real> &xe,
                                             const std::vector<real> &ys, const std::vector<real> &ye,
                                             const std::vector<real> &zs, const std::vector<real> &ze,
-                                            const cfd::Species &species) const {
-  const int n = (int) inflows.size();
+                                            const Species &species) const {
+  const int n = static_cast<int>(inflows.size());
   const int n_scalar = parameter.get_int("n_scalar");
   std::vector<real> var_info((6 + n_scalar) * n, 0);
   real *rho = var_info.data(), *u = rho + n, *v = u + n, *w = v + n, *p = w + n, *T = p + n;
@@ -402,7 +402,7 @@ void cfd::Field::initialize_basic_variables(const Parameter &parameter, const st
   std::vector<int> extent;
   std::vector<std::array<int, 3>> extents(n);
 
-  for (int i = 0; i < (int) inflows.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(inflows.size()); ++i) {
     std::tie(rho[i], u[i], v[i], w[i], p[i], T[i]) = inflows[i].var_info();
     if_profile[i] = inflows[i].inflow_type == 1 ? 1 : 0;
     if (if_profile[i]) {

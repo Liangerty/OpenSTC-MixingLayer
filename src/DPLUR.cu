@@ -4,9 +4,9 @@
 namespace cfd {
 __global__ void convert_dq_back_to_dqDt(DZone *zone, const DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const int i = blockDim.x * blockIdx.x + threadIdx.x;
-  const int j = blockDim.y * blockIdx.y + threadIdx.y;
-  const int k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   const real dt_local = zone->dt_local(i, j, k);
@@ -18,10 +18,10 @@ __global__ void convert_dq_back_to_dqDt(DZone *zone, const DParameter *param) {
 
 __global__ void set_dq_to_0(const DParameter *param, DZone *zone, int i_face) {
   const auto &b = zone->boundary[i_face];
-  auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto range_start = b.range_start, range_end = b.range_end;
+  const int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   for (int l = 0; l < param->n_var; ++l) {

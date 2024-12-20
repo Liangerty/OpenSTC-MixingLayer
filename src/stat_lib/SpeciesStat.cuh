@@ -152,7 +152,7 @@ std::vector<int> cfd::read_species_collect_file(Parameter &parameter, const Mesh
         printf("Error: The mesh size in %s is not consistent with the current mesh.\n", file_name.c_str());
         MPI_Abort(MPI_COMM_WORLD, 1);
       }
-      const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
+      const auto sz = static_cast<long long>(mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
       MPI_Datatype ty;
       int lSize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
       int start_idx[3]{0, 0, 0};
@@ -245,7 +245,7 @@ cfd::export_species_collect_file(Parameter &parameter, const Mesh &mesh, std::ve
   constexpr int ngg = T::ngg;
   for (int b = 0; b < mesh.n_block; ++b) {
     const int mx = mesh[b].mx, my = mesh[b].my, mz = mesh[b].mz;
-    const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
+    const auto sz = static_cast<long long>(mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
 
     T::copy_to_host(field[b], n_collect, sz);
 

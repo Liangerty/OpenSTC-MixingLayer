@@ -61,7 +61,7 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
         }
       }
     }
-    n_species_stat = (int) species_stat_index.size();
+    n_species_stat = static_cast<int>(species_stat_index.size());
   }
   parameter.update_parameter("n_species_stat", n_species_stat);
   parameter.update_parameter("species_stat_index", species_stat_index);
@@ -119,7 +119,7 @@ void SinglePointStat::init_stat_name() {
 
   // Next, see if there are some basic variables except rho, p are to be averaged.
   if (auto &stat_rey_1st = parameter.get_string_array("stat_rey_1st"); !stat_rey_1st.empty()) {
-    int n_rey_1st = (int) stat_rey_1st.size();
+    const int n_rey_1st = static_cast<int>(stat_rey_1st.size());
     for (int i = 0; i < n_rey_1st; ++i) {
       auto var = gxl::to_upper(stat_rey_1st[i]);
       if (var == "U") {
@@ -454,7 +454,7 @@ void SinglePointStat::read_previous_statistical_data() {
       printf("Error: The mesh size in the previous statistical data is not consistent with the current mesh.\n");
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
+    const auto sz = static_cast<long long>(mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
     MPI_Datatype ty;
     int lSize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
     int start_idx[3]{0, 0, 0};
@@ -578,7 +578,7 @@ void SinglePointStat::export_statistical_data(DParameter *param, bool perform_sp
   for (int b = 0; b < mesh.n_block; ++b) {
     const auto &zone = field[b].h_ptr;
     const int mx = mesh[b].mx, my = mesh[b].my, mz = mesh[b].mz;
-    const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
+    const auto sz = static_cast<long long>(mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
 
     cudaMemcpy(field[b].collect_reynolds_1st.data(), zone->collect_reynolds_1st.data(), sz * n_reyAve,
                cudaMemcpyDeviceToHost);
@@ -653,9 +653,9 @@ void SinglePointStat::export_statistical_data(DParameter *param, bool perform_sp
 
 __global__ void collect_single_point_basic_statistics(DZone *zone, const DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - 1;
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - 1;
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - 1;
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - 1;
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - 1;
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - 1;
   if (i >= extent[0] + 1 || j >= extent[1] + 1 || k >= extent[2] + 1) return;
 
   const auto &bv = zone->bv;
@@ -705,9 +705,9 @@ __global__ void collect_single_point_basic_statistics(DZone *zone, const DParame
 
 __global__ void collect_single_point_additional_statistics(DZone *zone, DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   if (param->stat_tke_budget) {

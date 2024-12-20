@@ -139,10 +139,10 @@ initialize_rest_rng(ggxl::VectorField2D<curandState> *rng_states, int iFace, int
 template<MixtureModel mix_model, class turb>
 __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
   const auto &b = zone->boundary[i_face];
-  auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto range_start = b.range_start, range_end = b.range_end;
+  const int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   const auto face = b.face;
@@ -210,10 +210,10 @@ __global__ void apply_outflow(DZone *zone, int i_face, const DParameter *param) 
   int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
-  auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto range_start = b.range_start, range_end = b.range_end;
+  const int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -243,9 +243,9 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -761,9 +761,9 @@ __global__ void apply_farfield(DZone *zone, FarField *farfield, int i_face, DPar
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -1031,9 +1031,9 @@ apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
   auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -1277,10 +1277,10 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
   int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
-  auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto range_start = b.range_start, range_end = b.range_end;
+  const int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -1363,10 +1363,10 @@ __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DPa
   int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
-  auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto range_start = b.range_start, range_end = b.range_end;
+  const int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -1448,10 +1448,10 @@ __global__ void apply_periodic(DZone *zone, DParameter *param, int i_face) {
   int dir[]{0, 0, 0};
   const auto &b = zone->boundary[i_face];
   dir[b.face] = b.direction;
-  auto range_start = b.range_start, range_end = b.range_end;
-  int i = range_start[0] + (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = range_start[1] + (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto range_start = b.range_start, range_end = b.range_end;
+  const int i = range_start[0] + static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = range_start[1] + static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = range_start[2] + static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
   auto &bv = zone->bv;
@@ -1466,6 +1466,7 @@ __global__ void apply_periodic(DZone *zone, DParameter *param, int i_face) {
       idx_other[1] = b.direction < 0 ? zone->my - 1 : 0;
       break;
     case 2: // k face
+    default:
       idx_other[2] = b.direction < 0 ? zone->mz - 1 : 0;
       break;
   }

@@ -7,7 +7,7 @@
 
 // First, which variables to output, we need the names of them.
 int cfd::add_other_variable_name(std::vector<std::string> &var_name, const Parameter &parameter) {
-  auto nv = (int) (var_name.size());
+  auto nv = static_cast<int>(var_name.size());
 
   /**********************************************************************************************/
   // TODO: Here is what you need to modify

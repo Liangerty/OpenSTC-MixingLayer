@@ -166,8 +166,8 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
         MPI_Type_commit(&ty);
 
         MPI_File_read_at(fp, offset, df_rng_state_cpu[iFace].data(), 3, ty, MPI_STATUS_IGNORE);
-        offset += (MPI_Offset) ((my + 2 * old_width_single_side) * (mz + 2 * old_width_single_side) * 3 *
-                                sizeof(curandState));
+        offset += static_cast<MPI_Offset>((my + 2 * old_width_single_side) * (mz + 2 * old_width_single_side) * 3 *
+                                          sizeof(curandState));
         cudaMemcpy(rng_states_hPtr[iFace].data(), df_rng_state_cpu[iFace].data(),
                    (my + 2 * ngg + 2 * DF_N) * (mz + 2 * ngg + 2 * DF_N) * 3 * sizeof(curandState),
                    cudaMemcpyHostToDevice);
@@ -409,7 +409,7 @@ DBoundCond::compute_fluctuations(const DParameter *param, DZone *zone, const Inf
 __global__ void
 compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij, ggxl::VectorField1D<real> *df_lundMatrix_hPtr,
                                                       int i_face, const real *y_scaled, int my, int ngg) {
-  int j = (int) (blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
   if (j >= my + ngg) {
     return;
   }
@@ -441,7 +441,7 @@ compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij, ggxl::Vec
 __global__ void
 compute_convolution_kernel(const real *y_scaled, ggxl::VectorField2D<real> *df_by, ggxl::VectorField2D<real> *df_bz,
                            real dz_scaled, int iFace, int my, int ngg) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
   if (j >= my + ngg) {
     return;
   }
@@ -491,8 +491,8 @@ compute_convolution_kernel(const real *y_scaled, ggxl::VectorField2D<real> *df_b
 __global__ void
 generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, ggxl::VectorField2D<real> *random_numbers,
                                int iFace, int my, int mz, int ngg) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
-  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  const int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
   if (j >= my + DBoundCond::DF_N + ngg || k >= mz + DBoundCond::DF_N + ngg) {
     return;
   }
@@ -503,7 +503,7 @@ generate_random_numbers_kernel(ggxl::VectorField2D<curandState> *rng_states, ggx
 }
 
 __global__ void remove_mean_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
   if (j >= my + DBoundCond::DF_N + ngg) {
     return;
   }
@@ -538,8 +538,8 @@ __global__ void remove_mean_spanwise(ggxl::VectorField2D<real> *random_numbers, 
 
 __global__ void
 apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace, int my, int mz, int ngg) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
-  int k = int(blockIdx.y * blockDim.y + threadIdx.y) + 1;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  const int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) + 1;
   if (j >= my + DBoundCond::DF_N + ngg || k > DBoundCond::DF_N + ngg) {
     return;
   }
@@ -556,8 +556,8 @@ apply_periodic_in_spanwise(ggxl::VectorField2D<real> *random_numbers, int iFace,
 __global__ void
 perform_convolution_y(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorField2D<real> *df_by,
                       ggxl::VectorField2D<real> *df_fy, int iFace, int my, int mz, int ngg) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
-  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg - DBoundCond::DF_N;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  const int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - ngg - DBoundCond::DF_N;
   if (j >= my + ngg || k >= mz + DBoundCond::DF_N + ngg) {
     return;
   }
@@ -612,8 +612,8 @@ perform_convolution_z(ggxl::VectorField2D<real> *df_fy, ggxl::VectorField2D<real
 __global__ void
 compute_fluctuations_first_step(ggxl::VectorField3D<real> *fluctuation_dPtr, ggxl::VectorField1D<real> *lundMatrix_dPtr,
                                 ggxl::VectorField2D<real> *df_velFluc_old_dPtr, int iFace, int my, int mz, int ngg) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
-  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  const int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
   if (j >= my + ngg || k >= mz + ngg) {
     return;
   }
@@ -634,8 +634,8 @@ Castro_time_correlation_and_fluc_computation(const DParameter *param, DZone *zon
                                              ggxl::VectorField1D<real> *lundMatrix_dPtr,
                                              ggxl::VectorField3D<real> *fluctuation_dPtr, int iFace, int my,
                                              int mz, int ngg) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
-  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  const int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
   if (j >= my + ngg || k >= mz + ngg) {
     return;
   }

@@ -27,9 +27,9 @@ void cfd::initialize_sponge_layer(Parameter &parameter, const Mesh &mesh, std::v
 
 __global__ void cfd::update_sponge_layer_value(DZone *zone, const DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   const int n_iter = param->sponge_iter;
@@ -210,12 +210,12 @@ void cfd::output_sponge_layer(const Parameter &parameter, const std::vector<Fiel
       n_grid_before += mesh.mx_blk[blk + b] * mesh.my_blk[blk + b] * mesh.mz_blk[blk + b];
     }
   }
-  int n_var = parameter.get_int("n_var");
-  offset += (MPI_Offset) (n_grid_before * n_var * sizeof(real));
+  const int n_var = parameter.get_int("n_var");
+  offset += static_cast<MPI_Offset>(n_grid_before * n_var * sizeof(real));
   for (auto &f: field) {
     MPI_File_write_at(fp, offset, f.sponge_mean_cv.data(), f.sponge_mean_cv.size() * n_var, MPI_REAL,
                       MPI_STATUS_IGNORE);
-    offset += (MPI_Offset) (f.sponge_mean_cv.size() * n_var * sizeof(real));
+    offset += static_cast<MPI_Offset>(f.sponge_mean_cv.size() * n_var * sizeof(real));
   }
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_File_close(&fp);
@@ -264,12 +264,12 @@ void cfd::read_sponge_layer(Parameter &parameter, const Mesh &mesh, std::vector<
       n_grid_before += mesh.mx_blk[blk + b] * mesh.my_blk[blk + b] * mesh.mz_blk[blk + b];
     }
   }
-  int n_var = parameter.get_int("n_var");
-  offset += (MPI_Offset) (n_grid_before * n_var * sizeof(real));
+  const int n_var = parameter.get_int("n_var");
+  offset += static_cast<MPI_Offset>(n_grid_before * n_var * sizeof(real));
   for (auto &f: field) {
     MPI_File_read_at(fp, offset, f.sponge_mean_cv.data(), f.sponge_mean_cv.size() * n_var, MPI_REAL,
                      MPI_STATUS_IGNORE);
-    offset += (MPI_Offset) (f.sponge_mean_cv.size() * n_var * sizeof(real));
+    offset += static_cast<MPI_Offset>(f.sponge_mean_cv.size() * n_var * sizeof(real));
   }
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_File_close(&fp);

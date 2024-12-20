@@ -5,9 +5,9 @@
 
 __global__ void cfd::store_last_step(DZone *zone) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = blockDim.x * blockIdx.x + threadIdx.x;
-  int j = blockDim.y * blockIdx.y + threadIdx.y;
-  int k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= mx || j >= my || k >= mz) return;
 
   auto &bv = zone->bv;
@@ -20,9 +20,9 @@ __global__ void cfd::store_last_step(DZone *zone) {
 
 __global__ void cfd::compute_square_of_dbv(DZone *zone) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = blockDim.x * blockIdx.x + threadIdx.x;
-  int j = blockDim.y * blockIdx.y + threadIdx.y;
-  int k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= mx || j >= my || k >= mz) return;
 
   auto &bv = zone->bv;
@@ -68,14 +68,14 @@ __global__ void cfd::update_physical_time(DParameter *param, real t) {
 }
 
 __global__ void cfd::min_of_arr(real *arr, int size) {
-  int i = blockDim.x * blockIdx.x + threadIdx.x;
-  const int t = threadIdx.x;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int t = static_cast<int>(threadIdx.x);
 
   if (i >= size) {
     return;
   }
   real inp{1e+6};
-  for (int idx = i; idx < size; idx += blockDim.x * gridDim.x) {
+  for (int idx = i; idx < size; idx += static_cast<int>(blockDim.x * gridDim.x)) {
     inp = min(inp, arr[idx]);
   }
   __syncthreads();

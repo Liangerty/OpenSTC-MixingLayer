@@ -293,15 +293,15 @@ __global__ void
 CDSPart1D<MixtureModel::Air>(DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const auto tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const auto block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
+  const auto tid = static_cast<int>(threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const auto block_dim = static_cast<int>(blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
 //  const int n_point = block_dim + 2 * ngg - 1;
 
   int idx[3];
-  idx[0] = (int) ((blockDim.x - 2 * ngg * labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (int) ((blockDim.y - 2 * ngg * labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (int) ((blockDim.z - 2 * ngg * labels[2]) * blockIdx.z + threadIdx.z);
+  idx[0] = static_cast<int>((blockDim.x - 2 * ngg * labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = static_cast<int>((blockDim.y - 2 * ngg * labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = static_cast<int>((blockDim.z - 2 * ngg * labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= ngg;
   if (idx[direction] >= max_extent - ngg) return;
 

@@ -784,7 +784,7 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
     {"T", 5},
     {"TEMPERATURE", 5},
   };
-  int nv = (int) var_name.size();
+  int nv = static_cast<int>(var_name.size());
   if (get_int("species") != 0) {
     const int ns = spec.n_spec;
     var_name.resize(nv + ns);

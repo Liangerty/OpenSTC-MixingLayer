@@ -8,14 +8,14 @@ namespace cfd {
 template<MixtureModel mix_model>
 __global__ void
 __launch_bounds__(64, 8)
-compute_convective_term_weno_x(cfd::DZone *zone, int max_extent, DParameter *param) {
-  int i = (int) ((blockDim.x - 1) * blockIdx.x + threadIdx.x - 1);
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+compute_convective_term_weno_x(DZone *zone, int max_extent, DParameter *param) {
+  const int i = static_cast<int>((blockDim.x - 1) * blockIdx.x + threadIdx.x - 1);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= max_extent) return;
 
-  const int tid = (int) threadIdx.x;
-  int block_dim = (int) blockDim.x;
+  const int tid = static_cast<int>(threadIdx.x);
+  const int block_dim = static_cast<int>(blockDim.x);
   const auto ngg{zone->ngg};
   const auto n_var{param->n_var};
   const auto n_reconstruct{n_var + 2};
@@ -159,14 +159,14 @@ compute_convective_term_weno_x(cfd::DZone *zone, int max_extent, DParameter *par
 template<MixtureModel mix_model>
 __global__ void
 __launch_bounds__(64, 8)
-compute_convective_term_weno_y(cfd::DZone *zone, int max_extent, DParameter *param) {
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = (int) ((blockDim.y - 1) * blockIdx.y + threadIdx.y - 1);
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+compute_convective_term_weno_y(DZone *zone, int max_extent, DParameter *param) {
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>((blockDim.y - 1) * blockIdx.y + threadIdx.y - 1);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (j >= max_extent) return;
 
-  const auto tid = (int) threadIdx.y;
-  const auto block_dim = (int) blockDim.y;
+  const auto tid = static_cast<int>(threadIdx.y);
+  const auto block_dim = static_cast<int>(blockDim.y);
   const auto ngg{zone->ngg};
   const auto n_var{param->n_var};
   const auto n_reconstruct{n_var + 2};
@@ -308,14 +308,14 @@ compute_convective_term_weno_y(cfd::DZone *zone, int max_extent, DParameter *par
 template<MixtureModel mix_model>
 __global__ void
 __launch_bounds__(64, 8)
-compute_convective_term_weno_z(cfd::DZone *zone, int max_extent, DParameter *param) {
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = (int) ((blockDim.z - 1) * blockIdx.z + threadIdx.z - 1);
+compute_convective_term_weno_z(DZone *zone, int max_extent, DParameter *param) {
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>((blockDim.z - 1) * blockIdx.z + threadIdx.z - 1);
   if (k >= max_extent) return;
 
-  const auto tid = (int) threadIdx.z;
-  const auto block_dim = (int) blockDim.z;
+  const auto tid = static_cast<int>(threadIdx.z);
+  const auto block_dim = static_cast<int>(blockDim.z);
   const auto ngg{zone->ngg};
   const auto n_var{param->n_var};
   const auto n_reconstruct{n_var + 2};
@@ -512,15 +512,15 @@ __global__ void
 compute_convective_term_weno_1D(DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const auto tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const auto block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
+  const auto tid = static_cast<int>(threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const auto block_dim = static_cast<int>(blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
   const int n_point = block_dim + 2 * ngg - 1;
 
   int idx[3];
-  idx[0] = (int) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (int) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (int) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
+  idx[0] = static_cast<int>((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = static_cast<int>((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = static_cast<int>((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= 1;
   if (idx[direction] >= max_extent) return;
 
@@ -1098,12 +1098,12 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
       if (param->inviscid_scheme == 52) {
         real vPlus[5], vMinus[5];
         for (int m = 0; m < 5; ++m) {
-          vPlus[m] = 0.5 * ((Fp[(i_shared - 2 + m) * n_var + 5 + l] +
-                             lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 2 + m]) -
+          vPlus[m] = 0.5 * (Fp[(i_shared - 2 + m) * n_var + 5 + l] +
+                            lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 2 + m] -
                             svm[l] * (Fp[(i_shared - 2 + m) * n_var] +
                                       lambda_l * cv[(i_shared - 2 + m) * (n_var + 2)] * jac[i_shared - 2 + m]));
-          vMinus[m] = 0.5 * ((Fp[(i_shared - 1 + m) * n_var + 5 + l] -
-                              lambda_l * cv[(i_shared - 1 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 1 + m]) -
+          vMinus[m] = 0.5 * (Fp[(i_shared - 1 + m) * n_var + 5 + l] -
+                             lambda_l * cv[(i_shared - 1 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 1 + m] -
                              svm[l] * (Fp[(i_shared - 1 + m) * n_var] -
                                        lambda_l * cv[(i_shared - 1 + m) * (n_var + 2)] * jac[i_shared - 1 + m]));
         }
@@ -1111,12 +1111,12 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
       } else if (param->inviscid_scheme == 72) {
         real vPlus[7], vMinus[7];
         for (int m = 0; m < 7; ++m) {
-          vPlus[m] = 0.5 * ((Fp[(i_shared - 3 + m) * n_var + 5 + l] +
-                             lambda_l * cv[(i_shared - 3 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 3 + m]) -
+          vPlus[m] = 0.5 * (Fp[(i_shared - 3 + m) * n_var + 5 + l] +
+                            lambda_l * cv[(i_shared - 3 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 3 + m] -
                             svm[l] * (Fp[(i_shared - 3 + m) * n_var] +
                                       lambda_l * cv[(i_shared - 3 + m) * (n_var + 2)] * jac[i_shared - 3 + m]));
-          vMinus[m] = 0.5 * ((Fp[(i_shared - 2 + m) * n_var + 5 + l] -
-                              lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 2 + m]) -
+          vMinus[m] = 0.5 * (Fp[(i_shared - 2 + m) * n_var + 5 + l] -
+                             lambda_l * cv[(i_shared - 2 + m) * (n_var + 2) + 5 + l] * jac[i_shared - 2 + m] -
                              svm[l] * (Fp[(i_shared - 2 + m) * n_var] -
                                        lambda_l * cv[(i_shared - 2 + m) * (n_var + 2)] * jac[i_shared - 2 + m]));
         }
@@ -1282,9 +1282,9 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
         for (int m = 0; m < 5; m++) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += lambda_p * LR(l, n) * cv[(i_shared - 2 + m) * (n_var + 2) + n] * 0.5 *
-                        (jac[i_shared] + jac[i_shared + 1]);
+                (jac[i_shared] + jac[i_shared + 1]);
             vMinus[m] += lambda_n * LR(l, n) * cv[(i_shared - 1 + m) * (n_var + 2) + n] * 0.5 *
-                         (jac[i_shared] + jac[i_shared + 1]);
+                (jac[i_shared] + jac[i_shared + 1]);
           }
         }
         fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
@@ -1306,9 +1306,9 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
         for (int m = 0; m < 7; m++) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += lambda_p * LR(l, n) * cv[(i_shared - 2 + m) * (n_var + 2) + n] * 0.5 *
-                        (jac[i_shared] + jac[i_shared + 1]);
+                (jac[i_shared] + jac[i_shared + 1]);
             vMinus[m] += lambda_n * LR(l, n) * cv[(i_shared - 1 + m) * (n_var + 2) + n] * 0.5 *
-                         (jac[i_shared] + jac[i_shared + 1]);
+                (jac[i_shared] + jac[i_shared + 1]);
           }
         }
         fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
@@ -1381,9 +1381,9 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
         for (int m = 0; m < 5; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * 5 + n] + lambda_l * cv[(i_shared - 2 + m) * 7 + n] *
-                                                                     jac[i_shared - 2 + m]);
+                                    jac[i_shared - 2 + m]);
             vMinus[m] += LR(l, n) * (Fm[(i_shared - 1 + m) * 5 + n] - lambda_l * cv[(i_shared - 1 + m) * 7 + n] *
-                                                                      jac[i_shared - 1 + m]);
+                                     jac[i_shared - 1 + m]);
           }
           vPlus[m] *= 0.5;
           vMinus[m] *= 0.5;
@@ -1423,9 +1423,9 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
         for (int m = 0; m < 7; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * 5 + n] + lambda_l * cv[(i_shared - 2 + m) * 7 + n] *
-                                                                     jac[i_shared - 2 + m]);
+                                    jac[i_shared - 2 + m]);
             vMinus[m] += LR(l, n) * (Fm[(i_shared - 1 + m) * 5 + n] - lambda_l * cv[(i_shared - 1 + m) * 7 + n] *
-                                                                      jac[i_shared - 1 + m]);
+                                     jac[i_shared - 1 + m]);
           }
           vPlus[m] *= 0.5;
           vMinus[m] *= 0.5;

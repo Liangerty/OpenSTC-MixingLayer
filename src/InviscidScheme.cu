@@ -52,15 +52,15 @@ __global__ void
 compute_convective_term_pv_1D(DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const int tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const int block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
+  const int tid = static_cast<int>(threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const int block_dim = static_cast<int>(blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
   const int n_point = block_dim + 2 * ngg - 1;
 
   int idx[3];
-  idx[0] = (int) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (int) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (int) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
+  idx[0] = static_cast<int>((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = static_cast<int>((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = static_cast<int>((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= 1;
   if (idx[direction] >= max_extent) return;
 
@@ -265,15 +265,15 @@ __global__ void
 compute_convective_term_aweno_1D(DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const auto tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const auto block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
+  const auto tid = static_cast<int>(threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const auto block_dim = static_cast<int>(blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
   const int n_point = block_dim + 2 * ngg - 1;
 
   int idx[3];
-  idx[0] = (int) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (int) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (int) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
+  idx[0] = static_cast<int>((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = static_cast<int>((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = static_cast<int>((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= 1;
   if (idx[direction] >= max_extent) return;
 
@@ -420,9 +420,9 @@ void Roe_compute_inviscid_flux(const Block &block, DZone *zone, DParameter *para
 template<MixtureModel mix_model>
 __global__ void compute_entropy_fix_delta(DZone *zone, DParameter *param) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - 1;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - 1;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - 1;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - 1;
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - 1;
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - 1;
   if (i >= mx + 1 || j >= my + 1 || k >= mz + 1) return;
 
   const auto &bv{zone->bv};
@@ -457,15 +457,15 @@ __global__ void
 Roe_compute_inviscid_flux_1D(DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const auto tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const auto block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
+  const auto tid = static_cast<int>(threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const auto block_dim = static_cast<int>(blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
   const int n_point = block_dim + 2 * ngg - 1;
 
   int idx[3];
-  idx[0] = (int) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (int) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (int) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
+  idx[0] = static_cast<int>((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = static_cast<int>((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = static_cast<int>((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= 1;
   if (idx[direction] >= max_extent) return;
 
@@ -590,15 +590,15 @@ template<MixtureModel mix_model>
 __global__ void compute_convective_term_ep_1D(DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
-  const int tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
-  const int block_dim = (int) (blockDim.x * blockDim.y * blockDim.z);
+  const int tid = static_cast<int>(threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
+  const int block_dim = static_cast<int>(blockDim.x * blockDim.y * blockDim.z);
   const auto ngg{zone->ngg};
   const int n_point = block_dim + 2 * ngg - 1;
 
   int idx[3];
-  idx[0] = (int) ((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
-  idx[1] = (int) ((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
-  idx[2] = (int) ((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
+  idx[0] = static_cast<int>((blockDim.x - labels[0]) * blockIdx.x + threadIdx.x);
+  idx[1] = static_cast<int>((blockDim.y - labels[1]) * blockIdx.y + threadIdx.y);
+  idx[2] = static_cast<int>((blockDim.z - labels[2]) * blockIdx.z + threadIdx.z);
   idx[direction] -= 1;
   if (idx[direction] >= max_extent) return;
 

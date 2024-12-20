@@ -34,9 +34,9 @@ unsteady_screen_output(int step, real err_max, gxl::Time &time, const std::array
 
 __global__ void check_nan(DZone *zone, int blk, int myid) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= mx || j >= my || k >= mz) return;
 
   auto &bv = zone->bv;

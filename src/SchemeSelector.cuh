@@ -70,9 +70,9 @@ void compute_viscous_flux(const Block &block, DZone *zone, DParameter *param, in
 template<MixtureModel mix_model, class turb_method>
 __global__ void viscous_flux_fv(DZone *zone, int max_extent, DParameter *param) {
   int idx[3];
-  idx[0] = ((int) blockDim.x - 1) * blockIdx.x + threadIdx.x - 1;
-  idx[1] = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  idx[2] = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  idx[0] = (static_cast<int>(blockDim.x) - 1) * blockIdx.x + threadIdx.x - 1;
+  idx[1] = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  idx[2] = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (idx[0] >= max_extent) return;
   const auto tid = threadIdx.x;
   const auto n_var{param->n_var};
@@ -99,9 +99,9 @@ __global__ void viscous_flux_fv(DZone *zone, int max_extent, DParameter *param) 
 template<MixtureModel mix_model, class turb_method>
 __global__ void viscous_flux_gv(DZone *zone, int max_extent, DParameter *param) {
   int idx[3];
-  idx[0] = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  idx[1] = (int) ((blockDim.y - 1) * blockIdx.y + threadIdx.y) - 1;
-  idx[2] = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  idx[0] = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  idx[1] = static_cast<int>((blockDim.y - 1) * blockIdx.y + threadIdx.y) - 1;
+  idx[2] = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (idx[1] >= max_extent) return;
   const auto tid = threadIdx.y;
   const auto n_var{param->n_var};
@@ -128,9 +128,9 @@ __global__ void viscous_flux_gv(DZone *zone, int max_extent, DParameter *param) 
 template<MixtureModel mix_model, class turb_method>
 __global__ void viscous_flux_hv(DZone *zone, int max_extent, DParameter *param) {
   int idx[3];
-  idx[0] = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  idx[1] = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  idx[2] = (int) ((blockDim.z - 1) * blockIdx.z + threadIdx.z) - 1;
+  idx[0] = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  idx[1] = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  idx[2] = static_cast<int>((blockDim.z - 1) * blockIdx.z + threadIdx.z) - 1;
   if (idx[2] >= max_extent) return;
   const auto tid = threadIdx.z;
   const auto n_var{param->n_var};

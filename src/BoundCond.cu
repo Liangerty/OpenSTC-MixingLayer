@@ -52,7 +52,7 @@ void register_bc<Wall>(Wall *&bc, int n_bc, std::vector<int> &indices, BCInfo *&
       }
       Wall wall(this_bc, parameter);
       bc_info[i].label = bc_label;
-      cudaMemcpy(&(bc[i]), &wall, sizeof(Wall), cudaMemcpyHostToDevice);
+      cudaMemcpy(&bc[i], &wall, sizeof(Wall), cudaMemcpyHostToDevice);
     }
   }
 }

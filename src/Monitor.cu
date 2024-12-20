@@ -430,8 +430,8 @@ std::vector<std::string> Monitor::setup_labels_to_monitor(const Parameter &param
   }
 
   // copy the index to the class member
-  n_bv = (int) (bv_idx.size());
-  n_sv = (int) (sv_idx.size());
+  n_bv = static_cast<int>(bv_idx.size());
+  n_sv = static_cast<int>(sv_idx.size());
   // The +1 is for physical time
   n_var = n_bv + n_sv + 1;
   h_ptr->n_bv = n_bv;
@@ -550,7 +550,7 @@ void Monitor::output_slices(const Parameter &parameter, std::vector<Field> &fiel
 
 __global__ void
 record_monitor_data(DZone *zone, DeviceMonitorData *monitor_info, int blk_id, int counter_pos, real physical_time) {
-  auto idx = (int) (blockDim.x * blockIdx.x + threadIdx.x);
+  const auto idx = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
   if (idx >= monitor_info->n_point[blk_id])
     return;
   const auto idx_tot = monitor_info->disp[blk_id] + idx;

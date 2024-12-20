@@ -230,9 +230,9 @@ void RK3(Driver<mix_model, turb> &driver) {
 template<MixtureModel mix_model, class turb_method>
 __global__ void update_cv_and_bv_rk(DZone *zone, DParameter *param, real dt, int rk) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   auto &cv = zone->cv;

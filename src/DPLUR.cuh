@@ -14,9 +14,9 @@ struct DZone;
 template<MixtureModel mixture_model, class turb_method>
 __global__ void compute_DQ_0(DZone *zone, const DParameter *param, real diag_factor = 0) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   const real dt_local = zone->dt_local(i, j, k);
@@ -157,9 +157,9 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
   // If we use a kernel in i direction, with each thread computing an ii, for ii=-1~blockDim,
   // then all threads in the block except threadID=0 and blockDim can use the just computed convJacTimesDq.
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   constexpr int n_var_max = 5 + MAX_SPEC_NUMBER + 4; // 5+n_spec+n_turb(n_turb<=2)

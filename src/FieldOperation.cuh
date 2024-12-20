@@ -107,9 +107,9 @@ __device__ void compute_cv_from_bv_1_point(DZone *zone, const DParameter *param,
 template<MixtureModel mix_model>
 __global__ void update_physical_properties(DZone *zone, DParameter *param) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz}, ngg{zone->ngg};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - ngg;
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - ngg;
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - ngg;
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   const real temperature{zone->bv(i, j, k, 5)};
@@ -142,9 +142,9 @@ __global__ void update_physical_properties(DZone *zone, DParameter *param) {
 template<MixtureModel mix_model, class turb_method>
 __global__ void initialize_mut(DZone *zone, DParameter *param) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
-  int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - 1;
-  int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - 1;
-  int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - 1;
+  int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x) - 1;
+  int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y) - 1;
+  int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z) - 1;
   if (i >= mx + 1 || j >= my + 1 || k >= mz + 1) return;
 
   const real temperature{zone->bv(i, j, k, 5)};
@@ -188,9 +188,9 @@ __device__ real compute_total_energy_1_point(int i, int j, int k, DZone *zone, D
 template<MixtureModel mix_model, class turb_method>
 __global__ void update_cv_and_bv(DZone *zone, DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   auto &cv = zone->cv;
@@ -243,9 +243,9 @@ __global__ void update_cv_and_bv(DZone *zone, DParameter *param) {
 template<MixtureModel mix_model, class turb_method>
 __global__ void update_bv(DZone *zone, DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   auto &bv = zone->bv;
@@ -307,9 +307,9 @@ __global__ void update_bv(DZone *zone, DParameter *param) {
 template<MixtureModel mix_model, class turb_method>
 __global__ void update_bv(DZone *zone, DParameter *param, real dt) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
-  const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
-  const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
+  const auto i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const auto j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const auto k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   auto &bv = zone->bv;

@@ -183,7 +183,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   }
 
   if (parameter.get_bool("if_collect_statistics")) {
-    n_reyAve = (int) parameter.get_int_array("reyAveVarIndex").size();
+    n_reyAve = static_cast<int>(parameter.get_int_array("reyAveVarIndex").size());
     cudaMalloc(&reyAveVarIndex, n_reyAve * sizeof(int));
     cudaMemcpy(reyAveVarIndex, parameter.get_int_array("reyAveVarIndex").data(), n_reyAve * sizeof(int),
                cudaMemcpyHostToDevice);

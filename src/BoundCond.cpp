@@ -147,9 +147,9 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
       if (!find) {
         profile_related_bc_names.push_back(inflow_name);
         inflow_type = 1;
-        profile_idx = (int) profile_related_bc_names.size() - 1;
+        profile_idx = static_cast<int>(profile_related_bc_names.size()) - 1;
         parameter.update_parameter("profile_related_bc_names", profile_related_bc_names);
-        parameter.update_parameter("n_profile", (int) profile_related_bc_names.size());
+        parameter.update_parameter("n_profile", static_cast<int>(profile_related_bc_names.size()));
         auto nameArray=parameter.get_string_array("profile_file_names");
         nameArray.emplace_back("mixingLayerProfile.dat");
         parameter.update_parameter("profile_file_names", nameArray);
@@ -364,7 +364,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, Species &spec, Parameter &pa
           auto fluctuation_profile_related_bc_name = parameter.get_string_array("fluctuation_profile_related_bc_name");
           fluctuation_profile_related_bc_name.push_back(inflow_name);
           parameter.update_parameter("fluctuation_profile_related_bc_name", fluctuation_profile_related_bc_name);
-          fluc_prof_idx = (int) (need_fluctuation_profile.size()) - 1;
+          fluc_prof_idx = static_cast<int>(need_fluctuation_profile.size()) - 1;
         }
       } else {
         parameter.update_parameter("need_fluctuation_profile", std::vector<int>{label});

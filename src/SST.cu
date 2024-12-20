@@ -5,9 +5,9 @@
 namespace cfd {
 __global__ void implicit_treat_for_SST(DZone *zone, const DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
-  const int i = blockDim.x * blockIdx.x + threadIdx.x;
-  const int j = blockDim.y * blockIdx.y + threadIdx.y;
-  const int k = blockDim.z * blockIdx.z + threadIdx.z;
+  const int i = static_cast<int>(blockDim.x * blockIdx.x + threadIdx.x);
+  const int j = static_cast<int>(blockDim.y * blockIdx.y + threadIdx.y);
+  const int k = static_cast<int>(blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   // Used in the explicit temporal scheme
