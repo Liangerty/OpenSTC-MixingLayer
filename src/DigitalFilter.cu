@@ -87,7 +87,7 @@ void DBoundCond::initialize_digital_filter(Parameter &parameter, Mesh &mesh) {
           for (int k = 1; k < n2; ++k) {
             dz += mesh[blk].z(i, 0, k) - mesh[blk].z(i, 0, k - 1);
           }
-          dz /= (n2 - 1);
+          dz /= n2 - 1;
 
           printf("\tInflow boundary %s with (%d, %d) grid points for digital filter on  process %d, dz = %f.\n",
                  boundary_name.c_str(), n1, n2, myid, dz);

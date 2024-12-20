@@ -265,7 +265,7 @@ SST<level>::compute_source_and_mut(DZone *zone, int i, int j, int k, const DPara
       const real d = max(dy, 1e-10);
       const real rd = (zone->mul(i, j, k) + zone->mut(i, j, k)) /
                       (zone->bv(i, j, k, 0) * max(sqrt_U_ij, 1e-10) * kappa * kappa * d * d);
-      const real fd = 1 - tanh((20 * rd) * (20 * rd) * (20 * rd));
+      const real fd = 1 - tanh(20 * rd * (20 * rd) * (20 * rd));
       zone->udv(i, j, k, 0) = fd;
 
       // Next, compute the RANS and DES scale.

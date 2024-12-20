@@ -27,7 +27,7 @@ void register_bc(BCType *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_i
       }
       bc_info[i].label = bc_label;
       BCType bound_cond(bc_name, parameter);
-      cudaMemcpy(&(bc[i]), &bound_cond, sizeof(BCType), cudaMemcpyHostToDevice);
+      cudaMemcpy(&bc[i], &bound_cond, sizeof(BCType), cudaMemcpyHostToDevice);
       break;
     }
   }
@@ -153,7 +153,7 @@ register_bc<BackPressure>(BackPressure *&bc, int n_bc, std::vector<int> &indices
       }
       bc_info[i].label = bc_label;
       BackPressure back_pressure(bc_name, parameter);
-      cudaMemcpy(&(bc[i]), &back_pressure, sizeof(BackPressure), cudaMemcpyHostToDevice);
+      cudaMemcpy(&bc[i], &back_pressure, sizeof(BackPressure), cudaMemcpyHostToDevice);
       break;
     }
   }
@@ -984,12 +984,12 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
   bool has_temperature = gxl::exists(label_order, 5);
   bool has_tke = gxl::exists(label_order, 6 + n_spec);
 
-  if ((!has_temperature) && (!has_pressure)) {
+  if (!has_temperature && !has_pressure) {
     printf("The temperature or pressure is not given in the profile, please provide at least one of them!\n");
     MpiParallel::exit();
   }
   real turb_viscosity_ratio{0}, turb_intensity{0};
-  if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+  if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !has_tke) {
     auto &info = parameter.get_struct(profile_related_bc_name);
     if (info.find("turb_viscosity_ratio") == info.end() || info.find("turbulence_intensity") == info.end()) {
       printf(
@@ -1142,7 +1142,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
             }
             profile_to_match(ic, j, k, 4) = profile_to_match(ic, j, k, 5) * R_u * profile_to_match(ic, j, k, 0) / mw;
           }
-          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !has_tke) {
             // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
             real mu{};
             if (n_spec > 0) {
@@ -1246,7 +1246,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
             }
             profile_to_match(i, jc, k, 4) = profile_to_match(i, jc, k, 5) * R_u * profile_to_match(i, jc, k, 0) / mw;
           }
-          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !has_tke) {
             // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
             real mu;
             if (n_spec > 0) {
@@ -1350,7 +1350,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
             }
             profile_to_match(i, j, kc, 4) = profile_to_match(i, j, kc, 5) * R_u * profile_to_match(i, j, kc, 0) / mw;
           }
-          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+          if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !has_tke) {
             // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
             real mu;
             if (n_spec > 0) {
@@ -1461,7 +1461,8 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
           if (n == gxl::to_upper(spec) + "R") {
             l = 12 + sp_label;
             break;
-          } else if (n == gxl::to_upper(spec) + "I") {
+          }
+          if (n == gxl::to_upper(spec) + "I") {
             l = 12 + n_spec + sp_label;
             break;
           }

@@ -1505,7 +1505,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; j++) {
         auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = n_point <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -1526,7 +1526,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; j++) {
         auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = n_point <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -1545,7 +1545,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; j++) {
         auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = n_point <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -1585,7 +1585,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
         uint tpb[3], bpg[3], n_point[3];
         for (size_t j = 0; j < 3; j++) {
           n_point[j] = hf.range_end[j] - hf.range_start[j] + 1;
-          tpb[j] = n_point[j] <= (2 * ngg + 1) ? 1 : 16;
+          tpb[j] = n_point[j] <= 2 * ngg + 1 ? 1 : 16;
           bpg[j] = (n_point[j] - 1) / tpb[j] + 1;
         }
         dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -1607,7 +1607,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; j++) {
         auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = n_point <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -1628,7 +1628,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; j++) {
         auto n_point = h_f.range_end[j] - h_f.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = n_point <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -1649,7 +1649,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; j++) {
         auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = n_point <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -1670,7 +1670,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; j++) {
         auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
-        tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = n_point <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};

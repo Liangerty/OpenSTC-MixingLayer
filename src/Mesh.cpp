@@ -118,7 +118,7 @@ void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
       target_start[target_face] = target_end[target_face];
     }
   } else {
-    target_start[target_face] = (sgn_tar > 0) ? 0 : ngg;
+    target_start[target_face] = sgn_tar > 0 ? 0 : ngg;
   }
   for (int i = 0; i < 3; ++i) {
     loop_dir[i] = range_start[i] <= range_end[i] ? 1 : -1;

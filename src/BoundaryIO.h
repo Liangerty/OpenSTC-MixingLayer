@@ -28,7 +28,8 @@ struct BoundaryIO {
   std::vector<std::vector<int>> xs, xe, ys, ye, zs, ze;
   std::vector<std::vector<int>> block_ids;
 
-  explicit BoundaryIO(const Parameter &parameter, const Mesh &mesh, const Species &species, std::vector<Field> &_field);
+  explicit BoundaryIO(const Parameter &parameter_, const Mesh &mesh_, const Species &species_,
+                      std::vector<Field> &_field);
 
   void print_boundary();
 
@@ -64,7 +65,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Paramet
   n_var.resize(n_labels);
   block_ids.resize(n_labels);
 
-  auto bc_names{parameter.get_string_array("boundary_conditions")};
+  const auto bc_names{parameter.get_string_array("boundary_conditions")};
   for (auto &name: bc_names) {
     auto &bc = parameter.get_struct(name);
     for (int i = 0; i < n_labels; ++i) {
@@ -95,7 +96,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::BoundaryIO(const Paramet
       for (int l = 0; l < n_labels; ++l) {
         if (label == labels_to_output[l]) {
           boundaries[l].push_back(&f);
-          auto face = f.face;
+          const auto face = f.face;
           int range_start[3]{f.range_start[0] + ngg, f.range_start[1] + ngg, f.range_start[2] + ngg};
           int range_end[3]{f.range_end[0] - ngg, f.range_end[1] - ngg, f.range_end[2] - ngg};
           range_start[face] -= ngg;
@@ -186,7 +187,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
 
     // I. Header section
 
-    // Each file should have only one header, thus we let process 0 to write it.
+    // Each file should have only one header; thus we let process 0 to write it.
 
     MPI_Offset offset{0};
     const int myid{parameter.get_int("myid")};
@@ -236,7 +237,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
       disp[i] = disp[i - 1] + n_face[i - 1];
       n_face_total += n_face[i];
     }
-    // Collect all length info to root process
+    // Collect all length info to the root process
     auto *len_x = new int[n_face_total];
     auto *len_y = new int[n_face_total];
     auto *len_z = new int[n_face_total];
@@ -347,7 +348,7 @@ BoundaryIO<mix_model, turb_method, output_time_choice>::write_header(const std::
       constexpr int32_t shared_var{0};
       MPI_File_write_at(fp, offset, &shared_var, 1, MPI_INT32_T, &status);
       offset += 4;
-      // 5. Zero based zone number to share connectivity list with (-1 = no sharing).
+      // 5. Zero-based zone number to share connectivity list with (-1 = no sharing).
       constexpr int32_t shared_connect{-1};
       MPI_File_write_at(fp, offset, &shared_connect, 1, MPI_INT32_T, &status);
       offset += 4;

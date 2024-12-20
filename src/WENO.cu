@@ -1129,12 +1129,12 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
   // We do not compute the right characteristic matrix here, because we explicitly write the components below.
   auto fci = &fc[tid * n_var];
   fci[0] = fChar[0] + kx * fChar[1] + ky * fChar[2] + kz * fChar[3] + fChar[4];
-  fci[1] = (um - kx * cm) * fChar[0] + (kx * um) * fChar[1] + (ky * um - kz * cm) * fChar[2] +
+  fci[1] = (um - kx * cm) * fChar[0] + kx * um * fChar[1] + (ky * um - kz * cm) * fChar[2] +
            (kz * um + ky * cm) * fChar[3] + (um + kx * cm) * fChar[4];
-  fci[2] = (vm - ky * cm) * fChar[0] + (kx * vm + kz * cm) * fChar[1] + (ky * vm) * fChar[2] +
+  fci[2] = (vm - ky * cm) * fChar[0] + (kx * vm + kz * cm) * fChar[1] + ky * vm * fChar[2] +
            (kz * vm - kx * cm) * fChar[3] + (vm + ky * cm) * fChar[4];
   fci[3] = (wm - kz * cm) * fChar[0] + (kx * wm - ky * cm) * fChar[1] + (ky * wm + kx * cm) * fChar[2] +
-           (kz * wm) * fChar[3] + (wm + kz * cm) * fChar[4];
+           kz * wm * fChar[3] + (wm + kz * cm) * fChar[4];
 
   fci[4] = (hm - Uk_bar * cm) * fChar[0] + (kx * (hm - cm * cm / gm1) + (kz * vm - ky * wm) * cm) * fChar[1] +
            (ky * (hm - cm * cm / gm1) + (kx * wm - kz * um) * cm) * fChar[2] +
@@ -1633,7 +1633,7 @@ __device__ real WENO5(const real *vp, const real *vm, real eps) {
   a2 = three10th + three10th * tau5sqr / ((eps + beta2) * (eps + beta2));
   const real fMinus{(a0 * v0 + a1 * v1 + a2 * v2) / (a0 + a1 + a2)};
 
-  return (fPlus + fMinus);
+  return fPlus + fMinus;
 }
 
 __device__ real WENO7(const real *vp, const real *vm, real eps) {
@@ -1709,7 +1709,7 @@ __device__ real WENO7(const real *vp, const real *vm, real eps) {
   v3 = one12th * (3 * vm[3] + 13 * vm[2] - 5 * vm[1] + vm[0]);
   const real fMinus{(a0 * v0 + a1 * v1 + a2 * v2 + a3 * v3) / (a0 + a1 + a2 + a3)};
 
-  return (fPlus + fMinus);
+  return fPlus + fMinus;
 }
 
 template void

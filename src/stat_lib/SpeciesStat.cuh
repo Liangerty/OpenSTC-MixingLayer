@@ -69,7 +69,7 @@ std::vector<int> cfd::read_species_collect_file(Parameter &parameter, const Mesh
                                                 std::vector<Field> &field) {
   const std::filesystem::path out_dir("output/stat/");
   std::string fileName{T::file_name};
-  std::string file_name = (out_dir.string() + fileName + ".bin");
+  std::string file_name = out_dir.string() + fileName + ".bin";
 
   const int n_species_stat = parameter.get_int("n_species_stat");
   const int n_ps = parameter.get_int("n_ps");

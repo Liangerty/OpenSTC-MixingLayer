@@ -40,7 +40,7 @@ void data_communication(const Mesh &mesh, std::vector<Field> &field, const Param
       const auto &fc = mesh[blk].inner_face[l];
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; ++j) {
-        tpb[j] = fc.n_point[j] <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = fc.n_point[j] <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (fc.n_point[j] - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -135,8 +135,8 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
                       * (std::abs(face.range_end[1] - face.range_start[1]) + 1)
                       * (std::abs(face.range_end[2] - face.range_start[2]) + 1);
       length[fc_num] = len;
-      cudaMalloc(&(temp_s[fc_num]), len * sizeof(real));
-      cudaMalloc(&(temp_r[fc_num]), len * sizeof(real));
+      cudaMalloc(&temp_s[fc_num], len * sizeof(real));
+      cudaMalloc(&temp_r[fc_num], len * sizeof(real));
       ++fc_num;
     }
   }
@@ -156,7 +156,7 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
 
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; ++j) {
-        tpb[j] = fc.n_point[j] <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = fc.n_point[j] <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (fc.n_point[j] - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};
@@ -186,7 +186,7 @@ void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int ste
       const auto &fc = B.parallel_face[f];
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; ++j) {
-        tpb[j] = fc.n_point[j] <= (2 * ngg + 1) ? 1 : 16;
+        tpb[j] = fc.n_point[j] <= 2 * ngg + 1 ? 1 : 16;
         bpg[j] = (fc.n_point[j] - 1) / tpb[j] + 1;
       }
       dim3 TPB{tpb[0], tpb[1], tpb[2]}, BPG{bpg[0], bpg[1], bpg[2]};

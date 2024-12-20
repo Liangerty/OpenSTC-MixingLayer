@@ -166,12 +166,12 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
   }
   bool has_pressure{false}, has_temperature{false}, has_tke{false};
   auto label_order = identify_variable_labels(parameter, var_name, species, has_pressure, has_temperature, has_tke);
-  if ((!has_temperature) && (!has_pressure)) {
+  if (!has_temperature && !has_pressure) {
     printf("The temperature or pressure is not given in the profile, please provide at least one of them!\n");
     cfd::MpiParallel::exit();
   }
   real turb_viscosity_ratio{0}, turb_intensity{0};
-  if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+  if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !has_tke) {
     auto &info = parameter.get_struct(parameter.get_string_array("profile_related_bc_names")[profile_idx]);
     if (info.find("turb_viscosity_ratio") == info.end() || info.find("turbulence_intensity") == info.end()) {
       printf(
@@ -269,7 +269,7 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
           }
           profile(i, j, k, 4 + 3) = profile(i, j, k, 5 + 3) * cfd::R_u * profile(i, j, k, 0 + 3) / mw;
         }
-        if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !(has_tke)) {
+        if (parameter.get_int("turbulence_method") != 0 && parameter.get_int("RANS_model") == 2 && !has_tke) {
           // If the turbulence intensity is given, we need to compute the turbulent viscosity ratio.
           real mu{};
           if (species.n_spec > 0) {
