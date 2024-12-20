@@ -139,13 +139,15 @@ compute_convective_term_weno_x(DZone *zone, int max_extent, DParameter *param) {
   }
   __syncthreads();
 
-  if (param->positive_preserving) {
-    real dt{0};
-    if (param->dt > 0)
-      dt = param->dt;
-    else
-      dt = zone->dt_local(i, j, k);
-    positive_preserving_limiter<mix_model>(f_1st, n_var, tid, fc, param, i_shared, dt, i, max_extent, cv, jac);
+  if constexpr (mix_model != MixtureModel::Air) {
+    if (param->positive_preserving) {
+      real dt{0};
+      if (param->dt > 0)
+        dt = param->dt;
+      else
+        dt = zone->dt_local(i, j, k);
+      positive_preserving_limiter(f_1st, n_var, tid, fc, param, i_shared, dt, i, max_extent, cv, jac);
+    }
   }
   __syncthreads();
 
@@ -288,15 +290,17 @@ compute_convective_term_weno_y(DZone *zone, int max_extent, DParameter *param) {
   }
   __syncthreads();
 
-  if (param->positive_preserving) {
-    real dt{0};
-    if (param->dt > 0)
-      dt = param->dt;
-    else
-      dt = zone->dt_local(i, j, k);
-    positive_preserving_limiter<mix_model>(f_1st, n_var, tid, fc, param, i_shared, dt, j, max_extent, cv, jac);
+  if constexpr (mix_model != MixtureModel::Air) {
+    if (param->positive_preserving) {
+      real dt{0};
+      if (param->dt > 0)
+        dt = param->dt;
+      else
+        dt = zone->dt_local(i, j, k);
+      positive_preserving_limiter(f_1st, n_var, tid, fc, param, i_shared, dt, j, max_extent, cv, jac);
+    }
+    __syncthreads();
   }
-  __syncthreads();
 
   if (tid > 0) {
     for (int l = 0; l < n_var; ++l) {
@@ -437,15 +441,17 @@ compute_convective_term_weno_z(DZone *zone, int max_extent, DParameter *param) {
   }
   __syncthreads();
 
-  if (param->positive_preserving) {
-    real dt{0};
-    if (param->dt > 0)
-      dt = param->dt;
-    else
-      dt = zone->dt_local(i, j, k);
-    positive_preserving_limiter<mix_model>(f_1st, n_var, tid, fc, param, i_shared, dt, k, max_extent, cv, jac);
+  if constexpr (mix_model != MixtureModel::Air) {
+    if (param->positive_preserving) {
+      real dt{0};
+      if (param->dt > 0)
+        dt = param->dt;
+      else
+        dt = zone->dt_local(i, j, k);
+      positive_preserving_limiter(f_1st, n_var, tid, fc, param, i_shared, dt, k, max_extent, cv, jac);
+    }
+    __syncthreads();
   }
-  __syncthreads();
 
   if (tid > 0) {
     for (int l = 0; l < n_var; ++l) {
@@ -651,16 +657,18 @@ compute_convective_term_weno_1D(DZone *zone, int direction, int max_extent, DPar
   }
   __syncthreads();
 
-  if (param->positive_preserving) {
-    real dt{0};
-    if (param->dt > 0)
-      dt = param->dt;
-    else
-      dt = zone->dt_local(idx[0], idx[1], idx[2]);
-    positive_preserving_limiter<mix_model>(f_1st, n_var, tid, fc, param, i_shared, dt, idx[direction], max_extent, cv,
-                                           jac);
+  if constexpr (mix_model != MixtureModel::Air) {
+    if (param->positive_preserving) {
+      real dt{0};
+      if (param->dt > 0)
+        dt = param->dt;
+      else
+        dt = zone->dt_local(idx[0], idx[1], idx[2]);
+      positive_preserving_limiter(f_1st, n_var, tid, fc, param, i_shared, dt, idx[direction], max_extent, cv,
+                                  jac);
+    }
+    __syncthreads();
   }
-  __syncthreads();
 
   if (tid > 0) {
     for (int l = 0; l < n_var; ++l) {
@@ -669,7 +677,6 @@ compute_convective_term_weno_1D(DZone *zone, int direction, int max_extent, DPar
   }
 }
 
-template<MixtureModel mix_model>
 __device__ void
 compute_flux(const real *Q, const DParameter *param, const real *metric, real jac, real *Fk) {
   const int n_var = param->n_var;
@@ -687,8 +694,7 @@ compute_flux(const real *Q, const DParameter *param, const real *metric, real ja
   }
 }
 
-template<MixtureModel mix_model>
-__device__ void compute_flux(const real *Q, DParameter *param, const real *metric, real jac, real *Fp, real *Fm) {
+__device__ void compute_flux(const real *Q, const DParameter *param, const real *metric, real jac, real *Fp, real *Fm) {
   const int n_var = param->n_var;
   const real Uk{(Q[1] * metric[0] + Q[2] * metric[1] + Q[3] * metric[2]) / Q[0]};
   const real pk{Q[n_var]};
@@ -724,18 +730,16 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
 
   const auto m_l = &metric[i_shared * 3], m_r = &metric[(i_shared + 1) * 3];
   if constexpr (method == 1) {
-    compute_flux<mix_model>(&cv[i_shared * (n_var + 2)], param, m_l, jac[i_shared], &Fp[i_shared * n_var],
-                            &Fm[i_shared * n_var]);
+    compute_flux(&cv[i_shared * (n_var + 2)], param, m_l, jac[i_shared], &Fp[i_shared * n_var], &Fm[i_shared * n_var]);
     for (size_t i = 0; i < n_add; i++) {
-      compute_flux<mix_model>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
-                              jac[ig_shared[i]], &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
+      compute_flux(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3], jac[ig_shared[i]],
+                   &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
     }
   } else if constexpr (method == 2) {
-    compute_flux<mix_model>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
-                            &Fp[i_shared * n_var]);
+    compute_flux(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared], &Fp[i_shared * n_var]);
     for (size_t i = 0; i < n_add; i++) {
-      compute_flux<mix_model>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
-                              jac[ig_shared[i]], &Fp[ig_shared[i] * n_var]);
+      compute_flux(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3], jac[ig_shared[i]],
+                   &Fp[ig_shared[i] * n_var]);
     }
   }
 
@@ -1151,18 +1155,17 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
   constexpr int method = 1;
 
   if constexpr (method == 1) {
-    compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
-                                    &Fp[i_shared * 5], &Fm[i_shared * 5]);
+    compute_flux(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared], &Fp[i_shared * 5],
+                 &Fm[i_shared * 5]);
     for (size_t i = 0; i < n_add; i++) {
-      compute_flux<MixtureModel::Air>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
-                                      jac[ig_shared[i]], &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
+      compute_flux(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3], jac[ig_shared[i]],
+                   &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
     }
   } else if constexpr (method == 2) {
-    compute_flux<MixtureModel::Air>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
-                                    &Fp[i_shared * 5]);
+    compute_flux(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared], &Fp[i_shared * 5]);
     for (size_t i = 0; i < n_add; i++) {
-      compute_flux<MixtureModel::Air>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
-                                      jac[ig_shared[i]], &Fp[ig_shared[i] * n_var]);
+      compute_flux(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3], jac[ig_shared[i]],
+                   &Fp[ig_shared[i] * n_var]);
     }
   }
 
@@ -1455,11 +1458,11 @@ compute_weno_flux_cp(const real *cv, DParameter *param, int tid, const real *met
                      int i_shared, real *Fp, real *Fm, const int *ig_shared, int n_add, real *f_1st) {
   const int n_var = param->n_var;
 
-  compute_flux<mix_model>(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared],
-                          &Fp[i_shared * n_var], &Fm[i_shared * n_var]);
+  compute_flux(&cv[i_shared * (n_var + 2)], param, &metric[i_shared * 3], jac[i_shared], &Fp[i_shared * n_var],
+               &Fm[i_shared * n_var]);
   for (size_t i = 0; i < n_add; i++) {
-    compute_flux<mix_model>(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3],
-                            jac[ig_shared[i]], &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
+    compute_flux(&cv[ig_shared[i] * (n_var + 2)], param, &metric[ig_shared[i] * 3], jac[ig_shared[i]],
+                 &Fp[ig_shared[i] * n_var], &Fm[ig_shared[i] * n_var]);
   }
   __syncthreads();
 
@@ -1478,9 +1481,11 @@ compute_weno_flux_cp(const real *cv, DParameter *param, int tid, const real *met
   eps_scaled[1] = eps_ref * param->v_ref * param->v_ref;
   eps_scaled[2] = eps_scaled[1] * param->v_ref * param->v_ref;
 
-  if (param->positive_preserving) {
-    for (int l = 0; l < n_var - 5; ++l) {
-      f_1st[tid * (n_var - 5) + l] = 0.5 * Fp[i_shared * n_var + l + 5] + 0.5 * Fm[(i_shared + 1) * n_var + l + 5];
+  if constexpr (mix_model != MixtureModel::Air) {
+    if (param->positive_preserving) {
+      for (int l = 0; l < n_var - 5; ++l) {
+        f_1st[tid * (n_var - 5) + l] = 0.5 * Fp[i_shared * n_var + l + 5] + 0.5 * Fm[(i_shared + 1) * n_var + l + 5];
+      }
     }
   }
 
@@ -1530,7 +1535,6 @@ compute_weno_flux_cp(const real *cv, DParameter *param, int tid, const real *met
   }
 }
 
-template<MixtureModel mix_model>
 __device__ void
 positive_preserving_limiter(const real *f_1st, int n_var, int tid, real *fc, const DParameter *param, int i_shared,
                             real dt, int idx_in_mesh, int max_extent, const real *cv, const real *jac) {
