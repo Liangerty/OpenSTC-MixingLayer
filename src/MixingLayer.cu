@@ -31,9 +31,7 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
   real rho_upper, rho_lower;
   real c_upper, c_lower;
   real mix_frac_upper{-1}, mix_frac_lower{-1};
-  real yk_upper[MAX_SPEC_NUMBER], yk_lower[MAX_SPEC_NUMBER];
-  memset(yk_upper, 0, sizeof(real) * MAX_SPEC_NUMBER);
-  memset(yk_lower, 0, sizeof(real) * MAX_SPEC_NUMBER);
+  real yk_upper[MAX_SPEC_NUMBER] = {}, yk_lower[MAX_SPEC_NUMBER] = {};
   real mu_upper{0}, mu_lower{0};
   if (n_spec > 0) {
     // Assign the species mass fraction to the corresponding position.

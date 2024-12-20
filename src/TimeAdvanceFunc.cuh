@@ -123,8 +123,7 @@ __global__ void cfd::limit_flow(DZone *zone, DParameter *param) {
   if (unphysical) {
     // printf("Unphysical values appear in process %d, block %d, i = %d, j = %d, k = %d.\n", param->myid, blk_id, i, j, k);
 
-    real updated_var[n_flow_var/* + MAX_SPEC_NUMBER + 4*/];
-    memset(updated_var, 0, (n_flow_var/* + MAX_SPEC_NUMBER + 4*/) * sizeof(real));
+    real updated_var[n_flow_var/* + MAX_SPEC_NUMBER + 4*/] = {};
     int kn{0};
     // Compute the sum of all "good" points surrounding the "bad" point
     for (int ka = -1; ka < 2; ++ka) {
@@ -206,8 +205,7 @@ __global__ void cfd::limit_flow(DZone *zone, DParameter *param) {
     }
 
     if (unphysical) {
-      real updated_var[n_turb];
-      memset(updated_var, 0, n_turb * sizeof(real));
+      real updated_var[n_turb] = {};
       int kn{0};
       // Compute the sum of all "good" points surrounding the "bad" point
       for (int ka = -1; ka < 2; ++ka) {
@@ -270,8 +268,7 @@ __global__ void cfd::limit_flow(DZone *zone, DParameter *param) {
     }
 
     if (unphysical) {
-      real updated_var[2];
-      memset(updated_var, 0, 2 * sizeof(real));
+      real updated_var[2] = {};
       int kn{0};
       // Compute the sum of all "good" points surrounding the "bad" point
       for (int ka = -1; ka < 2; ++ka) {

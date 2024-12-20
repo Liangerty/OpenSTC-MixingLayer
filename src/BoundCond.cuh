@@ -69,15 +69,15 @@ struct DBoundCond {
   // Profiles
   // For now, please make sure that all profiles are in the same plane, that the plane is not split into several parts.
   // There may be inflow with values of ghost grids also given.
-  std::vector<ggxl::VectorField3D<real>> profile_hPtr_withGhost;
+  std::vector<ggxl::VectorField3D<real>> profile_hPtr_withGhost = {};
   ggxl::VectorField3D<real> *profile_dPtr_withGhost = nullptr;
   // Fluctuation profiles, with real part and imaginary part given for basic variables
   ggxl::VectorField3D<real> *fluctuation_dPtr = nullptr;
 
   // Digital filter related
   int n_df_face = 0;
-  std::vector<int> df_label;
-  std::vector<int> df_related_block;
+  std::vector<int> df_label = {};
+  std::vector<int> df_related_block = {};
   constexpr static int DF_N = 50;
   // Random values for digital filter.
   // E.g., the dimensions are often like (ny,nz,3), where 3 is for 3 components of velocity.

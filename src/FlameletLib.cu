@@ -198,8 +198,7 @@ compute_massFraction_from_MixtureFraction(DZone *zone, int i, int j, int k, DPar
   // Next, apply a binary interpolation at z1 and z2, respectively.
   const auto chi_ave{zone->scalar_diss_rate(i, j, k)};
   // First, at z1
-  real yk_z1[MAX_SPEC_NUMBER];
-  memset(yk_z1, 0, sizeof(real) * MAX_SPEC_NUMBER);
+  real yk_z1[MAX_SPEC_NUMBER] = {};
   const int n_zPrime{param->n_zPrime};
   if (z1 == 0) {
     for (int l = 0; l < n_spec; ++l) {
@@ -222,9 +221,7 @@ compute_massFraction_from_MixtureFraction(DZone *zone, int i, int j, int k, DPar
       z_prime_2 = n_zPrime;
     }
     // Next, interpolate into the scalar dissipation rate
-    real yk_z11[MAX_SPEC_NUMBER], yk_z12[MAX_SPEC_NUMBER];
-    memset(yk_z11, 0, sizeof(real) * MAX_SPEC_NUMBER);
-    memset(yk_z12, 0, sizeof(real) * MAX_SPEC_NUMBER);
+    real yk_z11[MAX_SPEC_NUMBER] = {}, yk_z12[MAX_SPEC_NUMBER] = {};
     interpolate_scalar_dissipation_rate_with_given_z_zPrime(chi_ave, n_spec, z1, z_prime_1, param, yk_z11);
     interpolate_scalar_dissipation_rate_with_given_z_zPrime(chi_ave, n_spec, z1, z_prime_2, param, yk_z12);
     // Finally, interpolate into the mixture fraction variance
@@ -253,8 +250,7 @@ compute_massFraction_from_MixtureFraction(DZone *zone, int i, int j, int k, DPar
   }
 
   // Next, at z2
-  real yk_z2[MAX_SPEC_NUMBER];
-  memset(yk_z2, 0, sizeof(real) * MAX_SPEC_NUMBER);
+  real yk_z2[MAX_SPEC_NUMBER] = {};
   if (z2 == mz_lib) {
     for (int l = 0; l < n_spec; ++l) {
       yk_z2[l] = yk_lib(l, 0, 0, mz_lib);
@@ -276,9 +272,7 @@ compute_massFraction_from_MixtureFraction(DZone *zone, int i, int j, int k, DPar
       z_prime_2 = n_zPrime;
     }
     // Next, interpolate into the scalar dissipation rate
-    real yk_z21[MAX_SPEC_NUMBER], yk_z22[MAX_SPEC_NUMBER];
-    memset(yk_z21, 0, sizeof(real) * MAX_SPEC_NUMBER);
-    memset(yk_z22, 0, sizeof(real) * MAX_SPEC_NUMBER);
+    real yk_z21[MAX_SPEC_NUMBER] = {}, yk_z22[MAX_SPEC_NUMBER] = {};
     interpolate_scalar_dissipation_rate_with_given_z_zPrime(chi_ave, n_spec, z2, z_prime_1, param, yk_z21);
     interpolate_scalar_dissipation_rate_with_given_z_zPrime(chi_ave, n_spec, z2, z_prime_2, param, yk_z22);
     // Finally, interpolate into the mixture fraction variance
@@ -314,7 +308,7 @@ compute_massFraction_from_MixtureFraction(DZone *zone, int i, int j, int k, DPar
 
 __device__ int2
 find_chi_range(const ggxl::Array3D<real> &chi_ave, real chi, int i_z, int i_zPrime, int n_chi) {
-  int2 range;
+  int2 range{};
 
   real d_chi_l = 1e+6;
   real d_chi_r = 1e+6;

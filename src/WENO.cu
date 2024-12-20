@@ -754,10 +754,9 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
   const real hr{(cvr[4] + cvr[n_var]) * rhoR_inv};
   const real hm{rlc * hl + rrc * hr};
 
-  real svm[MAX_SPEC_NUMBER];
-  memset(svm, 0, MAX_SPEC_NUMBER * sizeof(real));
+  real svm[MAX_SPEC_NUMBER] = {};
   for (int l = 0; l < n_var - 5; ++l) {
-    svm[l] = (rlc * cvl[l + 5] * rhoL_inv + rrc * cvr[l + 5] * rhoR_inv);
+    svm[l] = rlc * cvl[l + 5] * rhoL_inv + rrc * cvr[l + 5] * rhoR_inv;
   }
 
   const int n_spec{param->n_spec};
@@ -813,8 +812,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
 
   if constexpr (method == 1) {
     // Li Xinliang's flux splitting
-    bool pp_limiter{param->positive_preserving};
-    if (pp_limiter) {
+    if (param->positive_preserving) {
       real spectralRadThis = abs((m_l[0] * cvl[1] + m_l[1] * cvl[2] + m_l[2] * cvl[3]) * rhoL_inv +
                                  cvl[n_var + 1] * sqrt(m_l[0] * m_l[0] + m_l[1] * m_l[1] + m_l[2] * m_l[2]));
       real spectralRadNext = abs((m_r[0] * cvr[1] + m_r[1] * cvr[2] + m_r[2] * cvr[3]) * rhoR_inv +
@@ -872,9 +870,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
           default:
             break;
         }
-        real vPlus[5], vMinus[5];
-        memset(vPlus, 0, 5 * sizeof(real));
-        memset(vMinus, 0, 5 * sizeof(real));
+        real vPlus[5] = {}, vMinus[5] = {};
         for (int m = 0; m < 5; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += L[n] * Fp[(i_shared - 3 + m) * n_var + n];
@@ -942,9 +938,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
             break;
         }
 
-        real vPlus[7], vMinus[7];
-        memset(vPlus, 0, 7 * sizeof(real));
-        memset(vMinus, 0, 7 * sizeof(real));
+        real vPlus[7] = {}, vMinus[7] = {};
         for (int m = 0; m < 7; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += L[n] * Fp[(i_shared - 3 + m) * n_var + n];
@@ -995,8 +989,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
     LR(4, 3) = -(gm1 * wm - kz * cm) * cm2_inv * 0.5;
     LR(4, 4) = gm1 * cm2_inv * 0.5;
 
-    real spec_rad[3], spectralRadThis, spectralRadNext;
-    memset(spec_rad, 0, 3 * sizeof(real));
+    real spec_rad[3] = {}, spectralRadThis, spectralRadNext;
     bool pp_limiter{param->positive_preserving};
     for (int l = -2; l < 4; ++l) {
       const real *Q = &cv[(i_shared + l) * (n_var + 2)];
@@ -1046,9 +1039,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
       }
 
       if (param->inviscid_scheme == 52) {
-        real vPlus[5], vMinus[5];
-        memset(vPlus, 0, 5 * sizeof(real));
-        memset(vMinus, 0, 5 * sizeof(real));
+        real vPlus[5] = {}, vMinus[5] = {};
         for (int m = 0; m < 5; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * n_var + n] +
@@ -1069,9 +1060,7 @@ compute_weno_flux_ch(const real *cv, DParameter *param, int tid, const real *met
         }
         fChar[l] = WENO5(vPlus, vMinus, eps_scaled);
       } else if (param->inviscid_scheme == 72) {
-        real vPlus[7], vMinus[7];
-        memset(vPlus, 0, 7 * sizeof(real));
-        memset(vMinus, 0, 7 * sizeof(real));
+        real vPlus[7] = {}, vMinus[7] = {};
         for (int m = 0; m < 7; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += LR(l, n) * (Fp[(i_shared - 3 + m) * n_var + n] +
@@ -1267,9 +1256,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
     an[2] = 0.5 * (Uk_bar + cm - max_spec_rad) * gradK;
     if (param->inviscid_scheme == 52) {
       for (int l = 0; l < 5; ++l) {
-        real vPlus[5], vMinus[5];
-        memset(vPlus, 0, 5 * sizeof(real));
-        memset(vMinus, 0, 5 * sizeof(real));
+        real vPlus[5] = {}, vMinus[5] = {};
         // ACANS version
         real lambda_p{ap[1]}, lambda_n{an[1]};
         if (l == 0) {
@@ -1291,9 +1278,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
       }
     } else if (param->inviscid_scheme == 72) {
       for (int l = 0; l < 5; ++l) {
-        real vPlus[7], vMinus[7];
-        memset(vPlus, 0, 7 * sizeof(real));
-        memset(vMinus, 0, 7 * sizeof(real));
+        real vPlus[7] = {}, vMinus[7] = {};
         // ACANS version
         real lambda_p{ap[1]}, lambda_n{an[1]};
         if (l == 0) {
@@ -1318,9 +1303,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
     // Li Xinliang version
     if (param->inviscid_scheme == 52) {
       for (int l = 0; l < 5; ++l) {
-        real vPlus[5], vMinus[5];
-        memset(vPlus, 0, 5 * sizeof(real));
-        memset(vMinus, 0, 5 * sizeof(real));
+        real vPlus[5] = {}, vMinus[5] = {};
         for (int m = 0; m < 5; m++) {
           for (int n = 0; n < 5; n++) {
             vPlus[m] += LR(l, n) * Fp[(i_shared - 2 + m) * 5 + n];
@@ -1331,9 +1314,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
       }
     } else if (param->inviscid_scheme == 72) {
       for (int l = 0; l < 7; ++l) {
-        real vPlus[7], vMinus[7];
-        memset(vPlus, 0, 7 * sizeof(real));
-        memset(vMinus, 0, 7 * sizeof(real));
+        real vPlus[7] = {}, vMinus[7] = {};
         for (int m = 0; m < 7; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += LR(l, n) * Fp[(i_shared - 3 + m) * 5 + n];
@@ -1345,8 +1326,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
     }
   } else {
     // My method
-    real spec_rad[3];
-    memset(spec_rad, 0, 3 * sizeof(real));
+    real spec_rad[3] = {};
 
     if (param->inviscid_scheme == 52) {
       for (int l = -2; l < 4; ++l) {
@@ -1375,9 +1355,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
           lambda_l = spec_rad[2];
         }
 
-        real vPlus[5], vMinus[5];
-        memset(vPlus, 0, 5 * sizeof(real));
-        memset(vMinus, 0, 5 * sizeof(real));
+        real vPlus[5] = {}, vMinus[5] = {};
         for (int m = 0; m < 5; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * 5 + n] + lambda_l * cv[(i_shared - 2 + m) * 7 + n] *
@@ -1417,9 +1395,7 @@ compute_weno_flux_ch<MixtureModel::Air>(const real *cv, DParameter *param, int t
           lambda_l = spec_rad[2];
         }
 
-        real vPlus[7], vMinus[7];
-        memset(vPlus, 0, 7 * sizeof(real));
-        memset(vMinus, 0, 7 * sizeof(real));
+        real vPlus[7] = {}, vMinus[7] = {};
         for (int m = 0; m < 7; ++m) {
           for (int n = 0; n < 5; ++n) {
             vPlus[m] += LR(l, n) * (Fp[(i_shared - 2 + m) * 5 + n] + lambda_l * cv[(i_shared - 2 + m) * 7 + n] *

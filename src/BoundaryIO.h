@@ -14,19 +14,19 @@ struct BoundaryIO {
   const Species &species;
   const std::vector<Field> &field;
   // The labels of the boundary conditions to be outputted
-  std::vector<int> labels_to_output;
+  std::vector<int> labels_to_output{};
   // For every boundary condition to be outputted, record its bc name
-  std::vector<std::string> name_of_boundary;
-  std::vector<int> type;
-  std::vector<MPI_Offset> offset_header;
-  std::vector<std::vector<MPI_Offset>> offset_minmax_var;
-  std::vector<std::vector<MPI_Offset>> offset_var;
-  std::vector<int> n_var;
+  std::vector<std::string> name_of_boundary{};
+  std::vector<int> type{};
+  std::vector<MPI_Offset> offset_header{};
+  std::vector<std::vector<MPI_Offset>> offset_minmax_var{};
+  std::vector<std::vector<MPI_Offset>> offset_var{};
+  std::vector<int> n_var{};
 
-  std::vector<std::vector<const Boundary *>> boundaries;
-  std::vector<std::vector<int>> mx, my, mz;
-  std::vector<std::vector<int>> xs, xe, ys, ye, zs, ze;
-  std::vector<std::vector<int>> block_ids;
+  std::vector<std::vector<const Boundary *>> boundaries{};
+  std::vector<std::vector<int>> mx{}, my{}, mz{};
+  std::vector<std::vector<int>> xs{}, xe{}, ys{}, ye{}, zs{}, ze{};
+  std::vector<std::vector<int>> block_ids{};
 
   explicit BoundaryIO(const Parameter &parameter_, const Mesh &mesh_, const Species &species_,
                       std::vector<Field> &_field);

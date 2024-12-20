@@ -24,8 +24,7 @@ __device__ void finite_rate_chemistry(DZone *zone, int i, int j, int k, const DP
   forward_reaction_rate(t, kf, c, param);
 
   // compute the backward reaction rate
-  real kb[MAX_REAC_NUMBER];
-  memset(kb, 0, MAX_REAC_NUMBER * sizeof(real));
+  real kb[MAX_REAC_NUMBER] = {};
   backward_reaction_rate(t, kf, c, param, kb);
 
   // compute the rate of progress
@@ -239,8 +238,7 @@ __global__ void EPI(DZone *zone, int n_spec) {
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   auto &chem_jac = zone->chem_src_jac;
-  real lhs[MAX_SPEC_NUMBER * MAX_SPEC_NUMBER];
-  memset(lhs, 0, MAX_SPEC_NUMBER * MAX_SPEC_NUMBER * sizeof(real));
+  real lhs[MAX_SPEC_NUMBER * MAX_SPEC_NUMBER] = {};
   const real dt{zone->dt_local(i, j, k)};
 
   for (int m = 0; m < n_spec; ++m) {
@@ -256,8 +254,7 @@ __global__ void EPI(DZone *zone, int n_spec) {
 }
 
 __device__ void EPI_for_dq0(DZone *zone, real diag, int i, int j, int k, int n_spec) {
-  real lhs[MAX_SPEC_NUMBER * MAX_SPEC_NUMBER];
-  memset(lhs, 0, MAX_SPEC_NUMBER * MAX_SPEC_NUMBER * sizeof(real));
+  real lhs[MAX_SPEC_NUMBER * MAX_SPEC_NUMBER] = {};
   const real dt{zone->dt_local(i, j, k)};
   auto &chem_jac = zone->chem_src_jac;
 
@@ -275,8 +272,7 @@ __device__ void EPI_for_dq0(DZone *zone, real diag, int i, int j, int k, int n_s
 
 __device__ void
 EPI_for_dqk(DZone *zone, real diag, int i, int j, int k, const real *dq_total, int n_spec) {
-  real lhs[MAX_SPEC_NUMBER * MAX_SPEC_NUMBER];
-  memset(lhs, 0, MAX_SPEC_NUMBER * MAX_SPEC_NUMBER * sizeof(real));
+  real lhs[MAX_SPEC_NUMBER * MAX_SPEC_NUMBER] = {};
   const real dt{zone->dt_local(i, j, k)};
 
   auto &chem_jac = zone->chem_src_jac;
@@ -290,8 +286,7 @@ EPI_for_dqk(DZone *zone, real diag, int i, int j, int k, const real *dq_total, i
     }
   }
 
-  real rhs[MAX_SPEC_NUMBER];
-  memset(rhs, 0, MAX_SPEC_NUMBER * sizeof(real));
+  real rhs[MAX_SPEC_NUMBER] = {};
   for (int l = 0; l < n_spec; ++l) {
     rhs[l] = dq_total[5 + l] * dt;
   }
@@ -306,8 +301,7 @@ EPI_for_dqk(DZone *zone, real diag, int i, int j, int k, const real *dq_total, i
 
 __device__ void solve_chem_system(real *lhs, DZone *zone, int i, int j, int k, int n_spec) {
   const int dim{n_spec};
-  int ipiv[MAX_SPEC_NUMBER];
-  memset(ipiv, 0, MAX_SPEC_NUMBER * sizeof(int));
+  int ipiv[MAX_SPEC_NUMBER] = {};
 
   // Column pivot LU decomposition
   for (int n = 0; n < dim; ++n) {
@@ -363,8 +357,7 @@ __device__ void solve_chem_system(real *lhs, DZone *zone, int i, int j, int k, i
 }
 
 __device__ void solve_chem_system(real *lhs, real *rhs, int dim) {
-  int ipiv[MAX_SPEC_NUMBER];
-  memset(ipiv, 0, MAX_SPEC_NUMBER * sizeof(int));
+  int ipiv[MAX_SPEC_NUMBER] = {};
 
   // Column pivot LU decomposition
   for (int n = 0; n < dim; ++n) {

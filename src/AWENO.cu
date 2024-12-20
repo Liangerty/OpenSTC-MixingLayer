@@ -78,9 +78,7 @@ AWENO_interpolation<MixtureModel::Air>(const real *cv, real *pv_l, real *pv_r, i
   LR(4, 4) = gm1 / cm2 * 0.5;
 
   // Interpolate the characteristic variable with WENO
-  real v_plus[5], v_minus[5];
-  memset(v_plus, 0, 5 * sizeof(real));
-  memset(v_minus, 0, 5 * sizeof(real));
+  real v_plus[5] = {}, v_minus[5] = {};
   if (param->reconstruction == 4) {
     // WENO 5
     for (int l = 0; l < 5; ++l) {
@@ -160,8 +158,7 @@ __device__ double2 WENO5(const real *L, const real *cv, int n_var, int i_shared,
   // 0 - i-2, 1 - i-1, 2 - i, 3 - i+1, 4 - i+2, 5 - i+3
 
   // Project to characteristic space
-  real v[6];
-  memset(v, 0, 6 * sizeof(real));
+  real v[6] = {};
   for (int i = -2; i < 4; ++i) {
     const int idx{i_shared + i};
     const real *U{&cv[idx * (n_var + 2)]};
@@ -217,8 +214,7 @@ __device__ double2 WENO7(const real *L, const real *cv, int n_var, int i_shared,
   // 0 - i-3, 1 - i-2, 2 - i-1, 3 - i, 4 - i+1, 5 - i+2, 6 - i+3, 7 - i+4
 
   // Project to characteristic space
-  real v[8];
-  memset(v, 0, 8 * sizeof(real));
+  real v[8] = {};
   for (int i = -3; i < 5; ++i) {
     const int idx{i_shared + i};
     const real *U{&cv[idx * (n_var + 2)]};

@@ -108,8 +108,8 @@ struct Wall {
   real fluctuation_frequency = 0;
   real fluctuation_x0 = 0;
   real fluctuation_x1 = 0;
-  real Zl[10] = {0};
-  real Tm[5] = {0};
+  real Zl[10] = {};
+  real Tm[5] = {};
   // For circular cylinder, the shock wave may not develop to the stagnation point. Blow it to develop!
   int if_blow_shock_wave = 0;
 };

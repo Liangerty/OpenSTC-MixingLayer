@@ -163,8 +163,7 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
   constexpr int n_var_max = 5 + MAX_SPEC_NUMBER + 4; // 5+n_spec+n_turb(n_turb<=2)
-  real convJacTimesDq[n_var_max], dq_total[n_var_max];
-  memset(dq_total, 0, n_var_max * sizeof(real));
+  real convJacTimesDq[n_var_max], dq_total[n_var_max] = {};
 
   const int n_var{param->n_var};
   const auto &inviscid_spectral_radius = zone->inv_spectr_rad;

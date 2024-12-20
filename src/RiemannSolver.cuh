@@ -114,8 +114,7 @@ riemannSolver_hllc(const real *pv_l, const real *pv_r, DParameter *param, int ti
 
   real gamma{gamma_air};
   real c_tilde;
-  real svm[MAX_SPEC_NUMBER + 4];
-  memset(svm, 0, sizeof(real) * (MAX_SPEC_NUMBER + 4));
+  real svm[MAX_SPEC_NUMBER + 4] = {};
   for (int l = 0; l < param->n_var - 5; ++l) {
     svm[l] = rl_c * pv_l[l + 5] + rr_c * pv_r[l + 5];
   }
@@ -311,8 +310,7 @@ riemannSolver_Roe(DZone *zone, real *pv, int tid, DParameter *param, real *fc, r
   real gamma{gamma_air};
   real c = std::sqrt((gamma - 1) * (h - ek));
   real mw{mw_air};
-  real svm[MAX_SPEC_NUMBER + 4];
-  memset(svm, 0, sizeof(real) * (MAX_SPEC_NUMBER + 4));
+  real svm[MAX_SPEC_NUMBER + 4] = {};
   for (int l = 0; l < param->n_var - 5; ++l) {
     svm[l] = (dl * pv_l[l + 5] + dr * pv_r[l + 5]) * inv_denominator;
   }
@@ -364,8 +362,7 @@ riemannSolver_Roe(DZone *zone, real *pv, int tid, DParameter *param, real *fc, r
 
   // compute dQ
   const real jac_ave{0.5 * (jac[i_shared] + jac[i_shared + 1])};
-  real dq[5 + MAX_SPEC_NUMBER + 4];
-  memset(dq, 0, sizeof(real) * (5 + MAX_SPEC_NUMBER + 4));
+  real dq[5 + MAX_SPEC_NUMBER + 4] = {};
   dq[0] = jac_ave * (pv_r[0] - pv_l[0]);
   for (int l = 1; l < param->n_var; ++l) {
     dq[l] = jac_ave * (pv_r[0] * pv_r[l] - pv_l[0] * pv_l[l]);
@@ -380,8 +377,7 @@ riemannSolver_Roe(DZone *zone, real *pv, int tid, DParameter *param, real *fc, r
   real c3 = dq[0] - c1;
 
   // compute L*dQ
-  real LDq[5 + MAX_SPEC_NUMBER + 4];
-  memset(LDq, 0, sizeof(real) * (5 + MAX_SPEC_NUMBER + 4));
+  real LDq[5 + MAX_SPEC_NUMBER + 4] = {};
   LDq[0] = 0.5 * (c1 - c2);
   LDq[1] = kx * c3 - ((kz * v - ky * w) * dq[0] - kz * dq[2] + ky * dq[3]) / c;
   LDq[2] = ky * c3 - ((kx * w - kz * u) * dq[0] - kx * dq[3] + kz * dq[1]) / c;

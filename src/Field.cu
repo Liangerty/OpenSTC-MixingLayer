@@ -689,11 +689,8 @@ void cfd::Field::deallocate_memory(const Parameter &parameter) {
     h_ptr->cp.deallocate_memory();
     if (parameter.get_int("reaction") == 1) {
       // Finite rate chemistry
-      if (const int chemSrcMethod = parameter.get_int("chemSrcMethod"); chemSrcMethod == 1) {
+      if (const int chemSrcMethod = parameter.get_int("chemSrcMethod"); chemSrcMethod == 1 || chemSrcMethod == 2) {
         // EPI
-        h_ptr->chem_src_jac.deallocate_memory();
-      } else if (chemSrcMethod == 2) {
-        // DA
         h_ptr->chem_src_jac.deallocate_memory();
       }
     } else if (parameter.get_int("reaction") == 2 || parameter.get_int("species") == 2) {
