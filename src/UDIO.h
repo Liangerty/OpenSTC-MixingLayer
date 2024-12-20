@@ -20,6 +20,6 @@ struct UserDefineIO {
 
 struct Field;
 
-void copy_auxiliary_data_from_device(cfd::Field &field, int size);
+void copy_auxiliary_data_from_device(Field &field, int size);
 
 }

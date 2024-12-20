@@ -21,7 +21,7 @@ void register_bc(BCType *&bc, int n_bc, std::vector<int> &indices, BCInfo *&bc_i
     const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      int bc_label = std::get<int>(this_bc.at("label"));
+      const int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -46,7 +46,7 @@ void register_bc<Wall>(Wall *&bc, int n_bc, std::vector<int> &indices, BCInfo *&
     const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      int bc_label = std::get<int>(this_bc.at("label"));
+      const int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -70,7 +70,7 @@ void register_bc<Inflow>(Inflow *&bc, int n_bc, std::vector<int> &indices, BCInf
     const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      int bc_label = std::get<int>(this_bc.at("label"));
+      const int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -96,7 +96,7 @@ register_bc<FarField>(FarField *&bc, int n_bc, std::vector<int> &indices, BCInfo
     const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      int bc_label = std::get<int>(this_bc.at("label"));
+      const int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -121,7 +121,7 @@ void register_bc<SubsonicInflow>(SubsonicInflow *&bc, int n_bc, std::vector<int>
     const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      int bc_label = std::get<int>(this_bc.at("label"));
+      const int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -147,7 +147,7 @@ register_bc<BackPressure>(BackPressure *&bc, int n_bc, std::vector<int> &indices
     const int index = indices[i];
     for (auto &bc_name: parameter.get_string_array("boundary_conditions")) {
       auto &this_bc = parameter.get_struct(bc_name);
-      int bc_label = std::get<int>(this_bc.at("label"));
+      const int bc_label = std::get<int>(this_bc.at("label"));
       if (index != bc_label) {
         continue;
       }
@@ -450,7 +450,7 @@ void count_boundary_of_type_bc(const std::vector<Boundary> &boundary, int n_bc, 
   auto *n = new int[n_bc];
   memset(n, 0, sizeof(int) * n_bc);
   for (size_t l = 0; l < n_bc; l++) {
-    int label = bc_info[l].label; // This means every bc should have a member "label"
+    const int label = bc_info[l].label; // This means every bc should have a member "label"
     for (size_t i = 0; i < n_boundary; i++) {
       auto &b = boundary[i];
       if (b.type_label == label) {
@@ -471,7 +471,7 @@ void link_boundary_and_condition(const std::vector<Boundary> &boundary, const BC
                                  int i_zone) {
   const auto n_boundary{boundary.size()};
   for (size_t l = 0; l < n_bc; l++) {
-    int label = bc[l].label;
+    const int label = bc[l].label;
     int has_read{sep[l][i_zone]};
     for (auto i = 0; i < n_boundary; i++) {
       auto &b = boundary[i];
@@ -485,7 +485,7 @@ void link_boundary_and_condition(const std::vector<Boundary> &boundary, const BC
 
 void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &parameter) {
   const int n_scalar{parameter.get_int("n_scalar")};
-  real *h_sv = new real[n_scalar];
+  const auto h_sv = new real[n_scalar];
   for (int l = 0; l < n_scalar; ++l) {
     h_sv[l] = sv[l];
   }
@@ -494,7 +494,7 @@ void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &param
   cudaMemcpy(sv, h_sv, n_scalar * sizeof(real), cudaMemcpyHostToDevice);
   if (inflow_type == 2) {
     // For mixing layer flow, there are another group of sv.
-    real *h_sv_lower = new real[n_scalar];
+    const auto h_sv_lower = new real[n_scalar];
     for (int l = 0; l < n_scalar; ++l) {
       h_sv_lower[l] = sv_lower[l];
     }
@@ -504,7 +504,7 @@ void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &param
   }
   if (fluctuation_type == 3) {
     // For the case of fluctuation_type == 3, we need to copy the fluctuation field to GPU.
-    real *h_rand_values = new real[199];
+    const auto h_rand_values = new real[199];
     for (int l = 0; l < 199; ++l) {
       h_rand_values[l] = random_phase[l];
     }
@@ -517,7 +517,7 @@ void Inflow::copy_to_gpu(Inflow *d_inflow, Species &spec, const Parameter &param
 
 void FarField::copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter &parameter) {
   const int n_scalar{parameter.get_int("n_scalar")};
-  real *h_sv = new real[n_scalar];
+  const auto h_sv = new real[n_scalar];
   for (int l = 0; l < n_scalar; ++l) {
     h_sv[l] = sv[l];
   }
@@ -530,7 +530,7 @@ void FarField::copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter 
 
 void SubsonicInflow::copy_to_gpu(cfd::SubsonicInflow *d_inflow, cfd::Species &spec, const cfd::Parameter &parameter) {
   const int n_scalar{parameter.get_int("n_scalar")};
-  real *h_sv = new real[n_scalar];
+  const auto h_sv = new real[n_scalar];
   for (int l = 0; l < n_scalar; ++l) {
     h_sv[l] = sv[l];
   }
@@ -576,7 +576,7 @@ void initialize_profile_with_inflow(const Boundary &boundary, const Block &block
   ggxl::VectorField3DHost<real> profile_host;
   const int n_var = parameter.get_int("n_var");
   profile_host.resize(n0, n1, n2, n_var + 1, ngg);
-  Inflow inflow1(profile_related_bc_name, species, parameter);
+  const Inflow inflow1(profile_related_bc_name, species, parameter);
   for (int i0 = range_0[0]; i0 <= range_0[1]; ++i0) {
     for (int i1 = range_1[0]; i1 <= range_1[1]; ++i1) {
       for (int i2 = range_2[0]; i2 <= range_2[1]; ++i2) {
@@ -599,8 +599,7 @@ void initialize_profile_with_inflow(const Boundary &boundary, const Block &block
 
 
 void init_mixingLayer_prof_compatible_cpu(const Boundary &boundary, Parameter &parameter, const Block &b,
-                                          const Species &species,
-                                          ggxl::VectorField3D<real> &profile) {
+                                          const Species &species, ggxl::VectorField3D<real> &profile) {
   const int direction = boundary.face;
   const int ngg = b.ngg;
   const int mx = b.mx, my = b.my, mz = b.mz;
@@ -887,7 +886,7 @@ int read_profile(const Boundary &boundary, const std::string &file, const Block 
 }
 
 std::vector<int>
-identify_variable_labels(const cfd::Parameter &parameter, std::vector<std::string> &var_name, const Species &species,
+identify_variable_labels(const Parameter &parameter, std::vector<std::string> &var_name, const Species &species,
                          bool &has_pressure, bool &has_temperature, bool &has_tke) {
   std::vector<int> labels;
   const int n_spec = species.n_spec;
@@ -965,7 +964,7 @@ read_dat_profile(const Boundary &boundary, const std::string &file, const Block 
 
   std::string input;
   std::vector<std::string> var_name;
-  gxl::read_until(file_in, input, "VARIABLES", gxl::Case::upper);
+  read_until(file_in, input, "VARIABLES", gxl::Case::upper);
   while (!(input.substr(0, 4) == "ZONE" || input.substr(0, 5) == " zone")) {
     gxl::replace(input, '"', ' ');
     gxl::replace(input, ',', ' ');
@@ -1406,7 +1405,7 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
 
   std::string input;
   std::vector<std::string> var_name;
-  gxl::read_until(file_in, input, "VARIABLES", gxl::Case::upper);
+  read_until(file_in, input, "VARIABLES", gxl::Case::upper);
   while (!(input.substr(0, 4) == "ZONE" || input.substr(0, 5) == " zone")) {
     gxl::replace(input, '"', ' ');
     gxl::replace(input, ',', ' ');
@@ -1681,145 +1680,11 @@ void read_lst_profile(const Boundary &boundary, const std::string &file, const B
   }
 }
 
-void init_mixingLayer_prof_compatible_cpu(Parameter &parameter, Block &b, Species &species,
-                                          ggxl::VectorField3DHost<real> &profile,
-                                          const int *range_x, const int *range_y, const int *range_z,
-                                          const real *var_info) {
-  const int n_spec = species.n_spec;
-  const real delta_omega = parameter.get_real("delta_omega");
-  int n_fl{0};
-  if ((species.n_spec > 0 && parameter.get_int("reaction") == 2) || parameter.get_int("species") == 2)
-    n_fl = 2;
-  const int i_fl = parameter.get_int("i_fl");
-  const int n_ps = parameter.get_int("n_ps");
-  const int i_ps = parameter.get_int("i_ps");
-  const int n_turb = parameter.get_int("n_turb");
-  const int n_scalar = parameter.get_int("n_scalar");
-
-  for (int j = range_y[0]; j <= range_y[1]; ++j) {
-    real y = b.y(0, j, 0);
-    const real u_upper = var_info[1], u_lower = var_info[8 + n_spec];
-    real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / delta_omega);
-    real p = var_info[4];
-    real density, t;
-    const real t_upper = var_info[5], t_lower = var_info[12 + n_spec];
-    real yk[MAX_SPEC_NUMBER + MAX_PASSIVE_SCALAR_NUMBER + 4] = {};
-
-    real y_upper = (u - u_lower) / (u_upper - u_lower);
-    real y_lower = 1 - y_upper;
-
-    if (n_spec > 0) {
-      // multi-species
-      auto sv_upper = &var_info[6];
-      auto sv_lower = &var_info[7 + n_spec + 6];
-
-      for (int l = 0; l < n_spec; ++l) {
-        yk[l] = y_upper * sv_upper[l] + y_lower * sv_lower[l];
-      }
-
-      // compute the total enthalpy of upper and lower streams
-      real h0_upper{0.5 * u_upper * u_upper}, h0_lower{0.5 * u_lower * u_lower};
-
-      real h_upper[MAX_SPEC_NUMBER], h_lower[MAX_SPEC_NUMBER];
-      species.compute_enthalpy(t_upper, h_upper);
-      species.compute_enthalpy(t_lower, h_lower);
-
-      real mw_inv = 0;
-      for (int l = 0; l < n_spec; ++l) {
-        h0_upper += yk[l] * h_upper[l];
-        h0_lower += yk[l] * h_lower[l];
-        mw_inv += yk[l] / species.mw[l];
-      }
-
-      real h = y_upper * h0_upper + y_lower * h0_lower;
-      h -= 0.5 * u * u;
-
-      auto hs = h_upper, cps = h_lower;
-      real err{1};
-      t = t_upper * y_upper + t_lower * y_lower;
-      constexpr int max_iter{1000};
-      constexpr real eps{1e-3};
-      int iter = 0;
-
-      while (err > eps && iter++ < max_iter) {
-        species.compute_enthalpy_and_cp(t, hs, cps);
-        real cp{0}, h_new{0};
-        for (int l = 0; l < n_spec; ++l) {
-          cp += yk[l] * cps[l];
-          h_new += yk[l] * hs[l];
-        }
-        const real t1 = t - (h_new - h) / cp;
-        err = abs(1 - t1 / t);
-        t = t1;
-      }
-      density = p / (R_u * mw_inv * t);
-
-      if (n_fl > 0) {
-        yk[i_fl] = var_info[6 + n_spec] * y_upper + var_info[13 + n_spec + n_spec] * y_lower;
-        yk[i_fl + 1] = 0;
-      }
-      if (n_ps > 0) {
-        for (int l = 0; l < n_ps; ++l) {
-          yk[i_ps + l] =
-              var_info[14 + 2 * n_spec + 4 + 2 * l] * y_upper + var_info[14 + 2 * n_spec + 4 + 2 * l + 1] * y_lower;
-        }
-      }
-    } else {
-      // Air
-      constexpr real cp = gamma_air * R_air / (gamma_air - 1);
-      real h0_upper = 0.5 * u_upper * u_upper + cp * var_info[5];
-      real h0_lower = 0.5 * u_lower * u_lower + cp * var_info[12 + n_spec];
-      real h = y_upper * h0_upper + y_lower * h0_lower - 0.5 * u * u;
-      t = h / cp;
-      density = p / (R_air * t);
-
-      if (n_ps > 0) {
-        if (y > 0) {
-          for (int l = 0; l < n_ps; ++l) {
-            yk[i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l];
-          }
-        } else {
-          for (int l = 0; l < n_ps; ++l) {
-            yk[i_ps + l] = var_info[14 + 2 * n_spec + 4 + 2 * l + 1];
-          }
-        }
-      }
-    }
-    if (n_turb > 0) {
-      if (y > 0) {
-        for (int l = 0; l < n_turb; ++l) {
-          yk[l + n_spec] = var_info[13 + 2 * n_spec + 1 + l];
-        }
-      } else {
-        for (int l = 0; l < n_turb; ++l) {
-          yk[l + n_spec] = var_info[13 + 2 * n_spec + n_turb + 1 + l];
-        }
-      }
-    }
-
-    auto &prof = profile;
-    for (int k = range_z[0]; k <= range_z[1]; ++k) {
-      for (int i = range_x[0]; i <= range_x[1]; ++i) {
-        prof(i, j, k, 0) = density;
-        prof(i, j, k, 1) = u;
-        prof(i, j, k, 2) = 0;
-        prof(i, j, k, 3) = 0;
-        prof(i, j, k, 4) = p;
-        prof(i, j, k, 5) = t;
-        for (int l = 0; l < n_scalar; ++l) {
-          prof(i, j, k, 6 + l) = yk[l];
-        }
-      }
-    }
-  }
-}
-
 void
 DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species &species, std::vector<Field> &field,
                                        DParameter *param) {
   if (const int n_profile = parameter.get_int("n_profile"); n_profile > 0) {
     profile_hPtr_withGhost.resize(n_profile);
-    // std::vector<int> special_treatment;
     for (int i = 0; i < n_profile; ++i) {
       const auto file_name = parameter.get_string_array("profile_file_names")[i];
       const auto profile_related_bc_name = parameter.get_string_array("profile_related_bc_names")[i];
@@ -2132,7 +1997,7 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
   if (!need_rng.empty()) {
     for (int blk = 0; blk < mesh.n_block; ++blk) {
       auto &bs = mesh[blk].boundary;
-      for (auto &b: bs) {
+      for (const auto &b: bs) {
         if (gxl::exists(need_rng, b.type_label)) {
           int n1{mesh[blk].my}, n2{mesh[blk].mz};
           if (b.face == 1) {
@@ -2142,7 +2007,7 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
             n2 = mesh[blk].my;
           }
           const auto ngg = mesh[blk].ngg;
-          auto this_size = (n1 + 2 * ngg) * (n2 + 2 * ngg);
+          const auto this_size = (n1 + 2 * ngg) * (n2 + 2 * ngg);
           if (this_size > size)
             size = this_size;
         }
@@ -2188,14 +2053,14 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
 __global__ void
 initialize_rest_rng(ggxl::VectorField2D<curandState> *rng_states, int iFace, int64_t time_stamp, int dy, int dz,
                     int ngg, int my, int mz) {
-  int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
-  int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - DBoundCond::DF_N - ngg;
+  const int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - DBoundCond::DF_N - ngg;
   if (j >= my + DBoundCond::DF_N + ngg || k >= mz + DBoundCond::DF_N + ngg) {
     return;
   }
   if (j < -ngg - DBoundCond::DF_N + dy || j > my + ngg + DBoundCond::DF_N - 1 - dy ||
       k < -ngg - DBoundCond::DF_N + dz || k > mz + ngg + DBoundCond::DF_N - 1 - dz) {
-    int sz = (my + 2 * ngg + 2 * DBoundCond::DF_N) * (mz + 2 * ngg + 2 * DBoundCond::DF_N);
+    const int sz = (my + 2 * ngg + 2 * DBoundCond::DF_N) * (mz + 2 * ngg + 2 * DBoundCond::DF_N);
     int i = k * (my + 2 * ngg + 2 * DBoundCond::DF_N) + j +
             (my + 2 * ngg + 2 * DBoundCond::DF_N + 1) * (ngg + DBoundCond::DF_N);
     curand_init(time_stamp + i, i, 0, &rng_states[iFace](j, k, 0));

@@ -14,12 +14,11 @@ struct DZone;
 
 struct Inflow;
 
-void assume_gaussian_reynolds_stress(cfd::Parameter &parameter, cfd::DBoundCond &dBoundCond, std::vector<int> &N1,
-                                     std::vector<std::vector<real>> &y_scaled);
+void assume_gaussian_reynolds_stress(Parameter &parameter, const DBoundCond &dBoundCond, const std::vector<int> &N1,
+                                     const std::vector<std::vector<real>> &y_scaled);
 
 __global__ void
-compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij,
-                                                      ggxl::VectorField1D<real> *df_lundMatrix_hPtr,
+compute_lundMat_with_assumed_gaussian_reynolds_stress(const real *Rij, ggxl::VectorField1D<real> *df_lundMatrix_hPtr,
                                                       int i_face, const real *y_scaled, int my, int ngg);
 
 __global__ void
@@ -48,10 +47,10 @@ perform_convolution_z(ggxl::VectorField2D<real> *df_fy, ggxl::VectorField2D<real
                       ggxl::VectorField2D<real> *velFluc, int iFace, int my, int mz, int ngg);
 
 __global__ void
-Castro_time_correlation_and_fluc_computation(DParameter *param, DZone *zone, Inflow *inflow,
+Castro_time_correlation_and_fluc_computation(const DParameter *param, DZone *zone, const Inflow *inflow,
                                              ggxl::VectorField2D<real> *velFluc_old,
                                              ggxl::VectorField2D<real> *velFluc_new,
                                              ggxl::VectorField1D<real> *lundMatrix_dPtr,
-                                             ggxl::VectorField3D<real> *fluctuation_dPtr, int iFace, int my,
-                                             int mz, int ngg);
+                                             ggxl::VectorField3D<real> *fluctuation_dPtr, int iFace, int my, int mz,
+                                             int ngg);
 }

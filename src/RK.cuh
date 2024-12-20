@@ -14,7 +14,7 @@ __device__ constexpr real c[3]{1.0, 0.25, 2.0 / 3.0};
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt, int rk);
+__global__ void update_cv_and_bv_rk(DZone *zone, DParameter *param, real dt, int rk);
 
 template<MixtureModel mix_model, class turb>
 void RK3(Driver<mix_model, turb> &driver) {
@@ -34,7 +34,7 @@ void RK3(Driver<mix_model, turb> &driver) {
     bpg[b] = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
   }
 
-  std::vector<cfd::Field> &field{driver.field};
+  std::vector<Field> &field{driver.field};
   const int ng_1 = 2 * mesh[0].ngg - 1;
   DParameter *param{driver.param};
   for (auto b = 0; b < n_block; ++b) {
@@ -167,7 +167,7 @@ void RK3(Driver<mix_model, turb> &driver) {
 
       // update physical properties such as Mach number, transport coefficients et, al.
       for (auto b = 0; b < n_block; ++b) {
-        int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+        const int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
         dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
         update_physical_properties<mix_model><<<BPG, tpb>>>(field[b].d_ptr, param);
       }
@@ -228,7 +228,7 @@ void RK3(Driver<mix_model, turb> &driver) {
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt, int rk) {
+__global__ void update_cv_and_bv_rk(DZone *zone, DParameter *param, real dt, int rk) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -238,7 +238,7 @@ __global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt
   auto &cv = zone->cv;
   auto &qn = zone->qn;
 
-  real dt_div_jac = dt / zone->jac(i, j, k);
+  const real dt_div_jac = dt / zone->jac(i, j, k);
   for (int l = 0; l < param->n_var; ++l) {
     cv(i, j, k, l) = SSPRK3::a[rk] * qn(i, j, k, l) + SSPRK3::b[rk] * cv(i, j, k, l) +
                      SSPRK3::c[rk] * dt_div_jac * zone->dq(i, j, k, l);
@@ -254,7 +254,7 @@ __global__ void update_cv_and_bv_rk(cfd::DZone *zone, DParameter *param, real dt
   bv(i, j, k, 1) = cv(i, j, k, 1) * density_inv;
   bv(i, j, k, 2) = cv(i, j, k, 2) * density_inv;
   bv(i, j, k, 3) = cv(i, j, k, 3) * density_inv;
-  auto V2 = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3); //V^2
+  const auto V2 = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3); //V^2
 
   auto &sv = zone->sv;
   if constexpr (mix_model != MixtureModel::FL) {

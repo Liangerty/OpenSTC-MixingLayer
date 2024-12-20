@@ -74,7 +74,7 @@ cfd::compute_transport_property(int i, int j, int k, real temperature, real mw_t
 
   real viscosity = 0;
   real conductivity = 0;
-  const real density = zone->bv(i, j, k, 0);
+  // const real density = zone->bv(i, j, k, 0);
   for (int m = 0; m < n_spec; ++m) {
     // compute the thermal conductivity
 //    real R = R_u / mw[m];
@@ -136,7 +136,7 @@ cfd::compute_transport_property(int i, int j, int k, real temperature, real mw_t
 }
 
 __device__ real
-cfd::compute_viscosity(int i, int j, int k, real temperature, real mw_total, DParameter *param, DZone *zone) {
+cfd::compute_viscosity(int i, int j, int k, real temperature, real mw_total, DParameter *param, const DZone *zone) {
   const auto n_spec{param->n_spec};
   const real *mw = param->mw;
   const auto &yk = zone->sv;

@@ -15,10 +15,10 @@ template<MixtureModel mix_model, class turb_method>
 __device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DParameter *param);
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_gv_2nd_order(const int idx[3], DZone *zone, real *fv, DParameter *param);
+__device__ void compute_gv_2nd_order(const int idx[3], DZone *zone, real *gv, DParameter *param);
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_hv_2nd_order(const int idx[3], DZone *zone, real *fv, DParameter *param);
+__device__ void compute_hv_2nd_order(const int idx[3], DZone *zone, real *hv, DParameter *param);
 
 template<MixtureModel mix_model, class turb_method>
 __device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DParameter *param) {
@@ -318,7 +318,7 @@ __device__ void compute_fv_2nd_order(const int idx[3], DZone *zone, real *fv, DP
 }
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, cfd::DParameter *param) {
+__device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, DParameter *param) {
   const auto i = idx[0], j = idx[1], k = idx[2];
   const auto &m = zone->metric(i, j, k);
   const auto &m1 = zone->metric(i, j + 1, k);
@@ -616,7 +616,7 @@ __device__ void compute_gv_2nd_order(const int *idx, DZone *zone, real *gv, cfd:
 }
 
 template<MixtureModel mix_model, class turb_method>
-__device__ void compute_hv_2nd_order(const int *idx, DZone *zone, real *hv, cfd::DParameter *param) {
+__device__ void compute_hv_2nd_order(const int *idx, DZone *zone, real *hv, DParameter *param) {
   const auto i = idx[0], j = idx[1], k = idx[2];
   const auto &m = zone->metric(i, j, k);
   const auto &m1 = zone->metric(i, j, k + 1);

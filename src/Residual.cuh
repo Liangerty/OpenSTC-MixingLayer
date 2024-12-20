@@ -9,10 +9,9 @@
 #include "Parallel.h"
 
 namespace cfd {
-
 template<int N>
 __global__ void reduction_of_dv_squared(real *arr, int size) {
-  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  const int i = blockDim.x * blockIdx.x + threadIdx.x;
   const int t = threadIdx.x;
   extern __shared__ real s[];
   memset(&s[t * N], 0, N * sizeof(real));
@@ -48,9 +47,11 @@ __global__ void reduction_of_dv_squared(real *arr, int size) {
     stride += lst;
     __syncthreads();
     if (t < stride) {
-      //when t+stride is larger than #elements, there's no meaning of comparison. So when it happens, just keep the current value for parMax[t]. This always happens when an odd number of t satisfying the condition.
+      // When t+stride is larger than #elements, there's no meaning of comparison.
+      // So when it happens, keep the current value for parMax[t].
+      // This always happens when an odd number of t satisfying the condition.
       if (t + stride < size) {
-#pragma unroll
+        #pragma unroll
         for (int l = 0; l < N; ++l) {
           s[t * N + l] += s[(t + stride) * N + l];
         }
@@ -69,7 +70,7 @@ __global__ void reduction_of_dv_squared(real *arr, int size) {
 
 __global__ void reduction_of_dv_squared(real *arr, int size);
 
-__global__ void check_nan(cfd::DZone *zone, int blk, int myid);
+__global__ void check_nan(DZone *zone, int blk, int myid);
 
 template<MixtureModel mix_model, class turb>
 real compute_residual(Driver<mix_model, turb> &driver, int step) {
@@ -105,9 +106,9 @@ real compute_residual(Driver<mix_model, turb> &driver, int step) {
     const int size = mx * my * mz;
     int n_blocks = std::min(num_blocks_per_sm * num_sms, (size + TPB - 1) / TPB);
     reduction_of_dv_squared<n_res_var> <<<n_blocks, TPB, TPB * sizeof(real) * n_res_var >>>(
-        field[b].h_ptr->bv_last.data(), size);
+      field[b].h_ptr->bv_last.data(), size);
     reduction_of_dv_squared<n_res_var> <<<1, TPB, TPB * sizeof(real) * n_res_var >>>(field[b].h_ptr->bv_last.data(),
-                                                                                     n_blocks);
+      n_blocks);
     cudaMemcpy(res_block, field[b].h_ptr->bv_last.data(), n_res_var * sizeof(real), cudaMemcpyDeviceToHost);
     for (int l = 0; l < n_res_var; ++l) {
       res[l] += res_block[l];
@@ -165,7 +166,7 @@ real compute_residual(Driver<mix_model, turb> &driver, int step) {
   if (isnan(err_max)) {
     have_nan = true;
   }
-  if (have_nan){
+  if (have_nan) {
     for (int b = 0; b < n_block; ++b) {
       const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
       dim3 bpg = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
@@ -178,16 +179,15 @@ real compute_residual(Driver<mix_model, turb> &driver, int step) {
   if (driver.myid == 0) {
     if (have_nan) {
       printf("Nan occurred in step %d. Stop simulation.\n", step);
-      cfd::MpiParallel::exit();
+      MpiParallel::exit();
     }
   }
 
   return err_max;
 }
 
-void steady_screen_output(int step, real err_max, gxl::Time &time, std::array<real, 4> &res);
+void steady_screen_output(int step, real err_max, gxl::Time &time, const std::array<real, 4> &res);
 
-void unsteady_screen_output(int step, real err_max, gxl::Time &time, std::array<real, 4> &res, real dt,
+void unsteady_screen_output(int step, real err_max, gxl::Time &time, const std::array<real, 4> &res, real dt,
                             real solution_time);
-
 } // cfd

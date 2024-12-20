@@ -15,7 +15,7 @@ __device__ void
 compute_temperature_and_pressure(int i, int j, int k, const DParameter *param, DZone *zone, real total_energy);
 
 template<MixtureModel mixture_model>
-__device__ void compute_total_energy(int i, int j, int k, cfd::DZone *zone, const DParameter *param) {
+__device__ void compute_total_energy(int i, int j, int k, DZone *zone, const DParameter *param) {
   auto &bv = zone->bv;
 
   const real V2 = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3);
@@ -113,8 +113,8 @@ __global__ void update_physical_properties(DZone *zone, DParameter *param) {
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
   const real temperature{zone->bv(i, j, k, 5)};
-  auto V = sqrt(zone->bv(i, j, k, 1) * zone->bv(i, j, k, 1) + zone->bv(i, j, k, 2) * zone->bv(i, j, k, 2) +
-                zone->bv(i, j, k, 3) * zone->bv(i, j, k, 3));
+  const auto V = sqrt(zone->bv(i, j, k, 1) * zone->bv(i, j, k, 1) + zone->bv(i, j, k, 2) * zone->bv(i, j, k, 2) +
+                      zone->bv(i, j, k, 3) * zone->bv(i, j, k, 3));
   if constexpr (mix_model != MixtureModel::Air) {
     const int n_spec{param->n_spec};
     auto &yk = zone->sv;
@@ -162,7 +162,7 @@ __global__ void initialize_mut(DZone *zone, DParameter *param) {
 }
 
 template<MixtureModel mixture_model>
-__device__ real compute_total_energy_1_point(int i, int j, int k, cfd::DZone *zone, DParameter *param) {
+__device__ real compute_total_energy_1_point(int i, int j, int k, DZone *zone, DParameter *param) {
   auto &bv = zone->bv;
   auto &sv = zone->sv;
 
@@ -186,7 +186,7 @@ __device__ real compute_total_energy_1_point(int i, int j, int k, cfd::DZone *zo
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void update_cv_and_bv(cfd::DZone *zone, DParameter *param) {
+__global__ void update_cv_and_bv(DZone *zone, DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -195,7 +195,7 @@ __global__ void update_cv_and_bv(cfd::DZone *zone, DParameter *param) {
 
   auto &cv = zone->cv;
 
-  real dt_div_jac = zone->dt_local(i, j, k) / zone->jac(i, j, k);
+  const real dt_div_jac = zone->dt_local(i, j, k) / zone->jac(i, j, k);
   for (int l = 0; l < param->n_var; ++l) {
     cv(i, j, k, l) += dt_div_jac * zone->dq(i, j, k, l);
   }
@@ -233,14 +233,15 @@ __global__ void update_cv_and_bv(cfd::DZone *zone, DParameter *param) {
     compute_temperature_and_pressure(i, j, k, param, zone, cv(i, j, k, 4));
   } else {
     // Air
-    real V2 = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3); //V^2
+    const real V2 = bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3);
+    //V^2
     bv(i, j, k, 4) = (gamma_air - 1) * (cv(i, j, k, 4) - 0.5 * bv(i, j, k, 0) * V2);
     bv(i, j, k, 5) = bv(i, j, k, 4) * mw_air * density_inv / R_u;
   }
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void update_bv(cfd::DZone *zone, DParameter *param) {
+__global__ void update_bv(DZone *zone, DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -254,7 +255,7 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param) {
   const real density_n = bv(i, j, k, 0);
   const real total_energy_n = compute_total_energy_1_point<mix_model>(i, j, k, zone, param);
 
-  real dt_div_jac = zone->dt_local(i, j, k) / zone->jac(i, j, k);
+  const real dt_div_jac = zone->dt_local(i, j, k) / zone->jac(i, j, k);
   // Update density first
   bv(i, j, k, 0) += dq(i, j, k, 0) * dt_div_jac;
   // Get the 1/density
@@ -268,7 +269,7 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param) {
     bv(i, j, k, 3) = density_inv * (density_n * bv(i, j, k, 3) + dq(i, j, k, 3) * dt_div_jac);
   }
   // Update total energy
-  real total_energy = (total_energy_n + dq(i, j, k, 4) * dt_div_jac);
+  const real total_energy = total_energy_n + dq(i, j, k, 4) * dt_div_jac;
 
   // Update scalars
   auto &sv = zone->sv;
@@ -304,7 +305,7 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param) {
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void update_bv(cfd::DZone *zone, DParameter *param, real dt) {
+__global__ void update_bv(DZone *zone, DParameter *param, real dt) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -318,7 +319,7 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param, real dt) {
   const real density_n = bv(i, j, k, 0);
   const real total_energy_n = compute_total_energy_1_point<mix_model>(i, j, k, zone, param);
 
-  real dt_div_jac = dt / zone->jac(i, j, k);
+  const real dt_div_jac = dt / zone->jac(i, j, k);
   // Update density first
   bv(i, j, k, 0) += dq(i, j, k, 0) * dt_div_jac;
   // Get the 1/density
@@ -332,7 +333,7 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param, real dt) {
     bv(i, j, k, 3) = density_inv * (density_n * bv(i, j, k, 3) + dq(i, j, k, 3) * dt_div_jac);
   }
   // Update total energy
-  real total_energy = (total_energy_n + dq(i, j, k, 4) * dt_div_jac);
+  const real total_energy = total_energy_n + dq(i, j, k, 4) * dt_div_jac;
 
   // Update scalars
   auto &sv = zone->sv;
@@ -356,8 +357,8 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param, real dt) {
       }
     } else {
       for (int l = 0; l < n_spec; ++l) {
-        real yk_mix = param->yk_lib(l, 0, 0, 0) +
-                      sv(i, j, k, param->i_fl) * (param->yk_lib(l, 0, 0, param->n_z) - param->yk_lib(l, 0, 0, 0));
+        const real yk_mix = param->yk_lib(l, 0, 0, 0) +
+                            sv(i, j, k, param->i_fl) * (param->yk_lib(l, 0, 0, param->n_z) - param->yk_lib(l, 0, 0, 0));
         sv(i, j, k, l) = yk_mix + param->n_fl_step * (yk_ave[l] - yk_mix) / 10000.0;
       }
     }
@@ -375,5 +376,5 @@ __global__ void update_bv(cfd::DZone *zone, DParameter *param, real dt) {
   }
 }
 
-__global__ void eliminate_k_gradient(cfd::DZone *zone, const DParameter *param);
+__global__ void eliminate_k_gradient(DZone *zone, const DParameter *param);
 }

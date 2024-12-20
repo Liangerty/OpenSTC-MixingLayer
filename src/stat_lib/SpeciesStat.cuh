@@ -11,12 +11,12 @@
 
 namespace cfd {
 template<typename T>
-std::vector<int> read_species_collect_file(cfd::Parameter &parameter, const cfd::Mesh &mesh, int n_block_ahead,
+std::vector<int> read_species_collect_file(Parameter &parameter, const Mesh &mesh, int n_block_ahead,
                                            std::vector<Field> &field);
 
 template<typename T>
 MPI_Offset
-create_species_collect_file(cfd::Parameter &parameter, const Mesh &mesh, int n_block_ahead);
+create_species_collect_file(Parameter &parameter, const Mesh &mesh, int n_block_ahead);
 
 template<typename T>
 void export_species_collect_file(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
@@ -31,17 +31,17 @@ struct SpeciesDissipationRate {
   constexpr static std::string_view file_name = "species_dissipation_rate";
 
   static void
-  read(MPI_File &fp, MPI_Offset offset_read, Field &zone, int index, int count, MPI_Datatype ty, MPI_Status *status);
+  read(const MPI_File &fp, MPI_Offset offset_read, Field &zone, int index, int count, MPI_Datatype ty, MPI_Status *status);
 
   static void copy_to_device(Field &zone, int nv, long long sz);
 
   static void copy_to_host(Field &zone, int nv, long long sz);
 
   static void
-  write(MPI_File &fp, MPI_Offset offset, Field &zone, int count, MPI_Datatype ty, MPI_Status *status);
+  write(const MPI_File &fp, MPI_Offset offset, Field &zone, int count, MPI_Datatype ty, MPI_Status *status);
 };
 
-__device__ void collect_species_dissipation_rate(DZone *zone, DParameter *param, int i, int j, int k);
+__device__ void collect_species_dissipation_rate(DZone *zone, const DParameter *param, int i, int j, int k);
 
 struct SpeciesVelocityCorrelation {
   constexpr static int n_collect = 3;
@@ -50,22 +50,22 @@ struct SpeciesVelocityCorrelation {
   constexpr static std::string_view file_name = "species_velocity_correlation";
 
   static void
-  read(MPI_File &fp, MPI_Offset offset_read, Field &zone, int index, int count, MPI_Datatype ty, MPI_Status *status);
+  read(const MPI_File &fp, MPI_Offset offset_read, Field &zone, int index, int count, MPI_Datatype ty, MPI_Status *status);
 
   static void copy_to_device(Field &zone, int nv, long long sz);
 
   static void copy_to_host(Field &zone, int nv, long long sz);
 
   static void
-  write(MPI_File &fp, MPI_Offset offset, Field &zone, int count, MPI_Datatype ty, MPI_Status *status);
+  write(const MPI_File &fp, MPI_Offset offset, Field &zone, int count, MPI_Datatype ty, MPI_Status *status);
 };
 
-__device__ void collect_species_velocity_correlation(DZone *zone, DParameter *param, int i, int j, int k);
+__device__ void collect_species_velocity_correlation(DZone *zone, const DParameter *param, int i, int j, int k);
 
 }
 
 template<typename T>
-std::vector<int> cfd::read_species_collect_file(cfd::Parameter &parameter, const cfd::Mesh &mesh, int n_block_ahead,
+std::vector<int> cfd::read_species_collect_file(Parameter &parameter, const Mesh &mesh, int n_block_ahead,
                                                 std::vector<Field> &field) {
   const std::filesystem::path out_dir("output/stat/");
   std::string fileName{T::file_name};
@@ -174,10 +174,10 @@ std::vector<int> cfd::read_species_collect_file(cfd::Parameter &parameter, const
 }
 
 template<typename T>
-MPI_Offset cfd::create_species_collect_file(cfd::Parameter &parameter, const cfd::Mesh &mesh, int n_block_ahead) {
+MPI_Offset cfd::create_species_collect_file(Parameter &parameter, const Mesh &mesh, int n_block_ahead) {
   const std::filesystem::path out_dir("output/stat/");
   MPI_File fp;
-  std::string fileName{T::file_name};
+  const std::string fileName{T::file_name};
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + fileName + ".bin").c_str(),
                 MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);
   MPI_Status status;
@@ -215,7 +215,7 @@ MPI_Offset cfd::create_species_collect_file(cfd::Parameter &parameter, const cfd
     offset += 4 * n_collect; // counter
   }
   for (int b = 0; b < n_block_ahead; ++b) {
-    MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
+    const MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
     offset += sz * n_collect + 4 * 3;
   }
 
@@ -228,7 +228,7 @@ cfd::export_species_collect_file(Parameter &parameter, const Mesh &mesh, std::ve
                                  MPI_Offset offset_ahead, std::vector<int> &counter,
                                  const std::vector<MPI_Datatype> &tys) {
   const std::filesystem::path out_dir("output/stat/");
-  std::string fileName{T::file_name};
+  const std::string fileName{T::file_name};
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + fileName + ".bin").c_str(),
                 MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp);

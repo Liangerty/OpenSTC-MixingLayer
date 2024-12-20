@@ -29,7 +29,7 @@ __global__ void set_dq_to_0(const DParameter *param, DZone *zone, int i_face) {
   }
 }
 
-void set_wall_dq_to_0(const Block &block, const DParameter *param, DZone *zone, DBoundCond &bound_cond) {
+void set_wall_dq_to_0(const Block &block, const DParameter *param, DZone *zone, const DBoundCond &bound_cond) {
   for (size_t l = 0; l < bound_cond.n_wall; l++) {
     const auto nb = bound_cond.wall_info[l].n_boundary;
     for (size_t i = 0; i < nb; i++) {
@@ -41,7 +41,7 @@ void set_wall_dq_to_0(const Block &block, const DParameter *param, DZone *zone, 
       const auto ngg = block.ngg;
       uint tpb[3], bpg[3];
       for (size_t j = 0; j < 3; j++) {
-        auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
+        const auto n_point = hf.range_end[j] - hf.range_start[j] + 1;
         tpb[j] = n_point <= (2 * ngg + 1) ? 1 : 16;
         bpg[j] = (n_point - 1) / tpb[j] + 1;
       }

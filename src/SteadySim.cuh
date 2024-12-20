@@ -20,7 +20,7 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
 
   auto &parameter{driver.parameter};
   auto &mesh{driver.mesh};
-  std::vector<cfd::Field> &field{driver.field};
+  std::vector<Field> &field{driver.field};
   DParameter *param{driver.param};
 
   if (driver.myid == 0) {
@@ -119,7 +119,7 @@ void steady_simulation(Driver<mix_model, turb> &driver) {
 
     // update physical properties such as Mach number, transport coefficients et, al.
     for (auto b = 0; b < n_block; ++b) {
-      int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+      const int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
       dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
       update_physical_properties<mix_model><<<BPG, tpb>>>(field[b].d_ptr, param);
     }

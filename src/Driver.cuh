@@ -27,7 +27,7 @@ public:
   Species spec;
   Reaction reac;
   FlameletLib flameletLib;
-  std::vector<cfd::Field> field; // The flowfield data of the simulation. Every block is a "Field" object
+  std::vector<Field> field; // The flowfield data of the simulation. Every block is a "Field" object
   DParameter *param = nullptr; // The parameters used for GPU simulation, data are stored on GPU while the pointer is on CPU
   DBoundCond bound_cond;  // Boundary conditions
   std::array<real, 4> res{1, 1, 1, 1};

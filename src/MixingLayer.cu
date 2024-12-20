@@ -10,10 +10,10 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
   // If we initialize a mixing layer problem, we need to know the following parameters:
   // 1. The convective Mach number Ma_c
   // 2. The vortex thickness at the entrance delta_omega
-  // 3. The info of the fuel stream: The mass fraction of species, the Mach number, and the temperature
+  // 3. The info of the fuel stream: The mass fraction of species, the Mach number, and temperature
   // 4. The info of the oxidizer stream: The mass fraction of species, the temperature. The Mach number should be computed with the Ma_c.
   const int n_spec{parameter.get_int("n_spec")};
-  real ma_c{parameter.get_real("ma_c")};
+  const real ma_c{parameter.get_real("ma_c")};
   auto &upper = parameter.get_struct("upper_stream");
   auto &lower = parameter.get_struct("lower_stream");
 
@@ -24,10 +24,10 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
   if (lower.find("mach") != lower.cend()) {
     ma_lower = std::get<real>(lower.at("mach"));
   }
-  real vel_ratio{parameter.get_real("velocity_ratio")};
+  const real vel_ratio{parameter.get_real("velocity_ratio")};
 
-  real T_upper{std::get<real>(upper.at("temperature"))}, T_lower{std::get<real>(lower.at("temperature"))};
-  real p_upper{std::get<real>(upper.at("pressure"))}, p_lower{std::get<real>(lower.at("pressure"))};
+  const real T_upper{std::get<real>(upper.at("temperature"))}, T_lower{std::get<real>(lower.at("temperature"))};
+  const real p_upper{std::get<real>(upper.at("pressure"))}, p_lower{std::get<real>(lower.at("pressure"))};
   real rho_upper, rho_lower;
   real c_upper, c_lower;
   real mix_frac_upper{-1}, mix_frac_lower{-1};
@@ -59,8 +59,8 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
       cp_upper += cpi_upper[i] * yk_upper[i];
       cp_lower += cpi_lower[i] * yk_lower[i];
     }
-    real gamma_upper{cp_upper / (cp_upper - R_u * mw_inv_upper)};
-    real gamma_lower{cp_lower / (cp_lower - R_u * mw_inv_lower)};
+    const real gamma_upper{cp_upper / (cp_upper - R_u * mw_inv_upper)};
+    const real gamma_lower{cp_lower / (cp_lower - R_u * mw_inv_lower)};
     c_upper = std::sqrt(gamma_upper * R_u * mw_inv_upper * T_upper);
     c_lower = std::sqrt(gamma_lower * R_u * mw_inv_lower * T_lower);
     rho_upper = p_upper / (R_u * mw_inv_upper * T_upper);
@@ -96,7 +96,7 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
     printf("At least one of the mach number and the convective Mach number should be given.\n");
     MpiParallel::exit();
   } else if (ma_upper > 0 && ma_lower > 0) {
-    real convective_mach = abs(ma_upper * c_upper - ma_lower * c_lower) / (c_upper + c_lower);
+    const real convective_mach = abs(ma_upper * c_upper - ma_lower * c_lower) / (c_upper + c_lower);
     if (abs(ma_c - convective_mach) > 1e-3) {
       printf(
         "The convective mach number with given streams = %e, which is not consistent with the given convective mach number %e.\n",
@@ -117,7 +117,7 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
       ma_upper = (ma_lower - ma_c) * c_lower / c_upper - ma_c;
     }
   }
-  real u_upper{ma_upper * c_upper}, u_lower{ma_lower * c_lower};
+  const real u_upper{ma_upper * c_upper}, u_lower{ma_lower * c_lower};
 
   // 7 : rho(0, 7+ns), u(1, 8+ns), v(2, 9+ns), w(3, 10+ns), p(4, 11+ns), T(5, 12+ns), mix_frac(6+ns, 13+2*ns);
   // n_spec : yk(6:6+ns-1, 13+ns:13+2*ns-1)
@@ -145,7 +145,7 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
   }
   var_info[13 + 2 * n_spec] = mix_frac_lower;
 
-  int counter = 13 + 2 * n_spec;
+  const int counter = 13 + 2 * n_spec;
 
   if (parameter.get_int("turbulence_method") == 1 || parameter.get_int("turbulence_method") == 2) {
     if (parameter.get_int("RANS_model") == 2) {
@@ -158,8 +158,8 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
       if (upper.find("turbulence_intensity") != upper.cend()) {
         turb_intensity = std::get<real>(upper.at("turbulence_intensity"));
       }
-      real tke_upper = 1.5 * turb_intensity * turb_intensity * u_upper * u_upper;
-      real omega_upper = rho_upper * tke_upper / (mutMul * mu_upper);
+      const real tke_upper = 1.5 * turb_intensity * turb_intensity * u_upper * u_upper;
+      const real omega_upper = rho_upper * tke_upper / (mutMul * mu_upper);
 
       turb_intensity = 0.01;
       mutMul = 1;
@@ -169,18 +169,18 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
       if (lower.find("turbulence_intensity") != lower.cend()) {
         turb_intensity = std::get<real>(lower.at("turbulence_intensity"));
       }
-      real tke_lower = 1.5 * turb_intensity * turb_intensity * u_lower * u_lower;
-      real omega_lower = rho_lower * tke_lower / (mutMul * mu_lower);
+      const real tke_lower = 1.5 * turb_intensity * turb_intensity * u_lower * u_lower;
+      const real omega_lower = rho_lower * tke_lower / (mutMul * mu_lower);
 
       var_info[counter + 1] = tke_upper;
       var_info[counter + 2] = omega_upper;
       var_info[counter + 3] = tke_lower;
       var_info[counter + 4] = omega_lower;
-      counter += 4;
+      // counter += 4;
     }
   }
 
-  if (int n_ps = parameter.get_int("n_ps"); n_ps > 0) {
+  if (const int n_ps = parameter.get_int("n_ps"); n_ps > 0) {
     for (int i = 1; i <= n_ps; ++i) {
       if (upper.find("ps" + std::to_string(i)) != upper.cend()) {
         var_info.push_back(std::get<real>(upper.at("ps" + std::to_string(i))));

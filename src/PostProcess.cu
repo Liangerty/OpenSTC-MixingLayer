@@ -4,7 +4,7 @@
 #include <fstream>
 
 void
-cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Field> &field, const Parameter &parameter) {
+cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<Field> &field, const Parameter &parameter) {
   const std::filesystem::path out_dir("output/wall");
   if (!exists(out_dir)) {
     create_directories(out_dir);
@@ -47,7 +47,7 @@ cfd::wall_friction_heatflux_2d(const Mesh &mesh, const std::vector<cfd::Field> &
   cudaFree(qw);
 }
 
-__global__ void cfd::wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction, real *heat_flux, real dyn_pressure) {
+__global__ void cfd::wall_friction_heatFlux_2d(DZone *zone, real *friction, real *heat_flux, real dyn_pressure) {
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i >= zone->mx) return;
 
@@ -71,8 +71,8 @@ __global__ void cfd::wall_friction_heatFlux_2d(cfd::DZone *zone, real *friction,
 
 }
 
-void cfd::wall_friction_heatFlux_3d(const cfd::Mesh &mesh, const std::vector<cfd::Field> &field,
-                                    const cfd::Parameter &parameter, DParameter *param) {
+void cfd::wall_friction_heatFlux_3d(const Mesh &mesh, const std::vector<Field> &field,
+                                    const Parameter &parameter, DParameter *param) {
   const std::filesystem::path out_dir("output");
   if (!exists(out_dir)) {
     create_directories(out_dir);
@@ -132,7 +132,7 @@ void cfd::wall_friction_heatFlux_3d(const cfd::Mesh &mesh, const std::vector<cfd
 }
 
 __global__ void
-cfd::wall_friction_heatFlux_3d(cfd::DZone *zone, ggxl::VectorField2D<real> *cfQw, cfd::DParameter *param, bool stat_on,
+cfd::wall_friction_heatFlux_3d(DZone *zone, ggxl::VectorField2D<real> *cfQw, const DParameter *param, bool stat_on,
                                bool spanwise_ave) {
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
   const int k = blockDim.z * blockIdx.z + threadIdx.z;
@@ -182,14 +182,14 @@ cfd::wall_friction_heatFlux_3d(cfd::DZone *zone, ggxl::VectorField2D<real> *cfQw
   bdjin(3, 2) = d2 / kk;
   bdjin(3, 3) = d3 / kk;
 
-  real vt = bdjin(2, 1) * u + bdjin(2, 2) * v + bdjin(2, 3) * w;
-  real vs = bdjin(3, 1) * u + bdjin(3, 2) * v + bdjin(3, 3) * w;
-  real velocity_tau = sqrt(vt * vt + vs * vs);
+  const real vt = bdjin(2, 1) * u + bdjin(2, 2) * v + bdjin(2, 3) * w;
+  const real vs = bdjin(3, 1) * u + bdjin(3, 2) * v + bdjin(3, 3) * w;
+  const real velocity_tau = sqrt(vt * vt + vs * vs);
 
-  real tau = velocity_tau / d_wini * zone->mul(i, 0, k);
-  real cf = tau / (0.5 * (rho_ref * v_ref * v_ref));
-  real u_tau = sqrt(tau / rho_w);
-  real y_plus = rho_w * u_tau * dy / zone->mul(i, 0, k);
+  const real tau = velocity_tau / d_wini * zone->mul(i, 0, k);
+  const real cf = tau / (0.5 * (rho_ref * v_ref * v_ref));
+  const real u_tau = sqrt(tau / rho_w);
+  const real y_plus = rho_w * u_tau * dy / zone->mul(i, 0, k);
 
   (*cfQw)(i, k, 0) = cf;
   (*cfQw)(i, k, 1) = y_plus;

@@ -13,7 +13,7 @@ struct Boundary {
 
   /**
    * \brief process the boundary information to identify its face and direction.
-   * \param ngg number of ghost grid in each direction
+   * \param ngg number of ghost grids in each direction
    * \param dim dimension of the problem
    */
   void register_boundary(int ngg, int dim);
@@ -25,7 +25,8 @@ struct Boundary {
   int type_label = 0;
   /**> the normal direction of the face, i-0, j-1, k-2*/
   int face = 0;
-  /**> is the face normal positive or negative. Default: +1, which means the
+  /**> is the face normal positive or negative?
+   *Default: +1, which means the
    * normal points to the direction that the coordinate increases*/
   int direction = 1;
 };
@@ -43,7 +44,7 @@ struct InnerFace {
 
   int range_start[3]{0, 0, 0};
   int range_end[3]{0, 0, 0};  // the coordinate range of 3 directions
-  int face = 0;  // the normal direction of the face, i-0, j-1, k-2
+  int face = 0;  // The normal direction of the face, i-0, j-1, k-2
   // is the face normal positive or negative. Default: +1, which means the
   // normal points to the direction that the coordinate increases
   int direction = 1;
@@ -51,7 +52,7 @@ struct InnerFace {
       target_end[3]{0, 0, 0};  // The coordinate range of target block
   int target_block = 0;                // The target block number.
   int target_face = 0;  // the normal direction of the target face, i-0, j-1, k-2
-  int target_direction = 1;  // is the target face normal positive or negative. Default: +1
+  int target_direction = 1;  // Is the target face normal positive or negative? Default: +1
   int src_tar[3]{0, 0, 0};  // the corresponding relation between this source face and the target face
   int loop_dir[3]{1, 1, 1};  // The direction that when looping over the face, i,j,k increment +1/-1
   int target_loop_dir[3]{1, 1, 1};  // The direction that when looping over the face, i,j,k increment +1/-1
@@ -66,10 +67,9 @@ struct ParallelFace {
   /**
    * \brief establish the value passing order of the face.
    * \param dim dimension
-   * \param ngg number of ghost grids in each direction
-   * \details The faces are stored in a fixed order @loop_order. The first face
-   * is the matched face, the second one is the face with positive index and the
-   * last face is the one with negative face.
+   * \details The faces are stored in a fixed order @loop_order.
+   * The first face is the matched face, the second one is the face with positive index,
+   * and the last face is the one with negative face.
    */
   void register_boundary(int dim, int ngg);
 
@@ -85,15 +85,15 @@ struct ParallelFace {
   int target_process = 0;  // The target block number.
   int flag_send = 0, flag_receive = 0;
   /**
-   * \brief When sending message, the order of data put into the buffer.
-   * \details The label with same number is first iterated, then the positive
+   * \brief When sending a message, the order of data put into the buffer.
+   * \details The label with the same number is first iterated, then the positive
    * one, and the negative direction last. When getting data out of the
    * received, also in the same order.
    */
   int loop_order[3]{0, 0, 0};
   /**
-   * \brief The direction for iteration of each coordinates, +1/-1
-   * \details The order is not directly in i/j/k directions, but in the order of
+   * \brief The direction for iteration of each coordinate, +1/-1
+   * \details The order is not directly in i/j/k directions but in the order of
    * @loop_order.
    */
   int loop_dir[3]{1, 1, 1};
@@ -121,8 +121,12 @@ public:
 
 private:
   /**
-    * \brief create the header of the error log about negative jacobians.
+    * \brief create the header of the error log about negative jacobian values.
     * \param myid current process id
+    * \param i the i-th grid point
+    * \param j the j-th grid point
+    * \param k the k-th grid point
+    *
     */
   void log_negative_jacobian(int myid, int i, int j, int k) const;
 
@@ -182,23 +186,20 @@ private:
   void read_grid(int myid, const Parameter &parameter);
 
   /**
-   * \brief read the physical boundary of current process
-   * \param myid the process id of current process
-   * \param ngg number of ghost layers
+   * \brief read the physical boundary of the current process
+   * \param myid the process id of the current process
    */
   void read_boundary(int myid/*, int ngg*/);
 
   /**
-   * \brief read the inner face communication message of current process
-   * \param myid the process id of current process
-   * \param ngg number of ghost layers
+   * \brief read the inner face communication message of the current process
+   * \param myid the process id of the current process
    */
   void read_inner_interface(int myid/*, int ngg*/);
 
   /**
    * \brief read the parallel boundary coordinates. Do not read the target face or match them, left for solver initialization
    * \param myid process number, used for identify which file to read
-   * \param ngg number of ghost grids in each direction
    */
   void read_parallel_interface(int myid/*, int ngg*/);
 
@@ -206,7 +207,7 @@ private:
    * \brief scale all coordinates (x/y/z) to unit of meters.
    * \param scale the scale of the coordinates
    * \details for example, if the grid is drawn in unit mm, when we compute it in meters, it should be multiplied by 0.001
-   *  first, where the 0.001 is the @scale here.
+   *  first, where the 0.001 is @scale.
    */
   void scale(real scale);
 
@@ -214,7 +215,6 @@ private:
    * \brief initialize the ghost grids of the simulation
    * \param myid process number, used for identify which file to read
    * \param parallel if the computation is conducted in parallel
-   * \param ngg number of ghost layers
    */
   void init_ghost_grid(int myid, bool parallel/*, int ngg*/);
 
@@ -225,8 +225,6 @@ private:
 
   /**
    * \brief called by @init_ghost_grid, initialize the ghost grids of parallel communication faces
-   * \param myid process number, used for identify which file to read
-   * \param ngg number of ghost layers
    */
   void init_parallel_ghost_grid(int myid/*, int ngg*/);
 };

@@ -9,8 +9,7 @@
 #include "fmt/os.h"
 
 cfd::Boundary::Boundary(int x1, int x2, int y1, int y2, int z1, int z2, int type) : range_start{x1, y1, z1},
-                                                                                    range_end{x2, y2, z2},
-                                                                                    type_label{type} {}
+  range_end{x2, y2, z2}, type_label{type} {}
 
 void cfd::Boundary::register_boundary(const int ngg, const int dim) {
   for (int i = 0; i < dim; ++i) {
@@ -34,8 +33,7 @@ void cfd::Boundary::register_boundary(const int ngg, const int dim) {
 
 cfd::InnerFace::InnerFace(int x1, int x2, int y1, int y2, int z1, int z2, int tx1, int tx2, int ty1, int ty2, int tz1,
                           int tz2, int block_id) : range_start{x1, y1, z1}, range_end{x2, y2, z2},
-                                                   target_start{tx1, ty1, tz1}, target_end{tx2, ty2, tz2},
-                                                   target_block{block_id - 1} {}
+  target_start{tx1, ty1, tz1}, target_end{tx2, ty2, tz2}, target_block{block_id - 1} {}
 
 void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
   for (int i = 0; i < dim; ++i) {
@@ -43,7 +41,7 @@ void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
     if (range_start[i] == range_end[i]) {
       face = i;
       // if the same value is 1, it is the small label face, and the normal
-      // points to negative direction
+      // points to the negative direction
       if (range_start[i] == 1) direction = -1;
       range_start[i] -= 1;
       range_end[i] -= 1;
@@ -105,10 +103,10 @@ void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
 
   // Here, the range of loop for corresponding face is changed to the ghost grid
   // range. The other two directions are also changed, which means the current
-  // method also communicate the data in corners. ACANS and Wang's code
-  // communicate the corners in default. Later if we do not want to communicate
+  // method also communicates the data in corners. ACANS and Wang's code
+  // communicate the corners in default. Later, if we do not want to communicate
   // corner data in default, the ranges for the other 2 directions should be
-  // decreased, which can be achieved by just commenting out the last loop of
+  // decreased, which can be achieved by just commenting the last loop of
   // this function.
   range_start[face] = direction < 0 ? -ngg : range_end[face];
   range_end[face] = direction < 0 ? 0 : range_end[face] + ngg;
@@ -127,8 +125,8 @@ void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
     target_loop_dir[i] = gxl::sgn(src_tar[i]);
     src_tar[i] = std::abs(src_tar[i]) - 1;
   }
-  // Include the corners into the transfer
-  // Commented on 2023/6/20. The data on corneres are not communicated
+  // Include the corners in the transfer
+  // Commented on 2023/6/20. The data on corners are not communicated
   /*
    * For corners such as
    *
@@ -148,16 +146,16 @@ void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
    *               and a vertical inner boundary(:)
    *             below the corner point(*).
    * We name the left side block 0, which contains the horizontal line and the fluid below,
-   * the right side block 1, which contains the vertical line and the fuild on its right.
+   * the right side block 1, which contains the vertical line and the fluid on its right.
    *
    * If the communication contains the ghost grids, then for block 1,
    * the communicated region would contain not only the vertical inner boundary,
    * but also 2 points above the corner point.
    * Those 2 points above the corner point is assigned to be the average between the 2 blocks.
-   * For this scene, the value of those 2 points are 0 in block 1 because they are on the wall.
-   * Those values on block 0 is the negative of the inner 2 points below the horizontal wall
+   * For this scene, the value of those 2 points is 0 in block 1 because they are on the wall.
+   * Those values on block 0 are the negative of the inner 2 points below the horizontal wall
    * as they are ghost grids in block 0. Thus, when we average the 2 values, we get non-zero value on these 2 points,
-   * which disobeys the wall bondary condition.
+   * which disobeys the wall boundary condition.
    *
    * */
 //  for (int i = 0; i < 3; ++i) {
@@ -174,16 +172,15 @@ void cfd::InnerFace::register_boundary(const int ngg, const int dim) {
 }
 
 cfd::ParallelFace::ParallelFace(int x1, int x2, int y1, int y2, int z1, int z2, int proc_id, int flag_s, int flag_r)
-    : range_start{x1, y1, z1}, range_end{x2, y2, z2}, target_process{proc_id}, flag_send{flag_s},
-      flag_receive{flag_r} {}
+  : range_start{x1, y1, z1}, range_end{x2, y2, z2}, target_process{proc_id}, flag_send{flag_s}, flag_receive{flag_r} {}
 
-void cfd::ParallelFace::register_boundary(const int dim, int ngg) {
+void cfd::ParallelFace::register_boundary(const int dim) {
   for (int i = 0; i < dim; ++i) {
     // if start==end, then it is the normal direction
     if (range_start[i] == range_end[i]) {
       face = i;
       // if the same value is 1, it is the small label face, and the normal
-      // points to negative direction
+      // points to the negative direction
       if (range_start[i] == 1) direction = -1;
       range_start[i] -= 1;
       range_end[i] -= 1;
@@ -234,15 +231,8 @@ void cfd::ParallelFace::register_boundary(const int dim, int ngg) {
 }
 
 cfd::Block::Block(int _mx, int _my, int _mz, int _ngg, int _id, const Parameter &parameter) : mx{_mx}, my{_my}, mz{_mz},
-                                                                                              n_grid{mx * my * mz},
-                                                                                              block_id{_id}, ngg{_ngg},
-                                                                                              x{mx, my, mz, _ngg + 1},
-                                                                                              y{mx, my, mz, _ngg + 1},
-                                                                                              z{mx, my, mz, _ngg + 1},
-                                                                                              jacobian{mx, my, mz,
-                                                                                                       _ngg},
-                                                                                              metric{mx, my, mz, _ngg},
-                                                                                              des_scale() {
+  n_grid{mx * my * mz}, block_id{_id}, ngg{_ngg}, x{mx, my, mz, _ngg + 1}, y{mx, my, mz, _ngg + 1},
+  z{mx, my, mz, _ngg + 1}, jacobian{mx, my, mz, _ngg}, metric{mx, my, mz, _ngg} {
   if (parameter.get_bool("turbulence") && parameter.get_int("turbulence_method") == 2) {
     des_scale.resize(mx, my, mz, ngg);
   }
@@ -272,10 +262,8 @@ void cfd::Block::compute_jac_metric(int myid) {
                          dxd3 * dyd1 * dzd2 - dxd1 * dyd3 * dzd2 -
                          dxd2 * dyd1 * dzd3 - dxd3 * dyd2 * dzd1;
         if (jac <= 0) {
-          fmt::print(
-              "Negative Jacobian from process {}\nBlock {}, index is ({}, {}, "
-              "{}).\nStop simulation.\n",
-              myid, block_id, i, j, k);
+          fmt::print("Negative Jacobian from process {}\nBlock {}, index is ({}, {}, {}).\nStop simulation.\n", myid,
+                     block_id, i, j, k);
           MPI_Abort(MPI_COMM_WORLD, 1);
         }
         jacobian(i, j, k) = jac;
@@ -292,8 +280,9 @@ void cfd::Block::compute_jac_metric(int myid) {
       }
     }
   }
-  // Start to compute boundaries, edges and corners. If negative value appears
-  // here, just assign the value of the inner layer to it. First block:
+  // Start to compute boundaries, edges and corners.
+  // If a negative value appears here, assign the value of the inner layer to it.
+  // First block:
   // k=-1,-ng No edges and corners
   for (int i = 1; i < mx - 1; ++i) {
     for (int j = 1; j < my - 1; ++j) {
@@ -545,7 +534,7 @@ void cfd::Block::compute_des_scale(const Parameter &parameter) {
   for (int k = -ngg; k < mz + ngg; ++k) {
     for (int j = -ngg; j < my + ngg; ++j) {
       for (int i = -ngg; i < mx + ngg; ++i) {
-        // Compute the left and right half point coordinate
+        // Compute the left and right half-point coordinate
         real left[3], right[3];
         left[0] = 0.5 * (x(i - 1, j, k) + x(i, j, k));
         left[1] = 0.5 * (y(i - 1, j, k) + y(i, j, k));
@@ -601,8 +590,8 @@ void cfd::Block::compute_des_scale(const Parameter &parameter) {
   }
 }
 
-cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg")},
-                                        n_proc{parameter.get_int("n_proc")}, nblk{new int[n_proc]} {
+cfd::Mesh::Mesh(Parameter &parameter) : n_proc{parameter.get_int("n_proc")}, ngg{parameter.get_int("ngg")},
+  nblk{new int[n_proc]} {
   const int myid = parameter.get_int("myid");
   const bool parallel = parameter.get_bool("parallel");
   if (myid == 0)
@@ -640,7 +629,7 @@ cfd::Mesh::Mesh(Parameter &parameter) : dimension{3}, ngg{parameter.get_int("ngg
 
   /*Compute the metrics and jacobian values of all grid points*/
   for (auto &b: block) b.compute_jac_metric(myid);
-  if (myid == 0) fmt::print("\tFinish computing metrics and jacobians.\n");
+  if (myid == 0) fmt::print("\tFinish computing metrics and jacobian values.\n");
 
   if (parameter.get_bool("turbulence") && parameter.get_int("turbulence_method") == 2) {
     // When we use DES simulation, we need to compute the grid scale \Delta.
@@ -673,7 +662,6 @@ void cfd::Mesh::read_grid(const int myid, const Parameter &parameter) {
     if (parameter.get_int("gridIsBinary")) {
       // Binary grid grd with MPI_File
       MPI_File grd;
-      MPI_Offset offset = 0;
       MPI_File_open(MPI_COMM_WORLD, fmt::format("./input/grid/grid{:>4}.dat", myid).c_str(), MPI_MODE_RDONLY,
                     MPI_INFO_NULL, &grd);
       MPI_File_read(grd, &n_block, 1, MPI_INT, MPI_STATUS_IGNORE); //	Read number of grid blocks
@@ -697,7 +685,6 @@ void cfd::Mesh::read_grid(const int myid, const Parameter &parameter) {
         //read grid coordinates
         MPI_Datatype ty;
         int lSize[3] = {block[blk].mx + 2 * (ngg + 1), block[blk].my + 2 * (ngg + 1), block[blk].mz + 2 * (ngg + 1)};
-        const long long memSz = lSize[0] * lSize[1] * lSize[2] * 8;
         int sSize[3] = {block[blk].mx, block[blk].my, block[blk].mz};
         int start_idx[3] = {ngg + 1, ngg + 1, ngg + 1};
         MPI_Type_create_subarray(3, lSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
@@ -880,7 +867,7 @@ void cfd::Mesh::read_parallel_interface(const int myid/*, int ngg*/) {
       grd >> i1 >> i2 >> i3 >> i4 >> i5 >> i6 >> i7 >> flag_s >> flag_r;
       block[blk].parallel_face.emplace_back(i1, i2, i3, i4, i5, i6,
                                             i7, flag_s, flag_r);
-      block[blk].parallel_face[f].register_boundary(dimension, ngg);
+      block[blk].parallel_face[f].register_boundary(dimension);
     }
   }
   delete[]n_face;
@@ -976,7 +963,7 @@ void cfd::Mesh::init_ghost_grid(const int myid, const bool parallel/*, const int
   init_inner_ghost_grid();
   //If we use parallel computation, assign the ghost grid of parallel boundaries by MPI
   if (parallel) {
-    init_parallel_ghost_grid(myid/*, ngg*/);
+    init_parallel_ghost_grid();
   }
   /*Assign ghost grids on the edges and at the corners by using parallelogram hypothesis*/
   for (int blk = 0; blk < n_block; ++blk) {
@@ -1109,18 +1096,19 @@ void cfd::Mesh::init_inner_ghost_grid() {
   }
 }
 
-void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
+void cfd::Mesh::init_parallel_ghost_grid() {
   //Add up to the total face number
   size_t total_face = 0;
   for (int m = 0; m < n_block; ++m) {
     total_face += block[m].parallel_face.size();
   }
 
-  //A 2-D array which is the cache used when using MPI to send/recv messages. The first dimension is the face index
-  //while the second dimension is the coordinate of that face, 3 consecutive number represents one position.
+  //A 2-D array which is the cache used when using MPI to send/recv messages.
+  //The first dimension is the face index,
+  //while the second dimension is the coordinate of that face, 3 consecutive numbers represent one position.
   const auto temp_s = new real *[total_face], temp_r = new real *[total_face];
 
-  //Added with iterate through faces and will equal to the total face number when the loop ends
+  //Added with iterating through faces and will equal to the total face number when the loop ends
   int fc_num = 0;
   //Compute the array size of different faces and allocate them. Different for different faces.
   for (int blk = 0; blk < n_block; ++blk) {
@@ -1130,9 +1118,11 @@ void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
       const auto &face = B.parallel_face[f];
       //The length of the array is 3*(ngg+1)*${number of grid points of the face}
       //ngg+1 is the number of layers to communicate, 3 for 3 coordinates(x,y,z)
-      int extent[3]{std::abs(face.range_start[0] - face.range_end[0]) + 1,
-                    std::abs(face.range_start[1] - face.range_end[1]) + 1,
-                    std::abs(face.range_start[2] - face.range_end[2]) + 1};
+      int extent[3]{
+        std::abs(face.range_start[0] - face.range_end[0]) + 1,
+        std::abs(face.range_start[1] - face.range_end[1]) + 1,
+        std::abs(face.range_start[2] - face.range_end[2]) + 1
+      };
       for (int i = 0; i < 3; ++i) {
         if (i == face.face) continue;
         extent[i] += 2 * ngg + 2;
@@ -1157,8 +1147,8 @@ void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
       //Iterate through the faces
       const auto &Fc = B.parallel_face[f];
       int num = 0;
-      int min_[]{Fc.range_start[0], Fc.range_start[1], Fc.range_start[2]}, max_[]{Fc.range_end[0], Fc.range_end[1],
-                                                                                  Fc.range_end[2]};
+      int min_[]{Fc.range_start[0], Fc.range_start[1], Fc.range_start[2]},
+          max_[]{Fc.range_end[0], Fc.range_end[1], Fc.range_end[2]};
       min_[0] = Fc.range_start[Fc.loop_order[0]] - Fc.direction;
       max_[0] = Fc.range_end[Fc.loop_order[0]] - Fc.direction * (ngg + 1);
       min_[1] = Fc.range_start[Fc.loop_order[1]] - Fc.loop_dir[Fc.loop_order[1]] * (ngg + 1);
@@ -1174,9 +1164,9 @@ void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
       }
       int send_ijk[]{0, 0, 0};
       for (send_ijk[Fc.loop_order[0]] = min_[0]; di1 * (send_ijk[Fc.loop_order[0]] - max_[0]) != 1; send_ijk[Fc.
-          loop_order[0]] += di1) {
+               loop_order[0]] += di1) {
         for (send_ijk[Fc.loop_order[1]] = min_[1]; dj1 * (send_ijk[Fc.loop_order[1]] - max_[1]) != 1; send_ijk[
-                                                                                                          Fc.loop_order[1]] += dj1) {
+                 Fc.loop_order[1]] += dj1) {
           for (send_ijk[Fc.loop_order[2]] = min_[2]; dk1 * (send_ijk[Fc.loop_order[2]] - max_[2]) != 1;
                send_ijk[Fc.loop_order[2]] += dk1) {
             const int i1{send_ijk[0]}, j1{send_ijk[1]}, k1{send_ijk[2]};
@@ -1226,9 +1216,9 @@ void cfd::Mesh::init_parallel_ghost_grid(const int myid/*, const int ngg*/) {
       int recv_ijk[]{0, 0, 0};
       // Because x/y/z are stored independently, these values should be read continuously.
       for (recv_ijk[fc.loop_order[0]] = min_[0]; di1 * (recv_ijk[fc.loop_order[0]] - max_[0]) != 1; recv_ijk[fc.
-          loop_order[0]] += di1) {
+               loop_order[0]] += di1) {
         for (recv_ijk[fc.loop_order[1]] = min_[1]; dj1 * (recv_ijk[fc.loop_order[1]] - max_[1]) != 1; recv_ijk[
-                                                                                                          fc.loop_order[1]] += dj1) {
+                 fc.loop_order[1]] += dj1) {
           for (recv_ijk[fc.loop_order[2]] = min_[2]; dk1 * (recv_ijk[fc.loop_order[2]] - max_[2]) != 1;
                recv_ijk[fc.loop_order[2]] += dk1) {
             const int i1{recv_ijk[0]}, j1{recv_ijk[1]}, k1{recv_ijk[2]};

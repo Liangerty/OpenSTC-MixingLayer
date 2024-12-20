@@ -22,11 +22,11 @@ class Monitor {
 public:
   explicit Monitor(const Parameter &parameter, const Species &species, const Mesh& mesh_);
 
-  void monitor_point(int step, real physical_time, std::vector<cfd::Field> &field);
+  void monitor_point(int step, real physical_time, const std::vector<Field> &field);
 
   void output_data();
 
-  void output_slices(const Parameter &parameter, std::vector<cfd::Field> &field, int step, real t);
+  void output_slices(const Parameter &parameter, std::vector<Field> &field, int step, real t);
 
   ~Monitor();
 

@@ -21,7 +21,7 @@ template<MixtureModel mix_model, class turb>
 void parallel_communication(const Mesh &mesh, std::vector<Field> &field, int step, const Parameter &parameter,
                             DParameter *param);
 
-__global__ void setup_data_to_be_sent(DZone *zone, int i_face, real *data, const DParameter *param);
+__global__ void setup_data_to_be_sent(const DZone *zone, int i_face, real *data, const DParameter *param);
 
 template<MixtureModel mix_model, class turb>
 __global__ void assign_data_received(DZone *zone, int i_face, const real *data, DParameter *param);

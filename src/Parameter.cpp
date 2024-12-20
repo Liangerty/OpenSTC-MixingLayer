@@ -257,7 +257,7 @@ void cfd::Parameter::deduce_known_info() {
   // to identify the method to be used.
   // 2-Roe, 3-AUSM+, 4-HLLC. These are used by default if the corresponding reconstruction methods are 1stOrder, MUSCL, or NND2.
   // Once the reconstruction method is changed to high-order ones, such as WENO5, WENO7, etc., we would use a new tag to identify
-  // them. Because, the reconstructed variables would be conservative variables, and there may be additional operations,
+  // them. Because the reconstructed variables would be conservative variables, and there may be additional operations,
   // such as characteristic reconstruction, high-order central difference, etc.
   // Summary: 2-Roe, 3-AUSM+, 4-HLLC, 14-HLLC+WENO
   int inviscid_tag{get_int("inviscid_scheme")};
@@ -287,7 +287,7 @@ void cfd::Parameter::deduce_known_info() {
   int n_scalar{0};
   if (bool_parameters["turbulence"] == 1) {
     if (int_parameters["turbulence_method"] == 1 || int_parameters["turbulence_method"] == 2) { // RANS or DES
-      if (int_parameters["RANS_model"] == 1) {// SA
+      if (int_parameters["RANS_model"] == 1) {                                                  // SA
         update_parameter("n_turb", 1);
         update_parameter("n_var", 5 + 1);
         n_scalar += 1;
@@ -445,13 +445,13 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["if_compute_wall_distance"] = 0;
   int_parameters["wall_distance"] = 0;
 
-  bool_parameters["steady"] = true; // Steady simulation is the default choice
-  int_parameters["implicit_method"] = 0; // Explicit is used by default
-  int_parameters["DPLUR_inner_step"] = 3; // The default DPLUR inner iterations.
+  bool_parameters["steady"] = true;               // Steady simulation is the default choice
+  int_parameters["implicit_method"] = 0;          // Explicit is used by default
+  int_parameters["DPLUR_inner_step"] = 3;         // The default DPLUR inner iterations.
   real_parameters["convergence_criteria"] = 1e-8; // The criteria of convergence
 
   // If we conduct transient simulations, the following parameters are used by default.
-  int_parameters["temporal_scheme"] = 3; // RK3 is used by default
+  int_parameters["temporal_scheme"] = 3;      // RK3 is used by default
   bool_parameters["fixed_time_step"] = false; // The time step is computed with CFL condition.
   real_parameters["dt"] = 1e-8;
   real_parameters["n_flowThroughTime"] = -1;
@@ -459,7 +459,8 @@ void cfd::Parameter::setup_default_settings() {
   real_parameters["characteristic_velocity"] = -1;
   real_parameters["set_current_physical_time"] = -1;
 
-  bool_parameters["steady_before_transient"] = false; // Whether to conduct a steady simulation before transient simulation.
+  bool_parameters["steady_before_transient"] = false;
+  // Whether to conduct a steady simulation before transient simulation.
 
   // If dual-time stepping is used, the following parameters are needed.
   int_parameters["inner_iteration"] = 20;
@@ -467,11 +468,11 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["iteration_adjust_step"] = 20;
 
   // For spatial discretization
-  int_parameters["inviscid_scheme"] = 3; // AUSM+
-  int_parameters["reconstruction"] = 2; // MUSCL
-  int_parameters["limiter"] = 0; //minmod
+  int_parameters["inviscid_scheme"] = 3;         // AUSM+
+  int_parameters["reconstruction"] = 2;          // MUSCL
+  int_parameters["limiter"] = 0;                 // minmod
   real_parameters["entropy_fix_factor"] = 0.125; // For Roe scheme, we need an entropy fix factor.
-  int_parameters["viscous_order"] = 2; // Default viscous order is 2.
+  int_parameters["viscous_order"] = 2;           // The default viscous order is 2.
   bool_parameters["gradPInDiffusionFlux"] = false;
 
   // When WENO is used, pp limiter is a choice
@@ -484,12 +485,13 @@ void cfd::Parameter::setup_default_settings() {
   int_parameters["chemSrcMethod"] = 0; // explicit treatment of the chemical source term is used by default.
   real_parameters["c_chi"] = 1;
 
-  bool_parameters["turbulence"] = false;// laminar
-  int_parameters["turbulence_method"] = 1;// 1-RAS, 2-DES
-  int_parameters["RANS_model"] = 2; // 1-SA, 2-SST
-  int_parameters["turb_implicit"] = 1; // turbulent source term is treated implicitly by default
+  bool_parameters["turbulence"] = false;            // laminar
+  int_parameters["turbulence_method"] = 1;          // 1-RAS, 2-DES
+  int_parameters["RANS_model"] = 2;                 // 1-SA, 2-SST
+  int_parameters["turb_implicit"] = 1;              // turbulent source term is treated implicitly by default
   int_parameters["compressibility_correction"] = 0; // No compressibility correction is added by default
-  int_parameters["des_scale_method"] = 0; // How to compute the grid scale in DES simulations. 0 - cubic root of cell volume, 1 - max of cell dimension
+  int_parameters["des_scale_method"] = 0;
+  // How to compute the grid scale in DES simulations. 0 - cubic root of cell volume, 1 - max of cell dimension
 
   int_parameters["n_ps"] = 0;
 
@@ -624,15 +626,8 @@ void cfd::Parameter::deduce_sim_info(const Species &spec) {
   }
   if (get_bool("turbulence")) {
     // turbulence simulation
-    if (auto turb_method = get_int("turbulence_method");turb_method == 1) {
-      // RANS
-      n_scalar_transported += get_int("n_turb");
-      n_scalar += get_int("n_turb");
-      i_ps += get_int("n_turb");
-      i_ps_cv += get_int("n_turb");
-      ++n_other_var; // mut
-    } else if (turb_method == 2) {
-      // DES type
+    if (const auto turb_method = get_int("turbulence_method"); turb_method == 1 || turb_method == 2) {
+      // RANS or DES type
       n_scalar_transported += get_int("n_turb");
       n_scalar += get_int("n_turb");
       i_ps += get_int("n_turb");
@@ -658,12 +653,12 @@ void cfd::Parameter::deduce_sim_info(const Species &spec) {
 
   get_variable_names(spec);
 
-  int myid = get_int("myid");
+  const int myid = get_int("myid");
   if (myid == 0) {
     fmt::print("\n{:*^80}\n", "Simulation Details");
     printf("\t->-> %-20d : number of equations to solve\n", n_var);
     printf("\t->-> %-20d : number of scalar variables\n", n_scalar);
-    if (auto n_ps = get_int("n_ps");n_ps > 0) {
+    if (const auto n_ps = get_int("n_ps"); n_ps > 0) {
       printf("\t->-> %-20d : number of passive scalar variables\n", n_ps);
     }
 
@@ -704,7 +699,7 @@ void cfd::Parameter::deduce_sim_info(const Species &spec) {
 
     if (get_bool("turbulence")) {
       bool need_ras_model{false};
-      if (auto method = get_int("turbulence_method");method == 1) {
+      if (const auto method = get_int("turbulence_method"); method == 1) {
         fmt::print("\n\t->-> {:<20} : simulation\n", "RAS");
         need_ras_model = true;
       } else if (method == 2) {
@@ -722,7 +717,7 @@ void cfd::Parameter::deduce_sim_info(const Species &spec) {
         }
         std::string cc_method{};
         bool cc_flag = false;
-        if (auto cc = get_int("compressibility_correction");cc == 1) {
+        if (const auto cc = get_int("compressibility_correction"); cc == 1) {
           cc_flag = true;
           cc_method = "Wilcox";
         } else if (cc == 2) {
@@ -739,8 +734,8 @@ void cfd::Parameter::deduce_sim_info(const Species &spec) {
 
     if (get_bool("sponge_layer")) {
       fmt::print("\n\t->-> {:<20} : sponge layer\n", "With");
-      auto dirs = int_array["sponge_layer_direction"];
-      for (auto dir: dirs) {
+      const auto dirs = int_array["sponge_layer_direction"];
+      for (const auto dir: dirs) {
         if (dir == 0) {
           fmt::print("\t\t->-> {:<20} : direction\n", "x-");
           fmt::print("\t\t\t->-> {:<20} : start\n", get_real("spongeXMinusStart"));
@@ -775,23 +770,23 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
   // First, basic variables.
   std::vector<std::string> var_name{"density", "u", "v", "w", "pressure", "temperature"};
   VNs = {
-      {"X",           -3},
-      {"Y",           -2},
-      {"Z",           -1},
-      // Basic variables
-      {"RHO",         0},
-      {"DENSITY",     0},
-      {"U",           1},
-      {"V",           2},
-      {"W",           3},
-      {"P",           4},
-      {"PRESSURE",    4},
-      {"T",           5},
-      {"TEMPERATURE", 5},
+    {"X", -3},
+    {"Y", -2},
+    {"Z", -1},
+    // Basic variables
+    {"RHO", 0},
+    {"DENSITY", 0},
+    {"U", 1},
+    {"V", 2},
+    {"W", 3},
+    {"P", 4},
+    {"PRESSURE", 4},
+    {"T", 5},
+    {"TEMPERATURE", 5},
   };
   int nv = (int) var_name.size();
   if (get_int("species") != 0) {
-    int ns = spec.n_spec;
+    const int ns = spec.n_spec;
     var_name.resize(nv + ns);
     auto &names = spec.spec_list;
     for (auto &[name, ind]: names) {
@@ -803,7 +798,7 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
     nv += ns;
   }
   if (get_bool("turbulence")) {
-    if (auto turb_method = get_int("turbulence_method");turb_method == 1 || turb_method == 2) {
+    if (const auto turb_method = get_int("turbulence_method"); turb_method == 1 || turb_method == 2) {
       // RAS/DDES
       // Currently, only SST is implemented, so there is no condition branch here.
       nv += 2;
@@ -826,7 +821,7 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
       }
     }
   }
-  if (int n_ps = get_int("n_ps");n_ps > 0) {
+  if (const int n_ps = get_int("n_ps"); n_ps > 0) {
     nv += n_ps;
     for (int i = 0; i < n_ps; ++i) {
       var_name.emplace_back("PS" + std::to_string(i + 1));
@@ -838,7 +833,7 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
   // Next, additional variables with assigned memory.
   var_name.emplace_back("mach");
   ++nv;
-  if (auto turb_method = get_int("turbulence_method");turb_method == 1 || turb_method == 2) {
+  if (const auto turb_method = get_int("turbulence_method"); turb_method == 1 || turb_method == 2) {
     // RAS/DDES
     var_name.emplace_back("mut");
     ++nv;
@@ -865,7 +860,7 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
 }
 
 std::vector<int>
-cfd::Parameter::identify_variable_labels(std::vector<std::string> &var_name, const cfd::Species &species) {
+cfd::Parameter::identify_variable_labels(std::vector<std::string> &var_name, const Species &species) const {
   std::vector<int> labels;
 
   for (auto &name: var_name) {
@@ -891,42 +886,5 @@ cfd::Parameter::identify_variable_labels(std::vector<std::string> &var_name, con
     }
     labels.emplace_back(l);
   }
-  return labels;
-}
-
-std::vector<int>
-cfd::identify_variable_labels(std::vector<std::string> &var_name, const Species &species) {
-  // When identifying the variable labels, all read variables are assigned a label.
-  // However, at this stage, we do not know if they are actually used in the simulation.
-  // Therefore, it is the responsibility of the user to ensure that the variables are correctly assigned.
-
-  // E.g., when we compute a laminar flow with a turbulence modeled simulation result, the turbulent variables
-  // tke, and omega are assigned labels, but when we use them in the read_flowfield, we do not even need them.
-
-  std::vector<int> labels;
-
-//  for (auto &name: var_name) {
-//    int l = 999;
-//    auto NAME = gxl::to_upper(name);
-//
-//    bool found = false;
-//    for (const auto &kk: VNs) {
-//      if (NAME == kk.first) {
-//        l = kk.second;
-//        found = true;
-//        break;
-//      }
-//    }
-//    if (!found && species.n_spec > 0) {
-//      const auto &spec_name = species.spec_list;
-//      for (const auto &[spec, sp_label]: spec_name) {
-//        if (NAME == gxl::to_upper(spec)) {
-//          l = 1000 + sp_label;
-//          break;
-//        }
-//      }
-//    }
-//    labels.emplace_back(l);
-//  }
   return labels;
 }

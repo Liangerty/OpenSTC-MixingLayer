@@ -117,7 +117,7 @@ void gxl::write_str(const char *str, FILE *file) {
   fwrite(&value, sizeof(int), 1, file);
 }
 
-std::string gxl::read_str_MPI_ver(MPI_File &file, MPI_Offset &offset, int n_bytes) {
+std::string gxl::read_str_MPI_ver(const MPI_File &file, MPI_Offset &offset, int n_bytes) {
   char *ch = new char[n_bytes + 1];
   MPI_File_read_at(file, offset, ch, n_bytes, MPI_CHAR, MPI_STATUS_IGNORE);
   ch[n_bytes] = '\0';
@@ -127,7 +127,7 @@ std::string gxl::read_str_MPI_ver(MPI_File &file, MPI_Offset &offset, int n_byte
   return str;
 }
 
-std::string gxl::read_str_from_binary_MPI_ver(MPI_File &file, MPI_Offset &offset) {
+std::string gxl::read_str_from_binary_MPI_ver(const MPI_File &file, MPI_Offset &offset) {
   int value = 0;
   std::string str;
   while (true) {
@@ -142,7 +142,7 @@ std::string gxl::read_str_from_binary_MPI_ver(MPI_File &file, MPI_Offset &offset
   return str;
 }
 
-void gxl::write_str_without_null(const char *str, MPI_File &file, MPI_Offset &offset) {
+void gxl::write_str_without_null(const char *str, const MPI_File &file, MPI_Offset &offset) {
   while (*str != '\0') {
     MPI_File_write_at(file, offset, str, 1, MPI_CHAR, MPI_STATUS_IGNORE);
     ++offset;
@@ -150,7 +150,7 @@ void gxl::write_str_without_null(const char *str, MPI_File &file, MPI_Offset &of
   }
 }
 
-void gxl::write_str(const char *str, MPI_File &file, MPI_Offset &offset) {
+void gxl::write_str(const char *str, const MPI_File &file, MPI_Offset &offset) {
   int value = 0;
   while (*str != '\0') {
     value = static_cast<int>(*str);

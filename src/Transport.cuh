@@ -19,6 +19,6 @@ __device__ real compute_viscosity(real temperature, real mw_total, real const *Y
 __device__ real compute_Omega_D(real t_red);
 
 __device__ real
-compute_viscosity(int i, int j, int k, real temperature, real mw_total, DParameter *param, DZone *zone);
+compute_viscosity(int i, int j, int k, real temperature, real mw_total, DParameter *param, const DZone *zone);
 
 }

@@ -290,7 +290,7 @@ __global__ void CDSPart1D(cfd::DZone *zone, int direction, int max_extent, DPara
 
 template<>
 __global__ void
-CDSPart1D<MixtureModel::Air>(cfd::DZone *zone, int direction, int max_extent, DParameter *param) {
+CDSPart1D<MixtureModel::Air>(DZone *zone, int direction, int max_extent, DParameter *param) {
   int labels[3]{0, 0, 0};
   labels[direction] = 1;
   const auto tid = (int) (threadIdx.x * labels[0] + threadIdx.y * labels[1] + threadIdx.z * labels[2]);
@@ -371,15 +371,15 @@ AWENO_interpolation<MixtureModel::MixtureFraction>(const real *cv, real *pv_l, r
                                                    int n_var, const real *metric, DParameter *param);
 
 template __global__ void
-CDSPart1D<MixtureModel::Mixture>(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
+CDSPart1D<MixtureModel::Mixture>(DZone *zone, int direction, int max_extent, DParameter *param);
 
 template __global__ void
-CDSPart1D<MixtureModel::FR>(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
+CDSPart1D<MixtureModel::FR>(DZone *zone, int direction, int max_extent, DParameter *param);
 
 template __global__ void
-CDSPart1D<MixtureModel::FL>(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
+CDSPart1D<MixtureModel::FL>(DZone *zone, int direction, int max_extent, DParameter *param);
 
 template __global__ void
-CDSPart1D<MixtureModel::MixtureFraction>(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
+CDSPart1D<MixtureModel::MixtureFraction>(DZone *zone, int direction, int max_extent, DParameter *param);
 
 }

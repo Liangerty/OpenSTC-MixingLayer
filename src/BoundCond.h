@@ -87,7 +87,7 @@ struct Inflow {
 struct Wall {
 //  explicit Wall(int type_label, std::ifstream &bc_file);
 
-  explicit Wall(const std::map<std::string, std::variant<std::string, int, real>> &info, cfd::Parameter &parameter);
+  explicit Wall(const std::map<std::string, std::variant<std::string, int, real>> &info, Parameter &parameter);
 
   enum class ThermalType {
     isothermal, adiabatic, equilibrium_radiation
@@ -115,19 +115,19 @@ struct Wall {
 };
 
 struct Outflow {
-  explicit Outflow(const std::string &inflow_name, cfd::Parameter &parameter);
+  explicit Outflow(const std::string &inflow_name, const Parameter &parameter);
 
   int label = 6;
 };
 
 struct Symmetry {
-  explicit Symmetry(const std::string &inflow_name, cfd::Parameter &parameter);
+  explicit Symmetry(const std::string &inflow_name, const Parameter &parameter);
 
   int label = 3;
 };
 
 struct FarField {
-  explicit FarField(const std::string &inflow_name, cfd::Species &spec, cfd::Parameter &parameter);
+  explicit FarField(const std::string &inflow_name, Species &spec, Parameter &parameter);
 
   void copy_to_gpu(FarField *d_farfield, Species &spec, const Parameter &parameter);
 
@@ -157,7 +157,7 @@ struct FarField {
  * @warning This implementation can only be used in air simulation. The multi-species simulation is not supported.
  */
 struct SubsonicInflow {
-  explicit SubsonicInflow(const std::string &inflow_name, cfd::Parameter &parameter);
+  explicit SubsonicInflow(const std::string &inflow_name, Parameter &parameter);
 
   void copy_to_gpu(SubsonicInflow *d_inflow, Species &spec, const Parameter &parameter);
 
@@ -173,17 +173,17 @@ struct SubsonicInflow {
  * @brief Back pressure boundary condition, default label is 9
  * @details This boundary condition specifies the back pressure at the outlet.
  * @note This boundary condition is only used in the subsonic flow simulation, which you make sure that the outflow is subsonic.
- * All quantities except pressure is extrapolated from the interior, while the pressure is specified by the user as the back pressure.
+ * All quantities except pressure are extrapolated from the interior, while the pressure is specified by the user as the back pressure.
  */
 struct BackPressure {
-  explicit BackPressure(const std::string &name, cfd::Parameter &parameter);
+  explicit BackPressure(const std::string &name, Parameter &parameter);
 
   int label = 9;
   real pressure = -1;
 };
 
 struct Periodic {
-  explicit Periodic(const std::string &name, cfd::Parameter &parameter);
+  explicit Periodic(const std::string &name, const Parameter &parameter);
 
   int label = 8;
 };

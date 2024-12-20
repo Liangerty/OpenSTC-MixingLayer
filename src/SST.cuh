@@ -47,9 +47,9 @@ struct SST {
   static constexpr double delta_C_des = C_des1 - C_des2;
 
   __device__ static void
-  compute_mut(cfd::DZone *zone, int i, int j, int k, real mul, const DParameter *param);
+  compute_mut(DZone *zone, int i, int j, int k, real mul, const DParameter *param);
 
-  __device__ static void compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParameter *param);
+  __device__ static void compute_source_and_mut(DZone *zone, int i, int j, int k, const DParameter *param);
 
   __device__ static void
   implicit_treat_for_dq0(DZone *zone, real diag, int i, int j, int k, const DParameter *param);
@@ -66,8 +66,8 @@ template<>
 struct TurbMethod<SST<TurbSimLevel::RANS>> {
   static constexpr bool isLaminar = false;
   static constexpr bool hasMut = true;
-  static constexpr TurbSimLevel type = TurbSimLevel::RANS;
-  static constexpr TurbMethodLabel label = TurbMethodLabel::SST;
+  static constexpr auto type = TurbSimLevel::RANS;
+  static constexpr auto label = TurbMethodLabel::SST;
   static constexpr bool needWallDistance = true;
   static constexpr bool hasImplicitTreat = true;
 };
@@ -76,8 +76,8 @@ template<>
 struct TurbMethod<SST<TurbSimLevel::DES>> {
   static constexpr bool isLaminar = false;
   static constexpr bool hasMut = true;
-  static constexpr TurbSimLevel type = TurbSimLevel::DES;
-  static constexpr TurbMethodLabel label = TurbMethodLabel::SST;
+  static constexpr auto type = TurbSimLevel::DES;
+  static constexpr auto label = TurbMethodLabel::SST;
   static constexpr bool needWallDistance = true;
   static constexpr bool hasImplicitTreat = true;
 };

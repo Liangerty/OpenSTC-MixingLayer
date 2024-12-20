@@ -31,7 +31,7 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
   // Read the points to be monitored
   auto monitor_file_name{parameter.get_string("monitor_file")};
   std::filesystem::path monitor_path{monitor_file_name};
-  if (!std::filesystem::exists(monitor_path)) {
+  if (!exists(monitor_path)) {
     if (myid == 0) {
       printf("The monitor file %s does not exist.\n", monitor_file_name.c_str());
     }
@@ -93,9 +93,9 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
   files.resize(n_point_total, nullptr);
   for (int l = 0; l < n_point_total; ++l) {
     std::string file_name{
-        "/monitor_" + std::to_string(myid) + '_' + std::to_string(bs_h[l]) + '_' + std::to_string(is_h[l]) + '_' +
-        std::to_string(js_h[l]) + '_' +
-        std::to_string(ks_h[l]) + ".dat"};
+      "/monitor_" + std::to_string(myid) + '_' + std::to_string(bs_h[l]) + '_' + std::to_string(is_h[l]) + '_' +
+      std::to_string(js_h[l]) + '_' + std::to_string(ks_h[l]) + ".dat"
+    };
     std::filesystem::path whole_name_path{out_dir.string() + file_name};
     if (!exists(whole_name_path)) {
       files[l] = fopen(whole_name_path.string().c_str(), "a");
@@ -158,10 +158,12 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
 
     // If the slice is found, we need to monitor the slice.
     if (n_iSlice > 0) {
-      auto core_range{parameter.get_real_range("coreRegion")};
-      Range<real> core_region{core_range.xs * gridScale, core_range.xe * gridScale,
-                              core_range.ys * gridScale, core_range.ye * gridScale,
-                              core_range.zs * gridScale, core_range.ze * gridScale};
+      auto [xs, xe, ys, ye, zs, ze]{parameter.get_real_range("coreRegion")};
+      Range<real> core_region{
+        xs * gridScale, xe * gridScale,
+        ys * gridScale, ye * gridScale,
+        zs * gridScale, ze * gridScale
+      };
       int MY{1}, MZ{1};
       for (int s = 0; s < n_iSlice; ++s) {
         // We need to find the region excluding the buffer layers.
@@ -359,10 +361,10 @@ Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh 
 }
 
 std::vector<std::string> Monitor::setup_labels_to_monitor(const Parameter &parameter, const Species &species) {
-  auto n_spec{species.n_spec};
+  const auto n_spec{species.n_spec};
   auto &spec_list{species.spec_list};
 
-  auto var_name{parameter.get_string_array("monitor_var")};
+  const auto var_name{parameter.get_string_array("monitor_var")};
 
   std::vector<int> bv_idx, sv_idx;
   auto n_found{0};
@@ -444,18 +446,18 @@ std::vector<std::string> Monitor::setup_labels_to_monitor(const Parameter &param
 }
 
 Monitor::~Monitor() {
-  for (auto fp: files) {
+  for (const auto fp: files) {
     fclose(fp);
   }
 }
 
-void Monitor::monitor_point(int step, real physical_time, std::vector<cfd::Field> &field) {
+void Monitor::monitor_point(int step, real physical_time, const std::vector<Field> &field) {
   if (counter_step == 0)
     step_start = step;
 
   for (int b = 0; b < n_block; ++b) {
     if (n_point[b] > 0) {
-      const auto tpb{128};
+      constexpr auto tpb{128};
       const auto bpg{(n_point[b] - 1) / tpb + 1};
       record_monitor_data<<<bpg, tpb>>>(field[b].d_ptr, d_ptr, b, counter_step % output_file, physical_time);
     }
@@ -479,7 +481,7 @@ void Monitor::output_data() {
   counter_step = 0;
 }
 
-void Monitor::output_slices(const Parameter &parameter, std::vector<cfd::Field> &field, int step, real t) {
+void Monitor::output_slices(const Parameter &parameter, std::vector<Field> &field, int step, real t) {
   if (n_iSlice <= 0) {
     return;
   }
@@ -498,11 +500,11 @@ void Monitor::output_slices(const Parameter &parameter, std::vector<cfd::Field> 
     }
 
     MPI_Datatype ty;
-    int l_size[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
+    const int l_size[3]{b.mx + 2 * b.ngg, b.my + 2 * b.ngg, b.mz + 2 * b.ngg};
     auto ny{iSlice_je[s] - iSlice_js[s] + 1}, nz{iSlice_ke[s] - iSlice_ks[s] + 1};
-    int small_size[3]{1, ny, nz};
+    const int small_size[3]{1, ny, nz};
     const auto mem_sz = ny * nz * 8;
-    int start_idx[3]{b.ngg + iSlice[s], b.ngg + iSlice_js[s], b.ngg + iSlice_ks[s]};
+    const int start_idx[3]{b.ngg + iSlice[s], b.ngg + iSlice_js[s], b.ngg + iSlice_ks[s]};
     MPI_Type_create_subarray(3, l_size, small_size, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
     MPI_Type_commit(&ty);
 
@@ -551,10 +553,10 @@ record_monitor_data(DZone *zone, DeviceMonitorData *monitor_info, int blk_id, in
   auto idx = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   if (idx >= monitor_info->n_point[blk_id])
     return;
-  auto idx_tot = monitor_info->disp[blk_id] + idx;
-  auto i = monitor_info->is_d[idx_tot];
-  auto j = monitor_info->js_d[idx_tot];
-  auto k = monitor_info->ks_d[idx_tot];
+  const auto idx_tot = monitor_info->disp[blk_id] + idx;
+  const auto i = monitor_info->is_d[idx_tot];
+  const auto j = monitor_info->js_d[idx_tot];
+  const auto k = monitor_info->ks_d[idx_tot];
 
   auto &data = monitor_info->data;
   const auto bv_label = monitor_info->bv_label;

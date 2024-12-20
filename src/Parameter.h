@@ -91,9 +91,9 @@ public:
  * \brief Deduces simulation information based on the current parameters.
    * This function is called on driver initialization, when the species and reactions info has been read.
  */
-  void deduce_sim_info(const cfd::Species &spec);
+  void deduce_sim_info(const Species &spec);
 
-  std::vector<int> identify_variable_labels(std::vector<std::string> &var_name, const Species &species);
+  std::vector<int> identify_variable_labels(std::vector<std::string> &var_name, const Species &species) const;
 
   ~Parameter() = default;
 
@@ -113,8 +113,8 @@ private:
 
   static std::map<std::string, std::variant<std::string, int, real>> read_struct(std::ifstream &file);
 
-  template<typename T>
-  static std::unordered_map<std::string, Range<T>> read_range(std::ifstream &file);
+  // template<typename T>
+  // static std::unordered_map<std::string, Range<T>> read_range(std::ifstream &file);
 
   void get_variable_names(const Species &spec);
 
@@ -148,7 +148,4 @@ static const std::map<std::string, int> VNsDefault /*short for Variable Names*/{
   {"MIXTUREFRACTION", 8},
   {"MIXTUREFRACTIONVARIANCE", 9},
 };
-
-std::vector<int>
-identify_variable_labels(std::vector<std::string> &var_name, const Species &species);
 }

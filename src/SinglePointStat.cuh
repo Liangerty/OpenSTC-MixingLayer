@@ -7,14 +7,14 @@
 
 namespace cfd {
 
-__global__ void collect_single_point_basic_statistics(DZone *zone, DParameter *param);
+__global__ void collect_single_point_basic_statistics(DZone *zone, const DParameter *param);
 
 __global__ void collect_single_point_additional_statistics(DZone *zone, DParameter *param);
 
 class SinglePointStat {
 public:
   explicit SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::vector<Field> &_field,
-                           const Species &species);
+                           const Species &_species);
 
   void initialize_statistics_collector();
 

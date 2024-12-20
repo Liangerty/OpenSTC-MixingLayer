@@ -5,23 +5,19 @@
 
 namespace cfd {
 template<MixtureModel mix_model, TurbulenceMethod turb_method>
-void
-compute_inviscid_flux(const Block &block, cfd::DZone *zone, DParameter *param, int n_var, const Parameter &parameter);
+void compute_inviscid_flux(const Block &block, DZone *zone, DParameter *param, int n_var, const Parameter &parameter);
 
 template<MixtureModel mix_model, TurbulenceMethod turb_method>
-void compute_viscous_flux(const Block &block, cfd::DZone *zone, DParameter *param, int n_var);
+void compute_viscous_flux(const Block &block, DZone *zone, DParameter *param, int n_var);
 
 template<MixtureModel mix_model, TurbulenceMethod turb_method>
-__global__ void
-viscous_flux_fv(cfd::DZone *zone, int max_extent, cfd::DParameter *param);
+__global__ void viscous_flux_fv(DZone *zone, int max_extent, DParameter *param);
 
 template<MixtureModel mix_model, TurbulenceMethod turb_method>
-__global__ void
-viscous_flux_gv(cfd::DZone *zone, int max_extent, cfd::DParameter *param);
+__global__ void viscous_flux_gv(DZone *zone, int max_extent, DParameter *param);
 
 template<MixtureModel mix_model, TurbulenceMethod turb_method>
-__global__ void
-viscous_flux_hv(cfd::DZone *zone, int max_extent, cfd::DParameter *param);
+__global__ void viscous_flux_hv(DZone *zone, int max_extent, DParameter *param);
 
 // Implementations
 
@@ -50,7 +46,7 @@ compute_inviscid_flux(const Block &block, cfd::DZone *zone, DParameter *param, i
 }
 
 template<MixtureModel mix_model, class turb_method>
-void compute_viscous_flux(const Block &block, cfd::DZone *zone, DParameter *param, int n_var) {
+void compute_viscous_flux(const Block &block, DZone *zone, DParameter *param, int n_var) {
   const int extent[3]{block.mx, block.my, block.mz};
   const int dim{extent[2] == 1 ? 2 : 3};
   constexpr int block_dim = 64;
@@ -72,8 +68,7 @@ void compute_viscous_flux(const Block &block, cfd::DZone *zone, DParameter *para
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void
-viscous_flux_fv(cfd::DZone *zone, int max_extent, cfd::DParameter *param) {
+__global__ void viscous_flux_fv(DZone *zone, int max_extent, DParameter *param) {
   int idx[3];
   idx[0] = ((int) blockDim.x - 1) * blockIdx.x + threadIdx.x - 1;
   idx[1] = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -102,7 +97,7 @@ viscous_flux_fv(cfd::DZone *zone, int max_extent, cfd::DParameter *param) {
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void viscous_flux_gv(cfd::DZone *zone, int max_extent, cfd::DParameter *param) {
+__global__ void viscous_flux_gv(DZone *zone, int max_extent, DParameter *param) {
   int idx[3];
   idx[0] = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   idx[1] = (int) ((blockDim.y - 1) * blockIdx.y + threadIdx.y) - 1;
@@ -131,7 +126,7 @@ __global__ void viscous_flux_gv(cfd::DZone *zone, int max_extent, cfd::DParamete
 }
 
 template<MixtureModel mix_model, class turb_method>
-__global__ void viscous_flux_hv(cfd::DZone *zone, int max_extent, cfd::DParameter *param) {
+__global__ void viscous_flux_hv(DZone *zone, int max_extent, DParameter *param) {
   int idx[3];
   idx[0] = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   idx[1] = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -158,5 +153,4 @@ __global__ void viscous_flux_hv(cfd::DZone *zone, int max_extent, cfd::DParamete
     }
   }
 }
-
 }

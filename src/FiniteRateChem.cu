@@ -4,7 +4,7 @@
 #include "Constants.h"
 
 namespace cfd {
-__device__ void finite_rate_chemistry(DZone *zone, int i, int j, int k, DParameter *param) {
+__device__ void finite_rate_chemistry(DZone *zone, int i, int j, int k, const DParameter *param) {
   const auto &bv = zone->bv;
   const auto &sv = zone->sv;
 
@@ -58,7 +58,7 @@ __device__ void finite_rate_chemistry(DZone *zone, int i, int j, int k, DParamet
   }
 }
 
-__device__ void forward_reaction_rate(real t, real *kf, const real *concentration, DParameter *param) {
+__device__ void forward_reaction_rate(real t, real *kf, const real *concentration, const DParameter *param) {
   const auto A = param->A, b = param->b, Ea = param->Ea;
   const auto type = param->reac_type;
   const auto A2 = param->A2, b2 = param->b2, Ea2 = param->Ea2;
@@ -136,7 +136,7 @@ backward_reaction_rate(real t, const real *kf, const real *concentration, const 
   constexpr real temp_p = p_atm / R_u * 1e-3;   // Convert the unit to mol*K/cm3
   const real temp_t = temp_p / t; // Unit is mol/cm3
   const auto &stoi_f = param->stoi_f, &stoi_b = param->stoi_b;
-  auto order = param->reac_order;
+  const auto order = param->reac_order;
   for (int i = 0; i < param->n_reac; ++i) {
     if (param->reac_type[i] != 2 && param->reac_type[i] != 0) {
       real d_gibbs{0};
@@ -323,7 +323,7 @@ __device__ void solve_chem_system(real *lhs, DZone *zone, int i, int j, int k, i
     ipiv[n] = ik;
     if (ik != n) {
       for (int t = 0; t < dim; ++t) {
-        auto mid = lhs[ik * dim + t];
+        const auto mid = lhs[ik * dim + t];
         lhs[ik * dim + t] = lhs[n * dim + t];
         lhs[n * dim + t] = mid;
       }
@@ -341,9 +341,9 @@ __device__ void solve_chem_system(real *lhs, DZone *zone, int i, int j, int k, i
   auto &b = zone->dq;
   // Solve the linear system with LU matrix
   for (int m = 0; m < dim; ++m) {
-    int t = ipiv[m];
+    const int t = ipiv[m];
     if (t != m) {
-      auto mid = b(i, j, k, 5 + t);
+      const auto mid = b(i, j, k, 5 + t);
       b(i, j, k, 5 + t) = b(i, j, k, 5 + m);
       b(i, j, k, 5 + m) = mid;
     }
@@ -380,7 +380,7 @@ __device__ void solve_chem_system(real *lhs, real *rhs, int dim) {
     ipiv[n] = ik;
     if (ik != n) {
       for (int t = 0; t < dim; ++t) {
-        auto mid = lhs[ik * dim + t];
+        const auto mid = lhs[ik * dim + t];
         lhs[ik * dim + t] = lhs[n * dim + t];
         lhs[n * dim + t] = mid;
       }
@@ -397,9 +397,9 @@ __device__ void solve_chem_system(real *lhs, real *rhs, int dim) {
 
   // Solve the linear system with LU matrix
   for (int m = 0; m < dim; ++m) {
-    int t = ipiv[m];
+    const int t = ipiv[m];
     if (t != m) {
-      auto mid = rhs[t];
+      const auto mid = rhs[t];
       rhs[t] = rhs[m];
       rhs[m] = mid;
     }

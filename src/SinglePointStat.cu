@@ -52,7 +52,7 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
         }
         printf("\tThe following species are used to collect statistical data:\n");
         int counter_spec{0};
-        for (int i: species_stat_index) {
+        for (const int i: species_stat_index) {
           printf("\t%s\t", species.spec_name[i].c_str());
           ++counter_spec;
           if (counter_spec % 10 == 0) {
@@ -99,7 +99,7 @@ SinglePointStat::SinglePointStat(Parameter &_parameter, const Mesh &_mesh, std::
 void SinglePointStat::init_stat_name() {
   // The default average is the favre one.
   // All variables computed will be Favre averaged.
-  int n_spec = species.n_spec;
+  const int n_spec = species.n_spec;
   if (n_spec > 0) {
     n_favAve += n_spec;
     n_fav2nd += n_spec;
@@ -175,10 +175,10 @@ void SinglePointStat::compute_offset_for_export_data() {
   MPI_Status status;
   MPI_Offset offset[4]{0, 0, 0, 0};
 
-  int n_stat_reynolds_1st = parameter.get_int("n_stat_reynolds_1st");
-  int n_stat_favre_1st = parameter.get_int("n_stat_favre_1st");
-  int n_stat_reynolds_2nd = parameter.get_int("n_stat_reynolds_2nd");
-  int n_stat_favre_2nd = parameter.get_int("n_stat_favre_2nd");
+  const int n_stat_reynolds_1st = parameter.get_int("n_stat_reynolds_1st");
+  const int n_stat_favre_1st = parameter.get_int("n_stat_favre_1st");
+  const int n_stat_reynolds_2nd = parameter.get_int("n_stat_reynolds_2nd");
+  const int n_stat_favre_2nd = parameter.get_int("n_stat_favre_2nd");
   if (myid == 0) {
     const int n_block = mesh.n_block_total;
     // collect reynolds 1st order statistics
@@ -237,7 +237,7 @@ void SinglePointStat::compute_offset_for_export_data() {
     n_block_ahead += mesh.nblk[p];
   }
   for (int b = 0; b < n_block_ahead; ++b) {
-    MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
+    const MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
     offset_unit[0] += sz * n_stat_reynolds_1st + 4 * 3;
     offset_unit[1] += sz * n_stat_favre_1st + 4 * 3;
     offset_unit[2] += sz * n_stat_reynolds_2nd + 4 * 3;
@@ -249,20 +249,20 @@ void SinglePointStat::compute_offset_for_export_data() {
     const int nx = mx + 2 * ngg, ny = my + 2 * ngg, nz = mz + 2 * ngg;
 
     MPI_Datatype ty1, ty0;
-    int lSize[3]{nx, ny, nz};
-    int start_idx[3]{0, 0, 0};
+    const int lSize[3]{nx, ny, nz};
+    constexpr int start_idx[3]{0, 0, 0};
     MPI_Type_create_subarray(3, lSize, lSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty1);
     MPI_Type_commit(&ty1);
     ty_1gg[b] = ty1;
 
-    int sSize[3]{mx, my, mz};
+    const int sSize[3]{mx, my, mz};
     MPI_Type_create_subarray(3, sSize, sSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty0);
     MPI_Type_commit(&ty0);
     ty_0gg[b] = ty0;
   }
 
   if (tke_budget) {
-    offset_tke_budget = cfd::create_tke_budget_file(parameter, mesh, n_block_ahead);
+    offset_tke_budget = create_tke_budget_file(parameter, mesh, n_block_ahead);
   }
   if (n_species_stat > 0 || n_ps > 0) {
     if (species_velocity_correlation) {
@@ -500,7 +500,7 @@ void SinglePointStat::read_previous_statistical_data() {
   }
 
   if (tke_budget) {
-    counter_tke_budget = cfd::read_tke_budget_file(parameter, mesh, n_block_ahead, field);
+    counter_tke_budget = read_tke_budget_file(parameter, mesh, n_block_ahead, field);
   }
   if (species_velocity_correlation) {
     counter_species_velocity_correlation =
@@ -576,7 +576,7 @@ void SinglePointStat::export_statistical_data(DParameter *param, bool perform_sp
     offset[3] += 4 * n_fav2nd;
   }
   for (int b = 0; b < mesh.n_block; ++b) {
-    auto &zone = field[b].h_ptr;
+    const auto &zone = field[b].h_ptr;
     const int mx = mesh[b].mx, my = mesh[b].my, mz = mesh[b].mz;
     const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
 
@@ -591,7 +591,7 @@ void SinglePointStat::export_statistical_data(DParameter *param, bool perform_sp
 
     // We create this datatype because in the original MPI_File_write_at, the number of elements is a 64-bit integer.
     // However, the nx*ny*nz may be larger than 2^31, so we need to use MPI_Type_create_subarray to create a datatype
-    auto ty = ty_1gg[b];
+    const auto ty = ty_1gg[b];
 
     MPI_File_write_at(fp_rey1, offset[0], &mx, 1, MPI_INT32_T, &status);
     offset[0] += 4;
@@ -651,7 +651,7 @@ void SinglePointStat::export_statistical_data(DParameter *param, bool perform_sp
   }
 }
 
-__global__ void collect_single_point_basic_statistics(DZone *zone, DParameter *param) {
+__global__ void collect_single_point_basic_statistics(DZone *zone, const DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - 1;
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - 1;
@@ -663,7 +663,7 @@ __global__ void collect_single_point_basic_statistics(DZone *zone, DParameter *p
   // The first order statistics of the flow field
   // Reynolds averaged variables
   auto &rey1st = zone->collect_reynolds_1st;
-  auto rho = bv(i, j, k, 0), p = bv(i, j, k, 4);
+  const auto rho = bv(i, j, k, 0), p = bv(i, j, k, 4);
   rey1st(i, j, k, 0) += rho; // rho
   rey1st(i, j, k, 1) += p; // p
   for (int l = 2; l < param->n_reyAve; ++l) {
@@ -671,7 +671,7 @@ __global__ void collect_single_point_basic_statistics(DZone *zone, DParameter *p
   }
   // Favre averaged variables
   auto &fav1st = zone->collect_favre_1st;
-  real u = bv(i, j, k, 1), v = bv(i, j, k, 2), w = bv(i, j, k, 3), T = bv(i, j, k, 5);
+  const real u = bv(i, j, k, 1), v = bv(i, j, k, 2), w = bv(i, j, k, 3), T = bv(i, j, k, 5);
   fav1st(i, j, k, 0) += rho * u; // rho*u
   fav1st(i, j, k, 1) += rho * v; // rho*v
   fav1st(i, j, k, 2) += rho * w; // rho*w

@@ -11,22 +11,22 @@ namespace cfd {
 __global__ void store_last_step(DZone *zone);
 
 template<MixtureModel mixture, class turb_method>
-__global__ void local_time_step(cfd::DZone *zone, DParameter *param);
+__global__ void local_time_step(DZone *zone, DParameter *param);
 
 __global__ void compute_square_of_dbv(DZone *zone);
 
-real global_time_step(const Mesh &mesh, const Parameter &parameter, std::vector<cfd::Field> &field);
+real global_time_step(const Mesh &mesh, const Parameter &parameter, const std::vector<Field> &field);
 
 __global__ void min_of_arr(real *arr, int size);
 
 __global__ void update_physical_time(DParameter *param, real t);
 
 template<MixtureModel mixture, class turb_method>
-__global__ void limit_flow(cfd::DZone *zone, cfd::DParameter *param);
+__global__ void limit_flow(DZone *zone, DParameter *param);
 }
 
 template<MixtureModel mixture, class turb_method>
-__global__ void cfd::local_time_step(cfd::DZone *zone, cfd::DParameter *param) {
+__global__ void cfd::local_time_step(DZone *zone, DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
   const int j = blockDim.y * blockIdx.y + threadIdx.y;
@@ -67,7 +67,7 @@ __global__ void cfd::local_time_step(cfd::DZone *zone, cfd::DParameter *param) {
   if constexpr (mixture != MixtureModel::Air) {
     gamma = zone->gamma(i, j, k);
   }
-  real coeff_1 = max(gamma, 4.0 / 3.0) / bv(i, j, k, 0);
+  const real coeff_1 = max(gamma, 4.0 / 3.0) / bv(i, j, k, 0);
   real coeff_2 = zone->mul(i, j, k) / param->Pr;
   if constexpr (TurbMethod<turb_method>::hasMut) {
     coeff_2 += zone->mut(i, j, k) / param->Prt;
@@ -83,7 +83,7 @@ __global__ void cfd::local_time_step(cfd::DZone *zone, cfd::DParameter *param) {
 }
 
 template<MixtureModel mixture, class turb_method>
-__global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param) {
+__global__ void cfd::limit_flow(DZone *zone, DParameter *param) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
   const int j = blockDim.y * blockIdx.y + threadIdx.y;
@@ -104,8 +104,8 @@ __global__ void cfd::limit_flow(cfd::DZone *zone, cfd::DParameter *param) {
   const int n_spec{param->n_spec};
 
   // Find the unphysical values and limit them
-  auto ll = param->limit_flow.ll;
-  auto ul = param->limit_flow.ul;
+  const auto ll = param->limit_flow.ll;
+  const auto ul = param->limit_flow.ul;
   bool unphysical{false};
   for (int l = 0; l < n_flow_var; ++l) {
     if (isnan(var[l])) {

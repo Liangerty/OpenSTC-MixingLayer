@@ -1,6 +1,6 @@
 #include "DualTimeStepping.cuh"
 
-__global__ void cfd::compute_qn_star(cfd::DZone *zone, int n_var, real dt_global) {
+__global__ void cfd::compute_qn_star(DZone *zone, int n_var, real dt_global) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -14,7 +14,7 @@ __global__ void cfd::compute_qn_star(cfd::DZone *zone, int n_var, real dt_global
 }
 
 __global__ void
-cfd::compute_modified_rhs(cfd::DZone *zone, int n_var, real dt_global) {
+cfd::compute_modified_rhs(DZone *zone, int n_var, real dt_global) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -104,7 +104,7 @@ bool cfd::inner_converged(const Mesh &mesh, const std::vector<Field> &field, con
   if (myid == 0) {
     if (isnan(err_max)) {
       printf("Nan occurred in iter %d of step %d. Stop simulation.\n", iter, step);
-      cfd::MpiParallel::exit();
+      MpiParallel::exit();
     }
     if (iter % 5 == 0 || err_max < 1e-3)
       printf("iter %d, err_max=%e\n", iter, err_max);
@@ -122,7 +122,7 @@ bool cfd::inner_converged(const Mesh &mesh, const std::vector<Field> &field, con
   }
 
   if (err_max < 1e-3) {
-    if (auto minus = inner_iter - iter;minus > 0) {
+    if (const auto minus = inner_iter - iter;minus > 0) {
       inner_iter -= minus;
       if (myid == 0) {
         printf("Inner iteration step is decreased to %d.\n", inner_iter);
@@ -134,7 +134,7 @@ bool cfd::inner_converged(const Mesh &mesh, const std::vector<Field> &field, con
   return false;
 }
 
-__global__ void cfd::compute_square_of_dbv_wrt_last_inner_iter(cfd::DZone *zone) {
+__global__ void cfd::compute_square_of_dbv_wrt_last_inner_iter(DZone *zone) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -145,13 +145,13 @@ __global__ void cfd::compute_square_of_dbv_wrt_last_inner_iter(cfd::DZone *zone)
   auto &bv_last = zone->in_last_step;
 
   bv_last(i, j, k, 0) = (bv(i, j, k, 0) - bv_last(i, j, k, 0)) * (bv(i, j, k, 0) - bv_last(i, j, k, 0));
-  real vel = sqrt(bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3));
+  const real vel = sqrt(bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3));
   bv_last(i, j, k, 1) = (vel - bv_last(i, j, k, 1)) * (vel - bv_last(i, j, k, 1));
   bv_last(i, j, k, 2) = (bv(i, j, k, 4) - bv_last(i, j, k, 2)) * (bv(i, j, k, 4) - bv_last(i, j, k, 2));
   bv_last(i, j, k, 3) = (bv(i, j, k, 5) - bv_last(i, j, k, 3)) * (bv(i, j, k, 5) - bv_last(i, j, k, 3));
 }
 
-__global__ void cfd::store_last_iter(cfd::DZone *zone) {
+__global__ void cfd::store_last_iter(DZone *zone) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);

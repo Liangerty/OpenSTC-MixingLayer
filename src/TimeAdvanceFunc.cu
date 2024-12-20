@@ -3,7 +3,7 @@
 #include <mpi.h>
 #include "gxl_lib/MyAtomic.cuh"
 
-__global__ void cfd::store_last_step(cfd::DZone *zone) {
+__global__ void cfd::store_last_step(DZone *zone) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   int j = blockDim.y * blockIdx.y + threadIdx.y;
@@ -13,12 +13,12 @@ __global__ void cfd::store_last_step(cfd::DZone *zone) {
   auto &bv = zone->bv;
   zone->bv_last(i, j, k, 0) = bv(i, j, k, 0);
   zone->bv_last(i, j, k, 1) = sqrt(
-      bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3));
+    bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3));
   zone->bv_last(i, j, k, 2) = bv(i, j, k, 4);
   zone->bv_last(i, j, k, 3) = bv(i, j, k, 5);
 }
 
-__global__ void cfd::compute_square_of_dbv(cfd::DZone *zone) {
+__global__ void cfd::compute_square_of_dbv(DZone *zone) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   int j = blockDim.y * blockIdx.y + threadIdx.y;
@@ -29,13 +29,14 @@ __global__ void cfd::compute_square_of_dbv(cfd::DZone *zone) {
   auto &bv_last = zone->bv_last;
 
   bv_last(i, j, k, 0) = (bv(i, j, k, 0) - bv_last(i, j, k, 0)) * (bv(i, j, k, 0) - bv_last(i, j, k, 0));
-  real vel = sqrt(bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3));
+  const real vel = sqrt(
+    bv(i, j, k, 1) * bv(i, j, k, 1) + bv(i, j, k, 2) * bv(i, j, k, 2) + bv(i, j, k, 3) * bv(i, j, k, 3));
   bv_last(i, j, k, 1) = (vel - bv_last(i, j, k, 1)) * (vel - bv_last(i, j, k, 1));
   bv_last(i, j, k, 2) = (bv(i, j, k, 4) - bv_last(i, j, k, 2)) * (bv(i, j, k, 4) - bv_last(i, j, k, 2));
   bv_last(i, j, k, 3) = (bv(i, j, k, 5) - bv_last(i, j, k, 3)) * (bv(i, j, k, 5) - bv_last(i, j, k, 3));
 }
 
-real cfd::global_time_step(const Mesh &mesh, const Parameter &parameter, std::vector<cfd::Field> &field) {
+real cfd::global_time_step(const Mesh &mesh, const Parameter &parameter, const std::vector<Field> &field) {
   real dt{1e+6};
 
   constexpr int TPB{128};
@@ -47,8 +48,8 @@ real cfd::global_time_step(const Mesh &mesh, const Parameter &parameter, std::ve
     const auto mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
     const int size = mx * my * mz;
     int n_blocks = std::min(num_blocks_per_sm * num_sms, (size + TPB - 1) / TPB);
-    min_of_arr<<<n_blocks, TPB>>>(field[b].h_ptr->dt_local.data(), size);//, TPB * sizeof(real)
-    min_of_arr<<<1, TPB>>>(field[b].h_ptr->dt_local.data(), n_blocks);//, TPB * sizeof(real)
+    min_of_arr<<<n_blocks, TPB>>>(field[b].h_ptr->dt_local.data(), size); //, TPB * sizeof(real)
+    min_of_arr<<<1, TPB>>>(field[b].h_ptr->dt_local.data(), n_blocks);    //, TPB * sizeof(real)
     cudaMemcpy(&dt_block, field[b].h_ptr->dt_local.data(), sizeof(real), cudaMemcpyDeviceToHost);
     dt = std::min(dt, dt_block);
   }

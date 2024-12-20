@@ -21,8 +21,8 @@ void simulate(Driver<mix_model, turb> &driver) {
     if (parameter.get_bool("steady_before_transient")) {
       if (parameter.get_int("initial") == 0) {
         // When we start a new simulation, and we want to run a steady simulation before the transient simulation.
-        real cfl_transient = parameter.get_real("cfl");
-        real cfl_steady = parameter.get_real("cfl_steady");
+        const real cfl_transient = parameter.get_real("cfl");
+        const real cfl_steady = parameter.get_real("cfl_steady");
         bool change_cfl = false;
         if (abs(cfl_steady - cfl_transient) > 1e-10) {
           change_cfl = true;
@@ -38,20 +38,20 @@ void simulate(Driver<mix_model, turb> &driver) {
     }
 
     real physical_time = parameter.get_real("solution_time");
-    if (real t0 = parameter.get_real("set_current_physical_time");t0 > -1e-10) {
+    if (const real t0 = parameter.get_real("set_current_physical_time");t0 > -1e-10) {
       physical_time = t0;
       parameter.update_parameter("solution_time", physical_time);
     }
-    int myid = parameter.get_int("myid");
+    const int myid = parameter.get_int("myid");
     if (myid == 0) {
       printf("\n\t-> %10.4es : Current physical time\n", physical_time);
     }
-    real length = parameter.get_real("domain_length");
+    const real length = parameter.get_real("domain_length");
     real u = parameter.get_real("v_inf");
     if (parameter.get_int("problem_type") == 1) {
       u = parameter.get_real("convective_velocity");
     }
-    if (real u_char = parameter.get_real("characteristic_velocity");u_char > 0) {
+    if (const real u_char = parameter.get_real("characteristic_velocity");u_char > 0) {
       u = u_char;
     }
     real flowThroughTime = length / u;

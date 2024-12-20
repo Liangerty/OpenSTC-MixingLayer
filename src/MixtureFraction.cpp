@@ -100,7 +100,7 @@ BilgerH::BilgerH(Inflow &fuel, Inflow &oxidizer, const Species &spec, int myid) 
   real tot_m{0};
   std::vector<real> z_elem(n_elem, 0);
   for (auto &[name, i]: spec.elem_list) {
-    z_elem[i] = (nu_fuel[i] + o2_needed * nu_oxid[i]) * cfd::Element(name).get_atom_weight();
+    z_elem[i] = (nu_fuel[i] + o2_needed * nu_oxid[i]) * Element(name).get_atom_weight();
     tot_m += z_elem[i];
   }
   z_h = z_elem[elem_label[0]] / tot_m;
@@ -129,11 +129,11 @@ real BilgerH::compute_coupling_function(real z_h, real z_o) const {
   return z_h / nuh_mwh - z_o / half_nuo_mwo;
 }
 
-real cfd::BilgerCH::compute_coupling_function(real z_c, real z_h, real z_o) const {
+real BilgerCH::compute_coupling_function(real z_c, real z_h, real z_o) const {
   return z_c / nuc_mwc + z_h / nuh_mwh - z_o / half_nuo_mwo;
 }
 
-real cfd::BilgerCH::compute_mixture_fraction(std::vector<real> &yk) {
+real BilgerCH::compute_mixture_fraction(std::vector<real> &yk) {
   real z_c{0}, z_h{0}, z_o{0};
   for (int i = 0; i < n_spec; ++i) {
     if (yk[i] > 1e-20) {
@@ -249,7 +249,7 @@ BilgerCH::BilgerCH(Inflow &fuel, Inflow &oxidizer, const Species &spec, int myid
   real tot_m{0};
   std::vector<real> z_elem(n_elem, 0);
   for (auto &[name, i]: spec.elem_list) {
-    z_elem[i] = (nu_fuel[i] + o2_needed * nu_oxid[i]) * cfd::Element(name).get_atom_weight();
+    z_elem[i] = (nu_fuel[i] + o2_needed * nu_oxid[i]) * Element(name).get_atom_weight();
     tot_m += z_elem[i];
   }
   z_c = z_elem[elem_label[0]] / tot_m;
@@ -402,7 +402,7 @@ acquire_mixture_fraction_expression(const Species &spec, const real *fuel, const
   real tot_m{0};
   std::vector<real> z_elem(n_elem, 0);
   for (auto &[name, i]: spec.elem_list) {
-    z_elem[i] = (nu_fuel[i] + o2_needed * nu_oxid[i]) * cfd::Element(name).get_atom_weight();
+    z_elem[i] = (nu_fuel[i] + o2_needed * nu_oxid[i]) * Element(name).get_atom_weight();
     tot_m += z_elem[i];
   }
   if (has_c)

@@ -40,14 +40,13 @@ struct DBoundCond {
   void
   apply_boundary_conditions(const Block &block, Field &field, DParameter *param, int step = -1) const;
 
-  void write_df(cfd::Parameter &parameter, const Mesh &mesh);
+  void write_df(Parameter &parameter, const Mesh &mesh) const;
 
   // There may be time-dependent BCs, which need to be updated at each time step.
   // E.g., the turbulent library method, we need to update the profile and fluctuation.
   // E.g., the NSCBC
   // Therefore, this function may be extended in the future to be called "time-dependent bc update".
-  //  void
-  //  time_dependent_bc_update(const Mesh &mesh, std::vector<Field> &field, DParameter *param, Parameter &parameter) const;
+  // void time_dependent_bc_update(const Mesh &mesh, std::vector<Field> &field, DParameter *param, Parameter &parameter) const;
 
   int n_wall = 0, n_symmetry = 0, n_inflow = 0, n_outflow = 0, n_farfield = 0, n_subsonic_inflow = 0, n_back_pressure =
           0, n_periodic = 0;
@@ -80,7 +79,8 @@ struct DBoundCond {
   std::vector<int> df_label;
   std::vector<int> df_related_block;
   constexpr static int DF_N = 50;
-  // Random values for digital filter. E.g. the dimensions are often like (ny,nz,3), where 3 is for 3 components of velocity.
+  // Random values for digital filter.
+  // E.g., the dimensions are often like (ny,nz,3), where 3 is for 3 components of velocity.
   ggxl::VectorField2D<real> *random_values_hPtr = nullptr;
   ggxl::VectorField2D<real> *random_values_dPtr = nullptr;
   ggxl::VectorField1D<real> *df_lundMatrix_dPtr = nullptr; // Lund matrix for digital filter
@@ -101,15 +101,15 @@ struct DBoundCond {
   curandState *rng_d_ptr = nullptr;
 
 private:
-  void initialize_digital_filter(Parameter &parameter, cfd::Mesh &mesh);
+  void initialize_digital_filter(Parameter &parameter, Mesh &mesh);
 
-  void initialize_df_memory(const Mesh &mesh, std::vector<int> &N1, std::vector<int> &N2);
+  void initialize_df_memory(const Mesh &mesh, const std::vector<int> &N1, const std::vector<int> &N2);
 
   void
-  get_digital_filter_lund_matrix(Parameter &parameter, std::vector<int> &N1, std::vector<std::vector<real>> &scaled_y);
+  get_digital_filter_lund_matrix(Parameter &parameter, const std::vector<int> &N1, const std::vector<std::vector<real>> &scaled_y) const;
 
-  void get_digital_filter_convolution_kernel(Parameter &parameter, std::vector<int> &N1,
-                                             std::vector<std::vector<real>> &y_scaled, real dz) const;
+  void get_digital_filter_convolution_kernel(Parameter &parameter, const std::vector<int> &N1,
+                                             const std::vector<std::vector<real>> &y_scaled, real dz) const;
 
   void generate_random_numbers(int iFace, int my, int mz, int ngg) const;
 
@@ -119,7 +119,7 @@ private:
                                   DParameter *param);
 
   void
-  compute_fluctuations(DParameter *param, DZone *zone, Inflow *inflowHere, int iFace, int my, int mz,
+  compute_fluctuations(const DParameter *param, DZone *zone, const Inflow *inflowHere, int iFace, int my, int mz,
                        int ngg) const;
 };
 
@@ -145,7 +145,7 @@ __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
   int k = range_start[2] + (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i > range_end[0] || j > range_end[1] || k > range_end[2]) return;
 
-  auto face = b.face;
+  const auto face = b.face;
   int dir[]{0, 0, 0};
   dir[face] = b.direction;
 
@@ -153,15 +153,15 @@ __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
 
   auto metric = zone->metric(i, j, k);
   real k_x{metric(face + 1, 1)}, k_y{metric(face + 1, 2)}, k_z{metric(face + 1, 3)};
-  real k_magnitude = sqrt(k_x * k_x + k_y * k_y + k_z * k_z);
+  const real k_magnitude = sqrt(k_x * k_x + k_y * k_y + k_z * k_z);
   k_x /= k_magnitude;
   k_y /= k_magnitude;
   k_z /= k_magnitude;
 
   auto &bv = zone->bv;
-  real u1{bv(inner_idx[0], inner_idx[1], inner_idx[2], 1)}, v1{bv(inner_idx[0], inner_idx[1], inner_idx[2], 2)}, w1{
-    bv(inner_idx[0], inner_idx[1], inner_idx[2], 3)
-  };
+  const real u1{bv(inner_idx[0], inner_idx[1], inner_idx[2], 1)},
+      v1{bv(inner_idx[0], inner_idx[1], inner_idx[2], 2)},
+      w1{bv(inner_idx[0], inner_idx[1], inner_idx[2], 3)};
   real u_k{k_x * u1 + k_y * v1 + k_z * w1};
   const real u_t{u1 - k_x * u_k}, v_t{v1 - k_y * u_k}, w_t{w1 - k_z * u_k};
 
@@ -185,7 +185,7 @@ __global__ void apply_symmetry(DZone *zone, int i_face, DParameter *param) {
 
     bv(gi, gj, gk, 0) = bv(ii, ij, ik, 0);
 
-    auto &u{bv(ii, ij, ik, 1)}, v{bv(ii, ij, ik, 2)}, w{bv(ii, ij, ik, 3)};
+    const auto &u{bv(ii, ij, ik, 1)}, v{bv(ii, ij, ik, 2)}, w{bv(ii, ij, ik, 3)};
     u_k = k_x * u + k_y * v + k_z * w;
     bv(gi, gj, gk, 1) = u - 2 * u_k * k_x;
     bv(gi, gj, gk, 2) = v - 2 * u_k * k_y;
@@ -624,22 +624,21 @@ apply_inflow_df(DZone *zone, Inflow *inflow, DParameter *param, ggxl::VectorFiel
 
   auto &bv = zone->bv;
   auto &sv = zone->sv;
-  auto &cv = zone->cv;
 
   constexpr int i = 0;
   const real u_upper = inflow->u, u_lower = inflow->u_lower;
   const auto y = zone->y(i, j, k);
   real u = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / inflow->delta_omega);
-  real u_fluc = fluctuation_dPtr[df_iFace](0, j, k, 0) * param->delta_u;
-  real v_fluc = fluctuation_dPtr[df_iFace](0, j, k, 1) * param->delta_u;
-  real w_fluc = fluctuation_dPtr[df_iFace](0, j, k, 2) * param->delta_u;
-  real mw = y > 0 ? inflow->mw : inflow->mw_lower;
+  const real u_fluc = fluctuation_dPtr[df_iFace](0, j, k, 0) * param->delta_u;
+  const real v_fluc = fluctuation_dPtr[df_iFace](0, j, k, 1) * param->delta_u;
+  const real w_fluc = fluctuation_dPtr[df_iFace](0, j, k, 2) * param->delta_u;
+  const real mw = y > 0 ? inflow->mw : inflow->mw_lower;
   real T = y > 0 ? inflow->temperature : inflow->t_lower;
   real rho = y > 0 ? inflow->density : inflow->density_lower;
   real p = y > 0 ? inflow->pressure : inflow->p_lower;
   real c_p = 0;
   if constexpr (mix_model != MixtureModel::Air) {
-    real *sv_b = y > 0 ? inflow->sv : inflow->sv_lower;
+    const real *sv_b = y > 0 ? inflow->sv : inflow->sv_lower;
     real cpl[MAX_SPEC_NUMBER];
     compute_cp(T, cpl, param);
     for (int l = 0; l < param->n_spec; ++l) {
@@ -650,7 +649,7 @@ apply_inflow_df(DZone *zone, Inflow *inflow, DParameter *param, ggxl::VectorFiel
   }
   real t_fluc = -u_fluc * u / c_p; // SRA
   t_fluc *= 0.25;                  // StreamS multiplies a parameter "dftscaling=0.25" here
-  real rho_fluc = -t_fluc * rho / T;
+  const real rho_fluc = -t_fluc * rho / T;
   u += u_fluc;
   rho += rho_fluc;
   T += t_fluc;
@@ -1068,7 +1067,7 @@ apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *
   }
   const real p{bv(idx[0], idx[1], idx[2], 4)};
 
-  real mw{cfd::mw_air};
+  real mw{mw_air};
   if constexpr (mix_model != MixtureModel::Air) {
     // Mixture
     const auto mwk = param->mw;
@@ -1081,7 +1080,7 @@ apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *
   }
   int if_fluctuation = wall->fluctuation_type;
 
-  const real rho_wall = p * mw / (t_wall * cfd::R_u);
+  const real rho_wall = p * mw / (t_wall * R_u);
   bv(i, j, k, 0) = rho_wall;
   bv(i, j, k, 1) = 0;
   bv(i, j, k, 2) = 0;
@@ -1090,41 +1089,41 @@ apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *
   bv(i, j, k, 5) = t_wall;
 
   if (wall->if_blow_shock_wave && step >= 0 && step <= 50) {
-    gxl::Matrix<real, 3, 3, 1> bdjin;
+    gxl::Matrix<real, 3, 3, 1> bdJin;
     real d1 = zone->metric(i, j, k)(2, 1);
     real d2 = zone->metric(i, j, k)(2, 2);
     real d3 = zone->metric(i, j, k)(2, 3);
     real kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
-    bdjin(1, 1) = d1 / kk;
-    bdjin(1, 2) = d2 / kk;
-    bdjin(1, 3) = d3 / kk;
+    bdJin(1, 1) = d1 / kk;
+    bdJin(1, 2) = d2 / kk;
+    bdJin(1, 3) = d3 / kk;
 
-    d1 = bdjin(1, 2) - bdjin(1, 3);
-    d2 = bdjin(1, 3) - bdjin(1, 1);
-    d3 = bdjin(1, 1) - bdjin(1, 2);
+    d1 = bdJin(1, 2) - bdJin(1, 3);
+    d2 = bdJin(1, 3) - bdJin(1, 1);
+    d3 = bdJin(1, 1) - bdJin(1, 2);
     kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
-    bdjin(2, 1) = d1 / kk;
-    bdjin(2, 2) = d2 / kk;
-    bdjin(2, 3) = d3 / kk;
+    bdJin(2, 1) = d1 / kk;
+    bdJin(2, 2) = d2 / kk;
+    bdJin(2, 3) = d3 / kk;
 
-    d1 = bdjin(1, 2) * bdjin(2, 3) - bdjin(1, 3) * bdjin(2, 2);
-    d2 = bdjin(1, 3) * bdjin(2, 1) - bdjin(1, 1) * bdjin(2, 3);
-    d3 = bdjin(1, 1) * bdjin(2, 2) - bdjin(1, 2) * bdjin(2, 1);
+    d1 = bdJin(1, 2) * bdJin(2, 3) - bdJin(1, 3) * bdJin(2, 2);
+    d2 = bdJin(1, 3) * bdJin(2, 1) - bdJin(1, 1) * bdJin(2, 3);
+    d3 = bdJin(1, 1) * bdJin(2, 2) - bdJin(1, 2) * bdJin(2, 1);
     kk = sqrt(d1 * d1 + d2 * d2 + d3 * d3);
-    bdjin(3, 1) = d1 / kk;
-    bdjin(3, 2) = d2 / kk;
-    bdjin(3, 3) = d3 / kk;
+    bdJin(3, 1) = d1 / kk;
+    bdJin(3, 2) = d2 / kk;
+    bdJin(3, 3) = d3 / kk;
 
     real u = bv(i - dir[0], j - dir[1], k - dir[2], 1),
         v = bv(i - dir[0], j - dir[1], k - dir[2], 2),
         w = bv(i - dir[0], j - dir[1], k - dir[2], 3);
-    real vn = bdjin(1, 1) * u + bdjin(1, 2) * v + bdjin(1, 3) * w;
-    real vt = bdjin(2, 1) * u + bdjin(2, 2) * v + bdjin(2, 3) * w;
-    real vs = bdjin(3, 1) * u + bdjin(3, 2) * v + bdjin(3, 3) * w;
+    real vn = bdJin(1, 1) * u + bdJin(1, 2) * v + bdJin(1, 3) * w;
+    real vt = bdJin(2, 1) * u + bdJin(2, 2) * v + bdJin(2, 3) * w;
+    real vs = bdJin(3, 1) * u + bdJin(3, 2) * v + bdJin(3, 3) * w;
 
-    bv(i, j, k, 1) = bdjin(2, 1) * vt + bdjin(3, 1) * vs - bdjin(1, 1) * vn;
-    bv(i, j, k, 2) = bdjin(2, 2) * vt + bdjin(3, 2) * vs - bdjin(1, 2) * vn;
-    bv(i, j, k, 3) = bdjin(2, 3) * vt + bdjin(3, 3) * vs - bdjin(1, 3) * vn;
+    bv(i, j, k, 1) = bdJin(2, 1) * vt + bdJin(3, 1) * vs - bdJin(1, 1) * vn;
+    bv(i, j, k, 2) = bdJin(2, 2) * vt + bdJin(3, 2) * vs - bdJin(1, 2) * vn;
+    bv(i, j, k, 3) = bdJin(2, 3) * vt + bdJin(3, 3) * vs - bdJin(1, 3) * vn;
   }
 
   real v_blow{0};
@@ -1239,7 +1238,7 @@ apply_wall(DZone *zone, Wall *wall, DParameter *param, int i_face, curandState *
       mw = 1 / mw;
     }
 
-    const real rho_g{p_i * mw / (t_g * cfd::R_u)};
+    const real rho_g{p_i * mw / (t_g * R_u)};
     bv(i_gh[0], i_gh[1], i_gh[2], 0) = rho_g;
     bv(i_gh[0], i_gh[1], i_gh[2], 1) = -bv(i_in[0], i_in[1], i_in[2], 1);
     bv(i_gh[0], i_gh[1], i_gh[2], 2) = v_blow * 2 - bv(i_in[0], i_in[1], i_in[2], 2);
@@ -1291,7 +1290,7 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
   real nx{zone->metric(i, j, k)(b.face + 1, 1)},
       ny{zone->metric(i, j, k)(b.face + 1, 2)},
       nz{zone->metric(i, j, k)(b.face + 1, 3)};
-  real grad_n_inv = b.direction / sqrt(nx * nx + ny * ny + nz * nz);
+  const real grad_n_inv = b.direction / sqrt(nx * nx + ny * ny + nz * nz);
   nx *= grad_n_inv;
   ny *= grad_n_inv;
   nz *= grad_n_inv;
@@ -1311,8 +1310,8 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
   const real delta{qb * qb - 4 * qa * qc};
   real a_new{acoustic_speed};
   if (delta >= 0) {
-    real a_plus{(-qb + sqrt(delta)) / (2 * qa)};
-    real a_minus{(-qb - sqrt(delta)) / (2 * qa)};
+    const real a_plus{(-qb + sqrt(delta)) / (2 * qa)};
+    const real a_minus{(-qb - sqrt(delta)) / (2 * qa)};
     a_new = a_plus > a_minus ? a_plus : a_minus;
   }
 
@@ -1324,7 +1323,7 @@ __global__ void apply_subsonic_inflow(DZone *zone, SubsonicInflow *inflow, DPara
   const real temperature{
     inflow->total_temperature * pow(pressure / inflow->total_pressure, (gamma_air - 1) / gamma_air)
   };
-  const real density{pressure * mw_air / (temperature * cfd::R_u)};
+  const real density{pressure * mw_air / (temperature * R_u)};
 
   // assign values for ghost cells
   for (int g = 1; g <= ngg; g++) {
@@ -1377,7 +1376,7 @@ __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DPa
   real nx{zone->metric(i, j, k)(b.face + 1, 1)},
       ny{zone->metric(i, j, k)(b.face + 1, 2)},
       nz{zone->metric(i, j, k)(b.face + 1, 3)};
-  real grad_n_inv = b.direction / sqrt(nx * nx + ny * ny + nz * nz);
+  const real grad_n_inv = b.direction / sqrt(nx * nx + ny * ny + nz * nz);
   nx *= grad_n_inv;
   ny *= grad_n_inv;
   nz *= grad_n_inv;
@@ -1389,10 +1388,10 @@ __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DPa
 
   if (mach_b < 1) {
     p_b = backPressure->pressure;
-    int i1 = i - dir[0], j1 = j - dir[1], k1 = k - dir[2];
-    real d1{bv(i1, j1, k1, 0)}, u1{bv(i1, j1, k1, 1)}, v1{bv(i1, j1, k1, 2)}, w1{bv(i1, j1, k1, 3)},
+    const int i1 = i - dir[0], j1 = j - dir[1], k1 = k - dir[2];
+    const real d1{bv(i1, j1, k1, 0)}, u1{bv(i1, j1, k1, 1)}, v1{bv(i1, j1, k1, 2)}, w1{bv(i1, j1, k1, 3)},
         p1{bv(i1, j1, k1, 4)};
-    real c1{sqrt(gamma_air * p1 / d1)};
+    const real c1{sqrt(gamma_air * p1 / d1)};
     rho_b = d1 + (p_b - p1) / (c1 * c1);
     u_b = u1 + nx * (p1 - p_b) / (d1 * c1);
     v_b = v1 + ny * (p1 - p_b) / (d1 * c1);
@@ -1402,8 +1401,9 @@ __global__ void apply_back_pressure(DZone *zone, BackPressure *backPressure, DPa
       const int gi{i + g * dir[0]}, gj{j + g * dir[1]}, gk{k + g * dir[2]};
       const int ii{i - g * dir[0]}, ij{j - g * dir[1]}, ik{k - g * dir[2]};
 
-      real p_g{2 * p_b - bv(ii, ij, ik, 4)}, rho_g{2 * rho_b - bv(ii, ij, ik, 0)};
-      real u_g{2 * u_b - bv(ii, ij, ik, 1)}, v_g{2 * v_b - bv(ii, ij, ik, 2)}, w_g{2 * w_b - bv(ii, ij, ik, 3)};
+      const real p_g{2 * p_b - bv(ii, ij, ik, 4)}, rho_g{2 * rho_b - bv(ii, ij, ik, 0)};
+      const real u_g{2 * u_b - bv(ii, ij, ik, 1)}, v_g{2 * v_b - bv(ii, ij, ik, 2)},
+          w_g{2 * w_b - bv(ii, ij, ik, 3)};
 
       bv(gi, gj, gk, 0) = rho_g;
       bv(gi, gj, gk, 1) = u_g;

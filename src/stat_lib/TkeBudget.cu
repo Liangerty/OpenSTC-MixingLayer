@@ -3,7 +3,7 @@
 #include <mpi.h>
 #include "../gxl_lib/MyString.h"
 
-MPI_Offset cfd::create_tke_budget_file(cfd::Parameter &parameter, const Mesh &mesh, int n_block_ahead) {
+MPI_Offset cfd::create_tke_budget_file(Parameter &parameter, const Mesh &mesh, int n_block_ahead) {
   const std::filesystem::path out_dir("output/stat");
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/tke_budget.bin").c_str(),
@@ -31,17 +31,17 @@ MPI_Offset cfd::create_tke_budget_file(cfd::Parameter &parameter, const Mesh &me
     offset += 4 * n_collect; // counter
   }
   for (int b = 0; b < n_block_ahead; ++b) {
-    MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
+    const MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
     offset += sz * n_collect + 4 * 3;
   }
 
   return offset;
 }
 
-std::vector<int> cfd::read_tke_budget_file(cfd::Parameter &parameter, const cfd::Mesh &mesh, int n_block_ahead,
+std::vector<int> cfd::read_tke_budget_file(Parameter &parameter, const Mesh &mesh, int n_block_ahead,
                                            std::vector<Field> &field) {
   const std::filesystem::path out_dir("output/stat");
-  std::string file_name = (out_dir.string() + "/tke_budget.bin");
+  const std::string file_name = out_dir.string() + "/tke_budget.bin";
 
   std::vector<int> counter_read(TkeBudget::n_collect, 0);
   if (!std::filesystem::exists(file_name)) {
@@ -90,7 +90,7 @@ std::vector<int> cfd::read_tke_budget_file(cfd::Parameter &parameter, const cfd:
     }
 
     for (int b = 0; b < n_block_ahead; ++b) {
-      MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
+      const MPI_Offset sz = (mesh.mx_blk[b] + 2 * ngg) * (mesh.my_blk[b] + 2 * ngg) * (mesh.mz_blk[b] + 2 * ngg) * 8;
       offset_read += sz * n_read_rey1 + 4 * 3;
     }
 
@@ -108,8 +108,8 @@ std::vector<int> cfd::read_tke_budget_file(cfd::Parameter &parameter, const cfd:
       }
       const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
       MPI_Datatype ty;
-      int lSize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
-      int start_idx[3]{0, 0, 0};
+      const int lSize[3]{mx + 2 * ngg, my + 2 * ngg, mz + 2 * ngg};
+      constexpr int start_idx[3]{0, 0, 0};
       MPI_Type_create_subarray(3, lSize, lSize, start_idx, MPI_ORDER_FORTRAN, MPI_DOUBLE, &ty);
       MPI_Type_commit(&ty);
 
@@ -122,7 +122,7 @@ std::vector<int> cfd::read_tke_budget_file(cfd::Parameter &parameter, const cfd:
   return counter_read;
 }
 
-__device__ void cfd::collect_tke_budget(cfd::DZone *zone, cfd::DParameter *param, int i, int j, int k) {
+__device__ void cfd::collect_tke_budget(DZone *zone, DParameter *param, int i, int j, int k) {
   auto &coll = zone->collect_tke_budget;
   auto &bv = zone->bv;
 
@@ -179,7 +179,7 @@ __device__ void cfd::collect_tke_budget(cfd::DZone *zone, cfd::DParameter *param
 
 void
 cfd::export_tke_budget_file(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, MPI_Offset offset_ahead,
-                            std::vector<int> &counter, const std::vector<MPI_Datatype> &tys) {
+                            const std::vector<int> &counter, const std::vector<MPI_Datatype> &tys) {
   const std::filesystem::path out_dir("output/stat");
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, (out_dir.string() + "/tke_budget.bin").c_str(),
@@ -195,7 +195,7 @@ cfd::export_tke_budget_file(Parameter &parameter, const Mesh &mesh, std::vector<
   }
   constexpr int ngg = TkeBudget::ngg;
   for (int b = 0; b < mesh.n_block; ++b) {
-    auto &zone = field[b].h_ptr;
+    const auto &zone = field[b].h_ptr;
     const int mx = mesh[b].mx, my = mesh[b].my, mz = mesh[b].mz;
     const auto sz = (long long) (mx + 2 * ngg) * (my + 2 * ngg) * (mz + 2 * ngg) * 8;
 
@@ -204,7 +204,7 @@ cfd::export_tke_budget_file(Parameter &parameter, const Mesh &mesh, std::vector<
 
     // We create this datatype because in the original MPI_File_write_at, the number of elements is a 64-bit integer.
     // However, the nx*ny*nz may be larger than 2^31, so we need to use MPI_Type_create_subarray to create a datatype
-    MPI_Datatype ty = tys[b];
+    const MPI_Datatype ty = tys[b];
 
     MPI_File_write_at(fp, offset, &mx, 1, MPI_INT32_T, &status);
     offset += 4;

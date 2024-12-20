@@ -3,7 +3,6 @@
 #include "Constants.h"
 
 namespace cfd {
-
 __global__ void implicit_treat_for_SST(DZone *zone, const DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -11,7 +10,7 @@ __global__ void implicit_treat_for_SST(DZone *zone, const DParameter *param) {
   const int k = blockDim.z * blockIdx.z + threadIdx.z;
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
-  // Used in explicit temporal scheme
+  // Used in the explicit temporal scheme
   const int i_turb_cv{param->i_turb_cv};
   auto &dq = zone->dq;
   const real dt_local = zone->dt_local(i, j, k);
@@ -23,7 +22,7 @@ __global__ void implicit_treat_for_SST(DZone *zone, const DParameter *param) {
 __device__ real Wilcox_compressibility_correction(real Mt) {
   constexpr real Mt0{0.25};
   real betaMultiXiMultiFMt{0};
-  if (const real DMt = Mt - Mt0;DMt > 0) {
+  if (const real DMt = Mt - Mt0; DMt > 0) {
     betaMultiXiMultiFMt = sst::beta_star * 2 * (Mt * Mt - Mt0 * Mt0);
   }
   return betaMultiXiMultiFMt;
@@ -32,9 +31,9 @@ __device__ real Wilcox_compressibility_correction(real Mt) {
 __device__ real Zeman_compressibility_correction(real Mt, real gammaP1) {
   const real Mt0{0.25 * sqrt(2.0 / gammaP1)};
   real betaMultiXiMultiFMt{0};
-  if (const real DMt = Mt - Mt0;DMt > 0) {
+  if (const real DMt = Mt - Mt0; DMt > 0) {
     constexpr real Lambda2{0.66 * 0.66}; // For boundary layer flow, Lambda=0.66; For free shear flow, Lambda=0.6
-    real F_Mt = 1 - exp(-0.5 * gammaP1 * DMt * DMt / Lambda2);
+    const real F_Mt = 1 - exp(-0.5 * gammaP1 * DMt * DMt / Lambda2);
     betaMultiXiMultiFMt = sst::beta_star * 0.75 * F_Mt;
   }
   return betaMultiXiMultiFMt;
@@ -42,7 +41,7 @@ __device__ real Zeman_compressibility_correction(real Mt, real gammaP1) {
 
 template<TurbSimLevel level>
 __device__ void
-SST<level>::compute_mut(cfd::DZone *zone, int i, int j, int k, real mul, const DParameter *param) {
+SST<level>::compute_mut(DZone *zone, int i, int j, int k, real mul, const DParameter *param) {
   const auto &m = zone->metric(i, j, k);
   const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
   const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
@@ -118,7 +117,7 @@ SST<level>::compute_mut(cfd::DZone *zone, int i, int j, int k, real mul, const D
 
 template<TurbSimLevel level>
 __device__ void
-SST<level>::compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParameter *param) {
+SST<level>::compute_source_and_mut(DZone *zone, int i, int j, int k, const DParameter *param) {
   const int n_spec{param->n_spec};
 
   const auto &m = zone->metric(i, j, k);
@@ -208,8 +207,8 @@ SST<level>::compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParam
   }
   //zone->udv(i, j, k, 2) = f2;
   real mut{0};
-  const real S = std::sqrt((v_x + u_y) * (v_x + u_y) + (w_x + u_z) * (w_x + u_z) + (w_y + v_z) * (w_y + v_z) +
-                           2 * (u_x * u_x + v_y * v_y + w_z * w_z));
+  // const real S = std::sqrt((v_x + u_y) * (v_x + u_y) + (w_x + u_z) * (w_x + u_z) + (w_y + v_z) * (w_y + v_z) +
+  //                          2 * (u_x * u_x + v_y * v_y + w_z * w_z));
 //  zone->udv(i, j, k, 0) = S;
 //  if (const real denominator = max(a_1 * omega, S * f2); denominator > 1e-25) {
   if (const real denominator = max(a_1 * omega, vorticity * f2); denominator > 1e-25) {
@@ -219,7 +218,7 @@ SST<level>::compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParam
 
   real beta = beta_2 + delta_beta * f1;
   real betaStar{beta_star};
-  if (auto correction = param->compressibility_correction;correction) {
+  if (const auto correction = param->compressibility_correction; correction) {
     real specific_heat_ratio{gamma_air};
     if (n_spec > 0) {
       specific_heat_ratio = zone->gamma(i, j, k);
@@ -234,8 +233,8 @@ SST<level>::compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParam
       case 2: // Sarkar
         beta_iStarMulXiStarMulFMt = beta_star * Mt * Mt;
         break;
-      case 3: // Zeman
-      default:// Zeman
+      case 3:  // Zeman
+      default: // Zeman
         beta_iStarMulXiStarMulFMt = Zeman_compressibility_correction(Mt, specific_heat_ratio + 1.0);
         break;
     }
@@ -262,7 +261,7 @@ SST<level>::compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParam
 
       // First, compute the blending function fd.
       const real sqrt_U_ij = sqrt(
-          u_x * u_x + v_y * v_y + w_z * w_z + u_y * u_y + u_z * u_z + v_x * v_x + v_z * v_z + w_x * w_x + w_y * w_y);
+        u_x * u_x + v_y * v_y + w_z * w_z + u_y * u_y + u_z * u_z + v_x * v_x + v_z * v_z + w_x * w_x + w_y * w_y);
       const real d = max(dy, 1e-10);
       const real rd = (zone->mul(i, j, k) + zone->mut(i, j, k)) /
                       (zone->bv(i, j, k, 0) * max(sqrt_U_ij, 1e-10) * kappa * kappa * d * d);
@@ -277,7 +276,7 @@ SST<level>::compute_source_and_mut(cfd::DZone *zone, int i, int j, int k, DParam
       diss_k = rhoK * sqrt(tke) / l_ddes;
 
       if (l_ddes > 1e-10 && abs(l_les - l_rans) > 1e-6) {
-        auto turb_src_jac_les = -1.5 * sqrt(tke) / l_les;
+        const auto turb_src_jac_les = -1.5 * sqrt(tke) / l_les;
         turb_src_jac_k = turb_src_jac_k + (l_ddes - l_rans) * (turb_src_jac_les - turb_src_jac_k) / (l_les - l_rans);
       }
     } else {

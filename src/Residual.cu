@@ -1,7 +1,7 @@
 #include "Residual.cuh"
 
 namespace cfd {
-void steady_screen_output(int step, real err_max, gxl::Time &time, std::array<real, 4> &res) {
+void steady_screen_output(int step, real err_max, gxl::Time &time, const std::array<real, 4> &res) {
   time.get_elapsed_time();
   FILE *history = std::fopen("history.dat", "a");
   fprintf(history, "%d\t%11.4e\n", step, err_max);
@@ -16,7 +16,8 @@ void steady_screen_output(int step, real err_max, gxl::Time &time, std::array<re
 }
 
 void
-unsteady_screen_output(int step, real err_max, gxl::Time &time, std::array<real, 4> &res, real dt, real solution_time) {
+unsteady_screen_output(int step, real err_max, gxl::Time &time, const std::array<real, 4> &res, real dt,
+                       real solution_time) {
   time.get_elapsed_time();
   FILE *history = std::fopen("history.dat", "a");
   fprintf(history, "%d\t%11.4e\n", step, err_max);
@@ -31,7 +32,7 @@ unsteady_screen_output(int step, real err_max, gxl::Time &time, std::array<real,
   printf("Total elapsed CPU time is %16.8fs\n", time.elapsed_time);
 }
 
-__global__ void check_nan(cfd::DZone *zone, int blk, int myid) {
+__global__ void check_nan(DZone *zone, int blk, int myid) {
   const int mx{zone->mx}, my{zone->my}, mz{zone->mz};
   int i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   int j = (int) (blockDim.y * blockIdx.y + threadIdx.y);

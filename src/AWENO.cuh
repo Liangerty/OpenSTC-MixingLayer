@@ -18,6 +18,6 @@ __device__ double2 WENO5(const real *L, const real *cv, int n_var, int i_shared,
 __device__ double2 WENO7(const real *L, const real *cv, int n_var, int i_shared, int l_row);
 
 template<MixtureModel mix_model>
-__global__ void CDSPart1D(cfd::DZone *zone, int direction, int max_extent, DParameter *param);
+__global__ void CDSPart1D(DZone *zone, int direction, int max_extent, DParameter *param);
 // Implementations
 }

@@ -58,20 +58,20 @@ void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<F
   }
 }
 
-void initialize_spec_from_inflow(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vector<Field> &field,
+void initialize_spec_from_inflow(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
                                  Species &species) {
-  // This can also be implemented like the from_start one, which can have patch.
-  // But currently, for easy to implement, just initialize the whole flowfield to the inflow composition,
+  // This can also be implemented like the from_start one, which can have patches.
+  // But currently, for easy to implement, initialize the whole flowfield to the inflow composition,
   // which means that other species would have to be computed from boundary conditions.
   // If the need for initialize species in groups is strong,
   // then we implement it just by copying the previous function "initialize_from_start",
   // which should be easy.
   const std::string default_init = parameter.get_string("default_init");
-  Inflow inflow(default_init, species, parameter);
+  const Inflow inflow(default_init, species, parameter);
   for (int blk = 0; blk < mesh.n_block; ++blk) {
     const int mx{mesh[blk].mx}, my{mesh[blk].my}, mz{mesh[blk].mz};
     const auto n_spec = parameter.get_int("n_spec");
-    auto mass_frac = inflow.sv;
+    const auto mass_frac = inflow.sv;
     auto &yk = field[blk].sv;
     for (int k = 0; k < mz; ++k) {
       for (int j = 0; j < my; ++j) {
@@ -91,7 +91,7 @@ void initialize_spec_from_inflow(cfd::Parameter &parameter, const cfd::Mesh &mes
     const int i_fl{parameter.get_int("i_fl")};
     for (int blk = 0; blk < mesh.n_block; ++blk) {
       const int mx{mesh[blk].mx}, my{mesh[blk].my}, mz{mesh[blk].mz};
-      auto sv_in = inflow.sv;
+      const auto sv_in = inflow.sv;
       auto &sv = field[blk].sv;
       for (int k = 0; k < mz; ++k) {
         for (int j = 0; j < my; ++j) {
@@ -105,15 +105,15 @@ void initialize_spec_from_inflow(cfd::Parameter &parameter, const cfd::Mesh &mes
   }
 }
 
-void initialize_turb_from_inflow(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vector<Field> &field,
+void initialize_turb_from_inflow(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
                                  Species &species) {
-  // This can also be implemented like the from_start one, which can have patch.
-  // But currently, for easy to implement, just initialize the whole flowfield to the main inflow turbulent state.
+  // This can also be implemented like the from_start one, which can have patches.
+  // But currently, for easy to implement, initialize the whole flowfield to the main inflow turbulent state.
   // If the need for initialize turbulence in groups is strong,
   // then we implement it just by copying the previous function "initialize_from_start",
   // which should be easy.
   const std::string default_init = parameter.get_string("default_init");
-  Inflow inflow(default_init, species, parameter);
+  const Inflow inflow(default_init, species, parameter);
   const auto n_turb = parameter.get_int("n_turb");
   const auto n_spec = parameter.get_int("n_spec");
   for (int blk = 0; blk < mesh.n_block; ++blk) {
@@ -137,7 +137,8 @@ void initialize_turb_from_inflow(cfd::Parameter &parameter, const cfd::Mesh &mes
 void initialize_mixture_fraction_from_species(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
                                               Species &species) {
   // This is called when we need to compute the mixture fraction from a given species field.
-  // We need to know the form of coupling functions, the boundary conditions of the 2 streams in order to know how to compute the mixture fraction
+  // We need to know the form of coupling functions,
+  // the boundary conditions of the 2 streams to know how to compute the mixture fraction
   Inflow *fuel = nullptr, *oxidizer = nullptr;
 
   // First find and initialize the fuel and oxidizer stream
@@ -146,7 +147,7 @@ void initialize_mixture_fraction_from_species(Parameter &parameter, const Mesh &
     auto &bc = parameter.get_struct(bc_name);
     auto &bc_type = std::get<std::string>(bc.at("type"));
     if (bc_type == "inflow") {
-      auto z = std::get<real>(bc.at("mixture_fraction"));
+      const auto z = std::get<real>(bc.at("mixture_fraction"));
       if (abs(z - 1) < 1e-10) {
         // fuel
         if (fuel == nullptr) {
@@ -169,7 +170,7 @@ void initialize_mixture_fraction_from_species(Parameter &parameter, const Mesh &
     exit(1);
   }
 
-  // Next, see which definition of mixture fraction is used.
+  // Next, see which definition of the mixture fraction is used.
   MixtureFraction *mixtureFraction = nullptr;
   if (species.elem_list.find("C") != species.elem_list.end()) {
     mixtureFraction = new BilgerCH(*fuel, *oxidizer, species, parameter.get_int("myid"));
@@ -181,7 +182,7 @@ void initialize_mixture_fraction_from_species(Parameter &parameter, const Mesh &
   for (int blk = 0; blk < mesh.n_block; ++blk) {
     const int mx{mesh[blk].mx}, my{mesh[blk].my}, mz{mesh[blk].mz};
     auto &sv = field[blk].sv;
-    auto i_fl = parameter.get_int("i_fl");
+    const auto i_fl = parameter.get_int("i_fl");
     for (int k = 0; k < mz; ++k) {
       for (int j = 0; j < my; ++j) {
         for (int i = 0; i < mx; ++i) {
@@ -203,7 +204,7 @@ void initialize_mixture_fraction_from_species(Parameter &parameter, const Mesh &
 void expand_2D_to_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field) {
   const int n_scalar{parameter.get_int("n_scalar")};
   for (size_t blk = 0; blk < mesh.n_block; ++blk) {
-    auto mx{mesh[blk].mx}, my{mesh[blk].my}, mz{mesh[blk].mz};
+    const auto mx{mesh[blk].mx}, my{mesh[blk].my}, mz{mesh[blk].mz};
     for (int l = 0; l < 6; ++l) {
       for (int k = 1; k < mz; ++k) {
         for (int j = 0; j < my; ++j) {
@@ -225,7 +226,8 @@ void expand_2D_to_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> 
   }
 }
 
-void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species) {
+void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
+                             const Species &species) {
   std::vector<real> var_info;
   get_mixing_layer_info(parameter, species, var_info);
 
@@ -264,14 +266,14 @@ initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec,
   int k = (int) (blockDim.z * blockIdx.z + threadIdx.z) - ngg;
   if (i >= mx + ngg || j >= my + ngg || k >= mz + ngg) return;
 
-  auto y = zone->y(i, j, k);
+  const auto y = zone->y(i, j, k);
   auto &bv = zone->bv, &sv = zone->sv;
 
   const real u_upper = var_info[1], u_lower = var_info[8 + n_spec];
   bv(i, j, k, 1) = 0.5 * (u_upper + u_lower) + 0.5 * (u_upper - u_lower) * tanh(2 * y / delta_omega);
 
   if (y >= 0) {
-    auto var = var_info;
+    const auto var = var_info;
 
     bv(i, j, k, 0) = var[0];
     bv(i, j, k, 2) = var[2];
@@ -296,7 +298,7 @@ initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec,
       }
     }
   } else {
-    auto var = &var_info[7 + n_spec];
+    const auto var = &var_info[7 + n_spec];
 
     bv(i, j, k, 0) = var[0];
     bv(i, j, k, 2) = var[2];

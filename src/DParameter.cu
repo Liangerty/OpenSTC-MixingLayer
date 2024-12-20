@@ -67,7 +67,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   auto mem_sz = n_spec * sizeof(real);
   cudaMalloc(&mw, mem_sz);
   cudaMemcpy(mw, spec.mw.data(), mem_sz, cudaMemcpyHostToDevice);
-#ifdef HighTempMultiPart
+  #ifdef HighTempMultiPart
   cudaMalloc(&n_temperature_range, n_spec * sizeof(int));
   cudaMemcpy(n_temperature_range, spec.n_temperature_range.data(), n_spec * sizeof(int), cudaMemcpyHostToDevice);
   int n_ranges = 2;
@@ -80,7 +80,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   therm_poly_coeff.allocate_memory(7, n_ranges, n_spec, 0);
   cudaMemcpy(therm_poly_coeff.data(), spec.therm_poly_coeff.data(), sizeof(real) * therm_poly_coeff.size(),
              cudaMemcpyHostToDevice);
-#else
+  #else
   high_temp_coeff.init_with_size(n_spec, 7);
   cudaMemcpy(high_temp_coeff.data(), spec.high_temp_coeff.data(), high_temp_coeff.size() * sizeof(real),
              cudaMemcpyHostToDevice);
@@ -93,7 +93,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   cudaMemcpy(t_low, spec.t_low.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMemcpy(t_mid, spec.t_mid.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMemcpy(t_high, spec.t_high.data(), mem_sz, cudaMemcpyHostToDevice);
-#endif
+  #endif
   cudaMalloc(&geometry, mem_sz);
   cudaMemcpy(geometry, spec.geometry.data(), mem_sz, cudaMemcpyHostToDevice);
   cudaMalloc(&LJ_potent_inv, mem_sz);
@@ -116,7 +116,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
   cudaMemcpy(ZRotF298, spec.ZRotF298.data(), mem_sz, cudaMemcpyHostToDevice);
   Sc = parameter.get_real("schmidt_number");
 
-  // reactions info
+  // reaction info
   if (n_reac > 0) {
     cudaMalloc(&reac_type, n_reac * sizeof(int));
     cudaMemcpy(reac_type, reaction->label.data(), n_reac * sizeof(int), cudaMemcpyHostToDevice);
@@ -210,7 +210,7 @@ cfd::DParameter::DParameter(cfd::Parameter &parameter, Species &species, Reactio
 
   // the following parameters have been computed in "write_reference_state".
   if (problem_type == 1) {
-    if (int i = parameter.get_int("characteristic_velocity_ml");i == 0) {
+    if (int i = parameter.get_int("characteristic_velocity_ml"); i == 0) {
       v_char = parameter.get_real("convective_velocity");
     } else {
       v_char = parameter.get_real("DeltaU");

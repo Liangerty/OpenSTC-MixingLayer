@@ -15,10 +15,10 @@ int add_other_variable_name(std::vector<std::string> &var_name, const Parameter 
 
 MPI_Offset write_static_max_min(MPI_Offset offset, const Field &field, int ngg, MPI_File &fp);
 
-MPI_Offset write_dynamic_max_min_first_step(MPI_Offset offset, const cfd::Field &field, int ngg, MPI_File &fp);
+MPI_Offset write_dynamic_max_min_first_step(MPI_Offset offset, const Field &field, int ngg, MPI_File &fp);
 
 MPI_Offset
-write_dynamic_max_min(MPI_Offset offset, const cfd::Field &field, int ngg, MPI_File &fp);
+write_dynamic_max_min(MPI_Offset offset, const Field &field, int ngg, MPI_File &fp);
 
 MPI_Offset
 write_static_array(MPI_Offset offset, const Field &field, MPI_File &fp, MPI_Datatype ty, long long int mem_sz);
@@ -471,7 +471,7 @@ FieldIO<mix_model, turb, output_time_choice>::acquire_variable_names(std::vector
     var_name.emplace_back("MixtureFraction");
     var_name.emplace_back("MixtureFractionVariance");
   }
-  if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
+  if (const int n_ps = parameter.get_int("n_ps");n_ps > 0) {
     nv += n_ps;
     for (int i = 0; i < n_ps; ++i) {
       var_name.emplace_back("PS" + std::to_string(i + 1));
@@ -703,7 +703,7 @@ int32_t FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::acquire_variable
     var_name.emplace_back("MixtureFraction");
     var_name.emplace_back("MixtureFractionVariance");
   }
-  if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
+  if (const int n_ps = parameter.get_int("n_ps");n_ps > 0) {
     nv += n_ps;
     for (int i = 0; i < n_ps; ++i) {
       var_name.emplace_back("PS" + std::to_string(i + 1));
@@ -784,7 +784,7 @@ void FieldIO<mix_model, turb, OutputTimeChoice::TimeSeries>::write_header() {
     offset_process[0] = offset;
 
     // iv. Zones
-    auto n_blk = mesh.nblk;
+    const auto n_blk = mesh.nblk;
     auto *disp = new int[mesh.n_proc];
     disp[0] = n_blk[0];
     for (int i = 1; i < mesh.n_proc; ++i) {

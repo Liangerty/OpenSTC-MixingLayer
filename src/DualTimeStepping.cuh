@@ -51,7 +51,7 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
     bpg[b] = {(mx - 1) / tpb.x + 1, (my - 1) / tpb.y + 1, (mz - 1) / tpb.z + 1};
   }
 
-  std::vector<cfd::Field> &field{driver.field};
+  std::vector<Field> &field{driver.field};
   const int n_var{parameter.get_int("n_var")};
   const int ng_1 = 2 * mesh[0].ngg - 1;
   DParameter *param{driver.param};
@@ -78,15 +78,15 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
 
   IOManager<mix_model, turb> ioManager(driver.myid, mesh, field, parameter, driver.spec, 0);
   TimeSeriesIOManager<mix_model, turb> timeSeriesIOManager(driver.myid, mesh, field, parameter, driver.spec, 0);
-  int output_time_series = parameter.get_int("output_time_series");
+  const int output_time_series = parameter.get_int("output_time_series");
 
   Monitor monitor(parameter, driver.spec, mesh);
   const int if_monitor{parameter.get_int("if_monitor")};
 
   int step{parameter.get_int("step")};
-  int total_step{parameter.get_int("total_step") + step};
+  const int total_step{parameter.get_int("total_step") + step};
   const int output_screen = parameter.get_int("output_screen");
-  real total_simulation_time{parameter.get_real("total_simulation_time")};
+  const real total_simulation_time{parameter.get_real("total_simulation_time")};
   const int output_file = parameter.get_int("output_file");
   int inner_iteration = parameter.get_int("inner_iteration");
 
@@ -178,9 +178,9 @@ void dual_time_stepping(Driver<mix_model, turb> &driver) {
 
       // update physical properties such as Mach number, transport coefficients et, al.
       for (auto b = 0; b < n_block; ++b) {
-        int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
-        dim3 bpg{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
-        update_physical_properties<mix_model><<<bpg, tpb>>>(field[b].d_ptr, param);
+        const int mx{mesh[b].mx}, my{mesh[b].my}, mz{mesh[b].mz};
+        dim3 BPG{(mx + ng_1) / tpb.x + 1, (my + ng_1) / tpb.y + 1, (mz + ng_1) / tpb.z + 1};
+        update_physical_properties<mix_model><<<BPG, tpb>>>(field[b].d_ptr, param);
       }
 
       if (monitor_inner_iteration)

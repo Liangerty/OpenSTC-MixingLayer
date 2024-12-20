@@ -102,7 +102,7 @@ void FlameletLib::read_ACANS_flamelet(const Parameter &parameter) {
 //  zi[n_z + 6] = 1;
 }
 
-__device__ void flamelet_source(cfd::DZone *zone, int i, int j, int k, DParameter *param) {
+__device__ void flamelet_source(DZone *zone, int i, int j, int k, const DParameter *param) {
   const auto &m = zone->metric(i, j, k);
   const real xi_x{m(1, 1)}, xi_y{m(1, 2)}, xi_z{m(1, 3)};
   const real eta_x{m(2, 1)}, eta_y{m(2, 2)}, eta_z{m(2, 3)};
@@ -154,7 +154,7 @@ __device__ void flamelet_source(cfd::DZone *zone, int i, int j, int k, DParamete
 ///
 /// The interpolated mass fractions are stored in the yk_ave array.
 __device__ void
-compute_massFraction_from_MixtureFraction(cfd::DZone *zone, int i, int j, int k, DParameter *param, real *yk_ave) {
+compute_massFraction_from_MixtureFraction(DZone *zone, int i, int j, int k, DParameter *param, real *yk_ave) {
   const auto mixFrac_ave{zone->sv(i, j, k, param->i_fl)};
 
   const auto n_spec{param->n_spec};

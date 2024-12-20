@@ -155,7 +155,7 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
   // This can be split into 3 kernels, such that the shared memory can be used.
   // E.g., i=2 needs ii=1 and ii=3, while i=4 needs ii=3 and ii=5, thus the ii=3 is recomputed.
   // If we use a kernel in i direction, with each thread computing an ii, for ii=-1~blockDim,
-  // then all threads in the block except threadID=0 and blockDim, can use the just computed convJacTimesDq.
+  // then all threads in the block except threadID=0 and blockDim can use the just computed convJacTimesDq.
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
@@ -224,11 +224,10 @@ __global__ void DPLUR_inner_iteration(const DParameter *param, DZone *zone, real
   }
 
   const real dt_local = zone->dt_local(i, j, k);
-  const auto &spect_rad = inviscid_spectral_radius(i, j, k);
-  real diag = 1 + diag_factor * dt_local + dt_local * (spect_rad[0] + spect_rad[1] + spect_rad[2])
+  const auto &spec_rad = inviscid_spectral_radius(i, j, k);
+  real diag = 1 + diag_factor * dt_local + dt_local * (spec_rad[0] + spec_rad[1] + spec_rad[2])
               + 2 * dt_local * (zone->visc_spectr_rad(i, j, k)[0] + zone->visc_spectr_rad(i, j, k)[1] +
                                 zone->visc_spectr_rad(i, j, k)[2]);
-  ;
   auto &dqk = zone->dqk;
   const auto &dq0 = zone->dq0;
   const int n_spec{param->n_spec};
@@ -296,7 +295,7 @@ __global__ void convert_dq_back_to_dqDt(DZone *zone, const DParameter *param);
 
 struct DBoundCond;
 
-void set_wall_dq_to_0(const Block &block, const DParameter *param, DZone *zone, DBoundCond &bound_cond);
+void set_wall_dq_to_0(const Block &block, const DParameter *param, DZone *zone, const DBoundCond &bound_cond);
 
 template<MixtureModel mixture_model, class turb_method>
 void DPLUR(const Block &block, const DParameter *param, DZone *d_ptr, DZone *h_ptr, const Parameter &parameter,
@@ -312,7 +311,7 @@ void DPLUR(const Block &block, const DParameter *param, DZone *d_ptr, DZone *h_p
   // DQ(0)=dt*DQ/(1+dt*DRho+dt*dS/dQ)
   compute_DQ_0<mixture_model, turb_method><<<bpg, tpb>>>(d_ptr, param, diag_factor);
   // Take care of all such treatments where n_var is used to decide the memory size,
-  // for when flamelet model is used, the data structure should be modified to make the useful data contiguous.
+  // for when the flamelet model is used, the data structure should be modified to make the useful data contiguous.
   const auto mem_sz = h_ptr->dq.size() * parameter.get_int("n_var") * sizeof(real);
   cudaMemcpy(h_ptr->dq0.data(), h_ptr->dq.data(), mem_sz, cudaMemcpyDeviceToDevice);
 

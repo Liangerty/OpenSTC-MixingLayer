@@ -10,9 +10,9 @@ int main(int argc, char *argv[]) {
 
   cfd::Mesh mesh(parameter);
 
-  int species = parameter.get_int("species");
-  bool turbulent_laminar = parameter.get_bool("turbulence");
-  int reaction = parameter.get_int("reaction");
+  const int species = parameter.get_int("species");
+  const bool turbulent_laminar = parameter.get_bool("turbulence");
+  const int reaction = parameter.get_int("reaction");
   int turbulent_method = parameter.get_int("turbulence_method");
   if (!turbulent_laminar) {
     parameter.update_parameter("turbulence_method", 0);

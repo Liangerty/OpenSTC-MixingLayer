@@ -211,7 +211,7 @@ __global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, 
   wall_dist = 1e+6;
   for (int l = 0; l < n_wall_point; ++l) {
     const int idx = 3 * l;
-    real d = (x - wall_point_coor[idx]) * (x - wall_point_coor[idx]) +
+    const real d = (x - wall_point_coor[idx]) * (x - wall_point_coor[idx]) +
              (y - wall_point_coor[idx + 1]) * (y - wall_point_coor[idx + 1]) +
              (z - wall_point_coor[idx + 2]) * (z - wall_point_coor[idx + 2]);
     if (wall_dist > d) {
@@ -222,7 +222,7 @@ __global__ void compute_wall_distance(const real *wall_point_coor, DZone *zone, 
 }
 
 void write_reference_state(Parameter &parameter, const Species &species) {
-  int myid = parameter.get_int("myid");
+  const int myid = parameter.get_int("myid");
   if (myid == 0) {
     printf("\n*******************************Flow Information*********************************\n");
     printf("\tReference state:\n");
@@ -277,7 +277,7 @@ void write_reference_state(Parameter &parameter, const Species &species) {
 
     if (myid == 0) {
       real mu;
-      std::filesystem::path out_dir("output/message");
+      const std::filesystem::path out_dir("output/message");
       if (!exists(out_dir)) {
         create_directories(out_dir);
       }
@@ -396,7 +396,7 @@ void write_reference_state(Parameter &parameter, const Species &species) {
     parameter.update_parameter("velocity_ratio", velocity_ratio);
     parameter.update_parameter("DeltaU", DeltaU);
   } else {
-    std::filesystem::path out_dir("output/message");
+    const std::filesystem::path out_dir("output/message");
     if (!exists(out_dir)) {
       create_directories(out_dir);
     }

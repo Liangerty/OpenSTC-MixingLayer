@@ -14,10 +14,10 @@ cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in)
   // Let us re-compute the number of variables to be solved here.
   n_var = parameter.get_int("n_var");
   // The variable "n_scalar_transported" is the number of scalar variables to be transported.
-  int n_other_var{parameter.get_int("n_other_var")}; // Default, mach number
+  const int n_other_var{parameter.get_int("n_other_var")}; // Default, mach number
   // The variable "n_scalar" is the number of scalar variables in total, including those not transported.
   // This is different from the variable "n_scalar_transported" only when the flamelet model is used.
-  int n_scalar{parameter.get_int("n_scalar")};
+  const int n_scalar{parameter.get_int("n_scalar")};
 
   // Acquire memory for variable arrays
   bv.resize(mx, my, mz, 6, ngg);
@@ -50,7 +50,7 @@ cfd::Field::Field(Parameter &parameter, const Block &block_in) : block(block_in)
     }
     const int n_species_stat = parameter.get_int("n_species_stat");
     const int n_ps = parameter.get_int("n_ps");
-    int n_scalar_stat = n_species_stat + n_ps;
+    const int n_scalar_stat = n_species_stat + n_ps;
     if (n_scalar_stat > 0) {
       if (parameter.get_bool("stat_species_velocity_correlation")) {
         collect_spec_vel_correlation.resize(mx, my, mz, n_scalar_stat * SpeciesVelocityCorrelation::n_collect,
@@ -150,7 +150,7 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
 
   std::string input;
   std::vector<std::string> var_name;
-  gxl::read_until(file_in, input, "VARIABLES", gxl::Case::upper);
+  read_until(file_in, input, "VARIABLES", gxl::Case::upper);
   while (!(input.substr(0, 4) == "ZONE" || input.substr(0, 5) == " zone")) {
     gxl::replace(input, '"', ' ');
     gxl::replace(input, ',', ' ');
@@ -280,7 +280,7 @@ std::array<int, 3> read_dat_profile_for_init(gxl::VectorField3D<real> &profile, 
               Y.push_back(profile(i, j, k, 6 + l + 3));
             }
             mw = 1 / mw;
-            mu = cfd::compute_viscosity(profile(i, j, k, 5 + 3), mw, Y.data(), species);
+            mu = compute_viscosity(profile(i, j, k, 5 + 3), mw, Y.data(), species);
           } else {
             mu = cfd::Sutherland(profile(i, j, k, 5 + 3));
           }
@@ -302,10 +302,10 @@ std::array<int, 3>
 read_profile_to_init(gxl::VectorField3D<real> &profile, int profile_idx, const cfd::Parameter &parameter,
                      const cfd::Species &species) {
   const std::string &file = parameter.get_string_array("profile_file_names")[profile_idx];
-  auto dot = file.find_last_of('.');
-  auto suffix = file.substr(dot + 1, file.size());
+  const auto dot = file.find_last_of('.');
+  const auto suffix = file.substr(dot + 1, file.size());
   if (suffix == "dat") {
-    auto extent = read_dat_profile_for_init(profile, file, parameter, species, profile_idx);
+    const auto extent = read_dat_profile_for_init(profile, file, parameter, species, profile_idx);
     return extent;
   } /*else if (suffix == "plt") {
 //    read_plt_profile();
@@ -313,9 +313,9 @@ read_profile_to_init(gxl::VectorField3D<real> &profile, int profile_idx, const c
   return {0, 0, 0};
 }
 
-__global__ void initialize_bv_with_inflow(real *var_info, int n_inflow, cfd::DZone *zone, const real *coordinate_ranges,
-                                          int n_scalar, const int *if_profile, ggxl::VectorField3D<real> *profiles,
-                                          int *extents) {
+__global__ void initialize_bv_with_inflow(const real *var_info, int n_inflow, cfd::DZone *zone,
+                                          const real *coordinate_ranges, int n_scalar, const int *if_profile,
+                                          ggxl::VectorField3D<real> *profiles, const int *extents) {
   const int ngg{zone->ngg}, mx{zone->mx}, my{zone->my}, mz{zone->mz};
   int i = (int) (blockDim.x * blockIdx.x + threadIdx.x) - ngg;
   int j = (int) (blockDim.y * blockIdx.y + threadIdx.y) - ngg;
@@ -324,8 +324,9 @@ __global__ void initialize_bv_with_inflow(real *var_info, int n_inflow, cfd::DZo
 
   auto &x = zone->x, &y = zone->y, &z = zone->z;
   auto &bv = zone->bv, &sv = zone->sv;
-  real *rho = var_info, *u = rho + n_inflow, *v = u + n_inflow, *w = v + n_inflow, *p = w + n_inflow, *T = p + n_inflow;
-  real *scalar_inflow = T + n_inflow;
+  const real *rho = var_info, *u = rho + n_inflow, *v = u + n_inflow, *w = v + n_inflow, *p = w + n_inflow, *T =
+      p + n_inflow;
+  const real *scalar_inflow = T + n_inflow;
   int i_init{0};
 
   if (n_inflow > 1) {
@@ -413,7 +414,7 @@ void cfd::Field::initialize_basic_variables(const Parameter &parameter, const st
     }
   }
   for (size_t i = 0; i < inflows.size(); ++i) {
-    auto sv_this = inflows[i].sv;
+    const auto sv_this = inflows[i].sv;
     for (int l = 0; l < n_scalar; ++l) {
       scalar_inflow[n * l + i] = sv_this[l];
     }
@@ -482,9 +483,9 @@ void cfd::Field::setup_device_memory(const Parameter &parameter) {
                cudaMemcpyHostToDevice);
   }
 
-  auto n_bound{block.boundary.size()};
-  auto n_inner{block.inner_face.size()};
-  auto n_par{block.parallel_face.size()};
+  const auto n_bound{block.boundary.size()};
+  const auto n_inner{block.inner_face.size()};
+  const auto n_par{block.parallel_face.size()};
   auto mem_sz = sizeof(Boundary) * n_bound;
   cudaMalloc(&h_ptr->boundary, mem_sz);
   cudaMemcpy(h_ptr->boundary, block.boundary.data(), mem_sz, cudaMemcpyHostToDevice);

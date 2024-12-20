@@ -13,8 +13,7 @@ struct FlameletLib;
 struct DParameter {
   DParameter() = default;
 
-  explicit DParameter(cfd::Parameter &parameter, Species &species, Reaction *reaction,
-                      FlameletLib *flamelet_lib);
+  explicit DParameter(Parameter &parameter, const Species &species, Reaction *reaction, FlameletLib *flamelet_lib);
 
   int myid = 0;   // The process id of this process
   int dim = 3;    // The dimension of the problem

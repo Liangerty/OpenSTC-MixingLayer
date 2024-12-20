@@ -27,10 +27,10 @@ private:
 
 struct DZone;
 
-__device__ void flamelet_source(cfd::DZone *zone, int i, int j, int k, DParameter *param);
+__device__ void flamelet_source(DZone *zone, int i, int j, int k, const DParameter *param);
 
 __device__ void
-compute_massFraction_from_MixtureFraction(cfd::DZone *zone, int i, int j, int k, DParameter *param, real *yk_ave);
+compute_massFraction_from_MixtureFraction(DZone *zone, int i, int j, int k, DParameter *param, real *yk_ave);
 
 __device__ void
 interpolate_scalar_dissipation_rate_with_given_z_zPrime(real chi_ave, int n_spec, int i_z, int i_zPrime,

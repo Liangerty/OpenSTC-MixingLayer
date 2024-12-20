@@ -392,7 +392,7 @@ std::tuple<real, real, real, real, real, real> cfd::Inflow::var_info() const {
   return std::make_tuple(density, u, v, w, pressure, temperature);
 }
 
-cfd::Inflow::Inflow(const std::string &inflow_name, const cfd::Species &spec, const cfd::Parameter &parameter) {
+cfd::Inflow::Inflow(const std::string &inflow_name, const Species &spec, const Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
   label = std::get<int>(info.at("label"));
   // In default, the mach number, pressure and temperature should be given.
@@ -494,7 +494,7 @@ cfd::Inflow::Inflow(const std::string &inflow_name, const cfd::Species &spec, co
   }
 }
 
-cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, int, real>> &info, cfd::Parameter &parameter)
+cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, int, real>> &info, Parameter &parameter)
     : label(std::get<int>(info.at("label"))) {
   if (info.contains("thermal_type")) {
     if (std::get<std::string>(info.at("thermal_type")) == "isothermal")
@@ -573,17 +573,17 @@ cfd::Wall::Wall(const std::map<std::string, std::variant<std::string, int, real>
   }
 }
 
-cfd::Symmetry::Symmetry(const std::string &inflow_name, cfd::Parameter &parameter) {
+cfd::Symmetry::Symmetry(const std::string &inflow_name, const Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
   label = std::get<int>(info.at("label"));
 }
 
-cfd::Outflow::Outflow(const std::string &inflow_name, cfd::Parameter &parameter) {
+cfd::Outflow::Outflow(const std::string &inflow_name, const Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
   label = std::get<int>(info.at("label"));
 }
 
-cfd::FarField::FarField(const std::string &inflow_name, cfd::Species &spec, cfd::Parameter &parameter) {
+cfd::FarField::FarField(const std::string &inflow_name, Species &spec, Parameter &parameter) {
   auto &info = parameter.get_struct(inflow_name);
   label = std::get<int>(info.at("label"));
 
@@ -663,7 +663,7 @@ cfd::FarField::FarField(const std::string &inflow_name, cfd::Species &spec, cfd:
     pressure = density * temperature * R_u / mw;
   }
   if (density < 0) {
-    // The density is not given, compute it from equation of state
+    // The density is not given, compute it from the equation of state
     density = pressure * mw / (R_u * temperature);
   }
   entropy = pressure / pow(density, specific_heat_ratio);
@@ -701,7 +701,7 @@ cfd::FarField::FarField(const std::string &inflow_name, cfd::Species &spec, cfd:
   }
 }
 
-cfd::SubsonicInflow::SubsonicInflow(const std::string &inflow_name, cfd::Parameter &parameter) {
+cfd::SubsonicInflow::SubsonicInflow(const std::string &inflow_name, Parameter &parameter) {
   const int n_spec{parameter.get_int("n_spec")};
   if (n_spec > 0) {
     printf("Subsonic inflow boundary condition does not support multi-species simulation.\n");
@@ -746,7 +746,7 @@ cfd::SubsonicInflow::SubsonicInflow(const std::string &inflow_name, cfd::Paramet
   }
 }
 
-cfd::BackPressure::BackPressure(const std::string &name, cfd::Parameter &parameter) {
+cfd::BackPressure::BackPressure(const std::string &name, Parameter &parameter) {
   const int n_spec{parameter.get_int("n_spec")};
   if (n_spec > 0) {
     printf("Back pressure boundary condition does not support multi-species simulation.\n");
@@ -767,7 +767,7 @@ cfd::BackPressure::BackPressure(const std::string &name, cfd::Parameter &paramet
   }
 }
 
-cfd::Periodic::Periodic(const std::string &name, cfd::Parameter &parameter) {
+cfd::Periodic::Periodic(const std::string &name, const Parameter &parameter) {
   auto &info = parameter.get_struct(name);
   label = std::get<int>(info.at("label"));
 }

@@ -10,8 +10,8 @@ template<MixtureModel mix_model>
 __device__ void
 riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, int tid, const real *metric,
                        const real *jac, real *fc, int i_shared) {
-  auto metric_l = &metric[i_shared * 3], metric_r = &metric[(i_shared + 1) * 3];
-  auto jac_l = jac[i_shared], jac_r = jac[i_shared + 1];
+  const auto metric_l = &metric[i_shared * 3], metric_r = &metric[(i_shared + 1) * 3];
+  const auto jac_l = jac[i_shared], jac_r = jac[i_shared + 1];
   const real k1 = 0.5 * (jac_l * metric_l[0] + jac_r * metric_r[0]);
   const real k2 = 0.5 * (jac_l * metric_l[1] + jac_r * metric_r[1]);
   const real k3 = 0.5 * (jac_l * metric_l[2] + jac_r * metric_r[2]);
@@ -63,7 +63,7 @@ riemannSolver_ausmPlus(const real *pv_l, const real *pv_r, DParameter *param, in
   const real mass_flux_half = c * (rho_l * mach_pos + rho_r * mach_neg);
   const real coeff = mass_flux_half * grad_k_div_jac;
 
-  auto fci = &fc[tid * n_var];
+  const auto fci = &fc[tid * n_var];
   if (mass_flux_half >= 0) {
     fci[0] = coeff;
     fci[1] = coeff * pv_l[1] + p_coeff * k1;
@@ -106,8 +106,8 @@ riemannSolver_hllc(const real *pv_l, const real *pv_r, DParameter *param, int ti
   }
 
   // Compute the Roe averaged variables.
-  const real rl_c{std::sqrt(pv_l[0]) / (std::sqrt(pv_l[0]) + std::sqrt(pv_r[0]))}, rr_c{
-      std::sqrt(pv_r[0]) / (std::sqrt(pv_l[0]) + std::sqrt(pv_r[0]))};
+  const real rl_c{std::sqrt(pv_l[0]) / (std::sqrt(pv_l[0]) + std::sqrt(pv_r[0]))},
+      rr_c{std::sqrt(pv_r[0]) / (std::sqrt(pv_l[0]) + std::sqrt(pv_r[0]))};
   const real u_tilde{pv_l[1] * rl_c + pv_r[1] * rr_c};
   const real v_tilde{pv_l[2] * rl_c + pv_r[2] * rr_c};
   const real w_tilde{pv_l[3] * rl_c + pv_r[3] * rr_c};
@@ -147,13 +147,13 @@ riemannSolver_hllc(const real *pv_l, const real *pv_r, DParameter *param, int ti
     c_tilde = std::sqrt(gamma * R_u * mw_inv * t);
   }
 
-  real kx = 0.5 * (metric[i_shared * 3] + metric[(i_shared + 1) * 3]);
-  real ky = 0.5 * (metric[i_shared * 3 + 1] + metric[(i_shared + 1) * 3 + 1]);
-  real kz = 0.5 * (metric[i_shared * 3 + 2] + metric[(i_shared + 1) * 3 + 2]);
+  const real kx = 0.5 * (metric[i_shared * 3] + metric[(i_shared + 1) * 3]);
+  const real ky = 0.5 * (metric[i_shared * 3 + 1] + metric[(i_shared + 1) * 3 + 1]);
+  const real kz = 0.5 * (metric[i_shared * 3 + 2] + metric[(i_shared + 1) * 3 + 2]);
   const real gradK = std::sqrt(kx * kx + ky * ky + kz * kz);
   const real U_tilde_bar{(kx * u_tilde + ky * v_tilde + kz * w_tilde) / gradK};
 
-  auto fci = &fc[tid * n_var];
+  const auto fci = &fc[tid * n_var];
   const real jac_ave{0.5 * (jac[i_shared] + jac[i_shared + 1])};
 
   real gamma_l{gamma_air}, gamma_r{gamma_air};
@@ -196,8 +196,10 @@ riemannSolver_hllc(const real *pv_l, const real *pv_r, DParameter *param, int ti
   }
 
   // Else, the current position is in star region; we need to identify the left and right star states.
-  const real sm{((pv_r[0] * Ur * (sr - Ur / gradK) - pv_l[0] * Ul * (sl - Ul / gradK)) / gradK + pv_l[4] - pv_r[4]) /
-                (pv_r[0] * (sr - Ur / gradK) - pv_l[0] * (sl - Ul / gradK))};
+  const real sm{
+    ((pv_r[0] * Ur * (sr - Ur / gradK) - pv_l[0] * Ul * (sl - Ul / gradK)) / gradK + pv_l[4] - pv_r[4]) /
+    (pv_r[0] * (sr - Ur / gradK) - pv_l[0] * (sl - Ul / gradK))
+  };
   const real pm{pv_l[0] * (sl - Ul / gradK) * (sm - Ul / gradK) + pv_l[4]};
   if (sm >= 0) {
     // Left star region, F_{*L}
@@ -292,7 +294,7 @@ riemannSolver_Roe(DZone *zone, real *pv, int tid, DParameter *param, real *fc, r
   }
 
   // Compute the left and right convective fluxes, which uses the reconstructed primitive variables, rather than the roe averaged ones.
-  auto fci = &fc[tid * param->n_var];
+  const auto fci = &fc[tid * param->n_var];
   compute_half_sum_left_right_flux<mix_model>(pv_l, pv_r, param, jac, metric, i_shared, fci);
 
   // Compute the Roe averaged variables.
@@ -393,7 +395,7 @@ riemannSolver_Roe(DZone *zone, real *pv, int tid, DParameter *param, real *fc, r
   }
 
   // To reduce memory usage, we use dq array to contain the b array to be computed
-  auto b = dq;
+  const auto b = dq;
   b[0] = -characteristic[0] * LDq[0];
   for (int l = 1; l < param->n_var; ++l) {
     b[l] = -characteristic[1] * LDq[l];
@@ -412,8 +414,8 @@ riemannSolver_Roe(DZone *zone, real *pv, int tid, DParameter *param, real *fc, r
   fci[2] += 0.5 * (v * c1 + ky * c2 - c * (kx * b[3] - kz * b[1]));
   fci[3] += 0.5 * (w * c1 + kz * c2 - c * (ky * b[1] - kx * b[2]));
   fci[4] += 0.5 *
-            (h * c1 + Uk * c2 - c * c * c0 / (gamma - 1) + c * ((kz * v - ky * w) * b[1] + (kx * w - kz * u) * b[2] +
-                                                                (ky * u - kx * v) * b[3]) + c3);
+  (h * c1 + Uk * c2 - c * c * c0 / (gamma - 1) + c * ((kz * v - ky * w) * b[1] + (kx * w - kz * u) * b[2] +
+                                                      (ky * u - kx * v) * b[3]) + c3);
   for (int l = 0; l < param->n_var - 5; ++l)
     fci[5 + l] += 0.5 * (b[l + 5] + svm[l] * c1);
 }
@@ -429,14 +431,13 @@ template<>
 __device__ void
 riemannSolver_laxFriedrich<MixtureModel::Air>(const real *pv_l, const real *pv_r, DParameter *param, int tid,
                                               const real *metric, const real *jac, real *fc, int i_shared) {
-
   const int n_var = param->n_var;
-  int n_reconstruct{n_var};
+  const int n_reconstruct{n_var};
 
   // The metrics are just the average of the two adjacent cells.
-  real kx = 0.5 * (metric[i_shared * 3] + metric[(i_shared + 1) * 3]);
-  real ky = 0.5 * (metric[i_shared * 3 + 1] + metric[(i_shared + 1) * 3 + 1]);
-  real kz = 0.5 * (metric[i_shared * 3 + 2] + metric[(i_shared + 1) * 3 + 2]);
+  const real kx = 0.5 * (metric[i_shared * 3] + metric[(i_shared + 1) * 3]);
+  const real ky = 0.5 * (metric[i_shared * 3 + 1] + metric[(i_shared + 1) * 3 + 1]);
+  const real kz = 0.5 * (metric[i_shared * 3 + 2] + metric[(i_shared + 1) * 3 + 2]);
   const real gradK = std::sqrt(kx * kx + ky * ky + kz * kz);
 
   // compute the left and right contravariance velocity
@@ -446,7 +447,7 @@ riemannSolver_laxFriedrich<MixtureModel::Air>(const real *pv_l, const real *pv_r
   const real cr{std::sqrt(gamma_air * pv_r[4] / pv_r[0])};
   const real spectral_radius{max(std::abs(Ukl) + cl * gradK, std::abs(Ukr) + cr * gradK)};
 
-  auto fci = &fc[tid * n_var];
+  const auto fci = &fc[tid * n_var];
   const real half_jac_ave{0.5 * 0.5 * (jac[i_shared] + jac[i_shared + 1])};
 
   const real rhoUl{pv_l[0] * Ukl};

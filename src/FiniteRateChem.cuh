@@ -5,9 +5,9 @@
 namespace cfd {
 struct DZone;
 
-__device__ void finite_rate_chemistry(DZone *zone, int i, int j, int k, DParameter *param);
+__device__ void finite_rate_chemistry(DZone *zone, int i, int j, int k, const DParameter *param);
 
-__device__ void forward_reaction_rate(real t, real *kf, const real *concentration, DParameter *param);
+__device__ void forward_reaction_rate(real t, real *kf, const real *concentration, const DParameter *param);
 
 __device__ real arrhenius(real t, real A, real b, real Ea);
 

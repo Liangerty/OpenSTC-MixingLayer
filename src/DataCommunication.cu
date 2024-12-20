@@ -1,6 +1,6 @@
 #include "DataCommunication.cuh"
 
-__global__ void cfd::setup_data_to_be_sent(cfd::DZone *zone, int i_face, real *data, const DParameter *param) {
+__global__ void cfd::setup_data_to_be_sent(const DZone *zone, int i_face, real *data, const DParameter *param) {
   const auto &f = zone->parFace[i_face];
   int n[3];
   n[0] = blockIdx.x * blockDim.x + threadIdx.x;

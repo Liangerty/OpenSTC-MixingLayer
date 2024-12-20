@@ -40,7 +40,7 @@ void read_flowfield_by_0Order_interpolation(Parameter &parameter, const Mesh &me
 template<MixtureModel mix_model, class turb>
 void read_2D_for_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
 
-void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species);
+void initialize_mixing_layer(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, const Species &species);
 
 __global__ void
 initialize_mixing_layer_with_profile(ggxl::VectorField3D<real> *profile_dPtr, int profile_idx, DZone *zone,
@@ -52,21 +52,24 @@ initialize_mixing_layer_with_info(DZone *zone, const real *var_info, int n_spec,
 
 /**
  * @brief To relate the order of variables from the flowfield files to bv, yk, turbulent arrays
+ * @param parameter the parameter object
  * @param var_name the array which contains all variables from the flowfield files
+ * @param species information about species
+ * @param old_data_info the information about the previous simulation, the first one tells if species info exists, the second one tells if turbulent var exists
  * @return an array of orders. 0~5 means density, u, v, w, p, T; 6~5+ns means the species order, 6+ns~... means other variables such as mut...
  */
 template<MixtureModel mix_model, class turb_method>
 std::vector<int>
-identify_variable_labels(cfd::Parameter &parameter, std::vector<std::string> &var_name, Species &species,
+identify_variable_labels(Parameter &parameter, std::vector<std::string> &var_name, Species &species,
                          std::array<int, 2> &old_data_info);
 
-void initialize_spec_from_inflow(cfd::Parameter &parameter, const cfd::Mesh &mesh,
+void initialize_spec_from_inflow(Parameter &parameter, const Mesh &mesh,
                                  std::vector<Field> &field, Species &species);
 
-void initialize_turb_from_inflow(cfd::Parameter &parameter, const cfd::Mesh &mesh,
+void initialize_turb_from_inflow(Parameter &parameter, const Mesh &mesh,
                                  std::vector<Field> &field, Species &species);
 
-void initialize_mixture_fraction_from_species(cfd::Parameter &parameter, const cfd::Mesh &mesh,
+void initialize_mixture_fraction_from_species(Parameter &parameter, const Mesh &mesh,
                                               std::vector<Field> &field, Species &species);
 
 void expand_2D_to_3D(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field);
@@ -413,7 +416,7 @@ identify_variable_labels(Parameter &parameter, std::vector<std::string> &var_nam
           old_data_info[1] = 1; // SA model in previous simulation
         }
       }
-      if (int n_ps = parameter.get_int("n_ps");n_ps > 0) {
+      if (const int n_ps = parameter.get_int("n_ps");n_ps > 0) {
         const int i_ps = parameter.get_int("i_ps");
         for (int i = 0; i < n_ps; ++i) {
           if (n == "PS" + std::to_string(i + 1)) {
@@ -797,10 +800,10 @@ void read_flowfield_by_0Order_interpolation(Parameter &parameter, const Mesh &me
 
   // Next, find the max block of previous simulation
   int max_blk_idx{0};
-  int n_block_read{(int) (mx.size())};
+  const int n_block_read{(int) (mx.size())};
   int64_t max_N{mx[1] * my[1] * mz[1]};
   for (int b = 1; b < n_block_read; ++b) {
-    int64_t N = mx[b] * my[b] * mz[b];
+    const int64_t N = mx[b] * my[b] * mz[b];
     if (N > max_N) {
       max_N = N;
       max_blk_idx = b;

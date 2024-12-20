@@ -4,17 +4,17 @@
 #include "gxl_lib/MyString.h"
 #include <filesystem>
 
-void cfd::initialize_sponge_layer(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vector<Field> &field,
+void cfd::initialize_sponge_layer(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
                                   const Species &spec) {
-  if (auto init = parameter.get_int("initial");init == 1) {
+  if (const auto init = parameter.get_int("initial");init == 1) {
     // Computation with previous results
     // We first find if there exists previous mean conservation variables' information
     // If so, we will use it to initialize the sponge layer
     // If not, we initialize the sponge layer as the same method when starting a new computation.
     // TODO: Implement this function after we have implemented the output part.
     // Find if the file "output/sponge_layer_mean_cv.bin" exists
-    std::filesystem::path file_path("output/sponge_layer_mean_cv.bin");
-    if (std::filesystem::exists(file_path)) {
+    const std::filesystem::path file_path("output/sponge_layer_mean_cv.bin");
+    if (exists(file_path)) {
       // Read the file
       read_sponge_layer(parameter, mesh, field, spec);
       return;
@@ -25,15 +25,15 @@ void cfd::initialize_sponge_layer(cfd::Parameter &parameter, const cfd::Mesh &me
   parameter.update_parameter("sponge_scalar_iter", std::vector<int>(parameter.get_int("n_scalar"), 0));
 }
 
-__global__ void cfd::update_sponge_layer_value(cfd::DZone *zone, cfd::DParameter *param) {
+__global__ void cfd::update_sponge_layer_value(DZone *zone, const DParameter *param) {
   const int extent[3]{zone->mx, zone->my, zone->mz};
   const auto i = (int) (blockDim.x * blockIdx.x + threadIdx.x);
   const auto j = (int) (blockDim.y * blockIdx.y + threadIdx.y);
   const auto k = (int) (blockDim.z * blockIdx.z + threadIdx.z);
   if (i >= extent[0] || j >= extent[1] || k >= extent[2]) return;
 
-  int n_iter = param->sponge_iter;
-  auto n_scalar_iter = param->sponge_scalar_iter;
+  const int n_iter = param->sponge_iter;
+  const auto n_scalar_iter = param->sponge_scalar_iter;
 
   auto &sponge = zone->sponge_mean_cv;
   auto &cv = zone->cv;
@@ -48,7 +48,7 @@ __global__ void cfd::update_sponge_layer_value(cfd::DZone *zone, cfd::DParameter
   }
 }
 
-void cfd::update_sponge_iter(cfd::DParameter *param, cfd::Parameter &parameter) {
+void cfd::update_sponge_iter(DParameter *param, Parameter &parameter) {
   parameter.update_parameter("sponge_iter", parameter.get_int("sponge_iter") + 1);
   auto para = parameter.get_int_array("sponge_scalar_iter");
   for (auto &l: para) {
@@ -58,90 +58,90 @@ void cfd::update_sponge_iter(cfd::DParameter *param, cfd::Parameter &parameter) 
   update_sponge_iter_dev<<<1, 1>>>(param);
 }
 
-__global__ void cfd::update_sponge_iter_dev(cfd::DParameter *param) {
+__global__ void cfd::update_sponge_iter_dev(DParameter *param) {
   ++param->sponge_iter;
   for (int i = 0; i < param->n_scalar; i++) {
     ++param->sponge_scalar_iter[i];
   }
 }
 
-__device__ void cfd::sponge_layer_source(cfd::DZone *zone, int i, int j, int k, cfd::DParameter *param) {
+__device__ void cfd::sponge_layer_source(DZone *zone, int i, int j, int k, const DParameter *param) {
   real sigma = 0;
   if (param->spongeX == 1 || param->spongeX == 3) {
     // X inlet sponge layer
-    real x1 = param->spongeXMinusStart;
-    real x = zone->x(i, j, k);
+    const real x1 = param->spongeXMinusStart;
+    const real x = zone->x(i, j, k);
     if (x < x1) {
-      real x2 = param->spongeXMinusEnd;
+      const real x2 = param->spongeXMinusEnd;
       real xi = (x - x1) / (x2 - x1);
       if (xi > 1)
         xi = 1;
-      real S = sponge_function(xi, param->sponge_function);
+      const real S = sponge_function(xi, param->sponge_function);
       sigma += param->sponge_sigma0 * S;
     }
   }
   if (param->spongeX == 2 || param->spongeX == 3) {
     // X outflow sponge layer
-    real x1 = param->spongeXPlusStart;
-    real x = zone->x(i, j, k);
+    const real x1 = param->spongeXPlusStart;
+    const real x = zone->x(i, j, k);
     if (x > x1) {
-      real x2 = param->spongeXPlusEnd;
+      const real x2 = param->spongeXPlusEnd;
       real xi = (x - x1) / (x2 - x1);
       if (xi > 1)
         xi = 1;
-      real S = sponge_function(xi, param->sponge_function);
+      const real S = sponge_function(xi, param->sponge_function);
       sigma += param->sponge_sigma1 * S;
     }
   }
   if (param->spongeY == 1 || param->spongeY == 3) {
     // Y- sponge layer
-    real y1 = param->spongeYMinusStart;
-    real y = zone->y(i, j, k);
+    const real y1 = param->spongeYMinusStart;
+    const real y = zone->y(i, j, k);
     if (y < y1) {
-      real y2 = param->spongeYMinusEnd;
+      const real y2 = param->spongeYMinusEnd;
       real xi = (y - y1) / (y2 - y1);
       if (xi > 1)
         xi = 1;
-      real S = sponge_function(xi, param->sponge_function);
+      const real S = sponge_function(xi, param->sponge_function);
       sigma += param->sponge_sigma2 * S;
     }
   }
   if (param->spongeY == 2 || param->spongeY == 3) {
     // Y+ sponge layer
-    real y1 = param->spongeYPlusStart;
-    real y = zone->y(i, j, k);
+    const real y1 = param->spongeYPlusStart;
+    const real y = zone->y(i, j, k);
     if (y > y1) {
-      real y2 = param->spongeYPlusEnd;
+      const real y2 = param->spongeYPlusEnd;
       real xi = (y - y1) / (y2 - y1);
       if (xi > 1)
         xi = 1;
-      real S = sponge_function(xi, param->sponge_function);
+      const real S = sponge_function(xi, param->sponge_function);
       sigma += param->sponge_sigma3 * S;
     }
   }
   if (param->spongeZ == 1 || param->spongeZ == 3) {
     // Z- sponge layer
-    real z1 = param->spongeZMinusStart;
-    real z = zone->z(i, j, k);
+    const real z1 = param->spongeZMinusStart;
+    const real z = zone->z(i, j, k);
     if (z < z1) {
-      real z2 = param->spongeZMinusEnd;
+      const real z2 = param->spongeZMinusEnd;
       real xi = (z - z1) / (z2 - z1);
       if (xi > 1)
         xi = 1;
-      real S = sponge_function(xi, param->sponge_function);
+      const real S = sponge_function(xi, param->sponge_function);
       sigma += param->sponge_sigma4 * S;
     }
   }
   if (param->spongeZ == 2 || param->spongeZ == 3) {
     // Z+ sponge layer
-    real z1 = param->spongeZPlusStart;
-    real z = zone->z(i, j, k);
+    const real z1 = param->spongeZPlusStart;
+    const real z = zone->z(i, j, k);
     if (z > z1) {
-      real z2 = param->spongeZPlusEnd;
+      const real z2 = param->spongeZPlusEnd;
       real xi = (z - z1) / (z2 - z1);
       if (xi > 1)
         xi = 1;
-      real S = sponge_function(xi, param->sponge_function);
+      const real S = sponge_function(xi, param->sponge_function);
       sigma += param->sponge_sigma5 * S;
     }
   }
@@ -164,13 +164,13 @@ __device__ real cfd::sponge_function(real xi, int method) {
   real S{0};
   if (method == 0) {
     // (Nektar++, CPC, 2024)
-    real xi3 = xi * xi * xi;
+    const real xi3 = xi * xi * xi;
     S = 6 * xi3 * xi * xi - 15 * xi3 * xi + 10 * xi3;
   }
   return S;
 }
 
-void cfd::output_sponge_layer(const cfd::Parameter &parameter, const std::vector<Field> &field, const Mesh &mesh,
+void cfd::output_sponge_layer(const Parameter &parameter, const std::vector<Field> &field, const Mesh &mesh,
                               const Species &spec) {
   for (const auto &b: field) {
     cudaMemcpy(b.sponge_mean_cv.data(), b.h_ptr->sponge_mean_cv.data(),
@@ -181,13 +181,13 @@ void cfd::output_sponge_layer(const cfd::Parameter &parameter, const std::vector
   MPI_File_open(MPI_COMM_WORLD, "output/sponge_layer_mean_cv.bin", MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL,
                 &fp);
 
-  int myid{parameter.get_int("myid")};
+  const int myid{parameter.get_int("myid")};
   MPI_Offset offset{0};
   if (myid == 0) {
-    int n_iter = parameter.get_int("sponge_iter");
+    const int n_iter = parameter.get_int("sponge_iter");
     MPI_File_write_at(fp, offset, &n_iter, 1, MPI_INT32_T, MPI_STATUS_IGNORE);
     offset += 4;
-    int n_scalar = parameter.get_int("n_scalar");
+    const int n_scalar = parameter.get_int("n_scalar");
     MPI_File_write_at(fp, offset, &n_scalar, 1, MPI_INT32_T, MPI_STATUS_IGNORE);
     offset += 4;
     auto &list = spec.spec_name;
@@ -221,7 +221,7 @@ void cfd::output_sponge_layer(const cfd::Parameter &parameter, const std::vector
   MPI_File_close(&fp);
 }
 
-void cfd::read_sponge_layer(cfd::Parameter &parameter, const cfd::Mesh &mesh, std::vector<Field> &field,
+void cfd::read_sponge_layer(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field,
                             const Species &spec) {
   MPI_File fp;
   MPI_File_open(MPI_COMM_WORLD, "output/sponge_layer_mean_cv.bin", MPI_MODE_RDONLY, MPI_INFO_NULL, &fp);
@@ -247,14 +247,14 @@ void cfd::read_sponge_layer(cfd::Parameter &parameter, const cfd::Mesh &mesh, st
   std::vector<int> sponge_scalar_iter(parameter.get_int("n_scalar"), 0);
   auto &list = spec.spec_list;
   for (int l = 0; l < n_scalar; ++l) {
-    auto nn = spec_name[l];
+    const auto& nn = spec_name[l];
     if (list.find(nn) != list.end()) {
       sponge_scalar_iter[list.at(nn)] = sponge_last_iter[l];
     }
   }
   parameter.update_parameter("sponge_scalar_iter", sponge_scalar_iter);
 
-  int myid{parameter.get_int("myid")};
+  const int myid{parameter.get_int("myid")};
   int blk = 0;
   int64_t n_grid_before{0};
   for (int p = 0; p < myid; ++p) {

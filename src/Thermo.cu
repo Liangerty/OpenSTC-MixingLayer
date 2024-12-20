@@ -133,7 +133,7 @@ __device__ void cfd::compute_gibbs_div_rt(real t, const cfd::DParameter *param, 
   }
 }
 #else
-__device__ void cfd::compute_enthalpy(real t, real *enthalpy, const cfd::DParameter *param) {
+__device__ void cfd::compute_enthalpy(real t, real *enthalpy, const DParameter *param) {
   const real t2{t * t}, t3{t2 * t}, t4{t3 * t}, t5{t4 * t};
   for (int i = 0; i < param->n_spec; ++i) {
     if (t < param->t_low[i]) {
@@ -149,7 +149,7 @@ __device__ void cfd::compute_enthalpy(real t, real *enthalpy, const cfd::DParame
       enthalpy[i] = coeff(i, 0) * t + 0.5 * coeff(i, 1) * t2 + coeff(i, 2) * t3 / 3 + 0.25 * coeff(i, 3) * t4 +
                     0.2 * coeff(i, 4) * t5 + coeff(i, 5);
     }
-    enthalpy[i] *= cfd::R_u / param->mw[i];
+    enthalpy[i] *= R_u / param->mw[i];
   }
 }
 
@@ -175,7 +175,7 @@ __device__ void cfd::compute_enthalpy_and_cp(real t, real *enthalpy, real *cp, c
   }
 }
 
-__device__ void cfd::compute_cp(real t, real *cp, cfd::DParameter *param) {
+__device__ void cfd::compute_cp(real t, real *cp, DParameter *param) {
   const real t2{t * t}, t3{t2 * t}, t4{t3 * t};
   for (auto i = 0; i < param->n_spec; ++i) {
     if (t < param->t_low[i]) {
@@ -191,7 +191,7 @@ __device__ void cfd::compute_cp(real t, real *cp, cfd::DParameter *param) {
   }
 }
 
-__device__ void cfd::compute_gibbs_div_rt(real t, const cfd::DParameter *param, real *gibbs_rt) {
+__device__ void cfd::compute_gibbs_div_rt(real t, const DParameter *param, real *gibbs_rt) {
   const real t2{t * t}, t3{t2 * t}, t4{t3 * t}, t_inv{1 / t}, log_t{std::log(t)};
   for (int i = 0; i < param->n_spec; ++i) {
     if (t < param->t_low[i]) {
