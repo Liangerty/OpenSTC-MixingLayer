@@ -9,6 +9,8 @@
 namespace cfd {
 
 struct MixtureFraction {
+  virtual ~MixtureFraction() = default;
+
   int n_spec{0};
   real beta_f{0}, beta_o{0};
   real beta_diff{0};
@@ -21,7 +23,7 @@ struct MixtureFraction {
   virtual real compute_mixture_fraction(std::vector<real> &yk) = 0;
 };
 
-class BilgerH : public MixtureFraction {
+class BilgerH final : public MixtureFraction {
   real nuh_mwh{0}, half_nuo_mwo{0};
   int elem_label[2]{0, 1};
 public:
@@ -33,7 +35,7 @@ private:
   [[nodiscard]] real compute_coupling_function(real z_h, real z_o) const;
 };
 
-class BilgerCH : public MixtureFraction {
+class BilgerCH final : public MixtureFraction {
   real nuc_mwc{0}, nuh_mwh{0}, half_nuo_mwo{0};
   int elem_label[3]{0, 1, 2};
 public:

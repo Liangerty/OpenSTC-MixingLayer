@@ -524,7 +524,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       //S mode waves with wide band frequencies and spanwise wavenumbers are induced
       real t = param->physical_time;
 
-      real x = zone->x(i, j, k), z = zone->z(i, j, k);
+      real x = zone->x(i, j, k);
       for (int m = 0; m <= 198; ++m) {
         constexpr real delta_f = 5000;
         real f = delta_f * m + 10000;
@@ -570,7 +570,7 @@ apply_inflow(DZone *zone, Inflow *inflow, int i_face, DParameter *param, ggxl::V
       //S mode waves with wide band frequencies and spanwise wavenumbers are induced
       real t = param->physical_time;
 
-      real x = zone->x(gi, gj, gk), z = zone->z(gi, gj, gk);
+      real x = zone->x(gi, gj, gk);
       for (int m = 0; m <= 198; ++m) {
         constexpr real delta_f = 5000;
         real f = delta_f * m + 10000;
