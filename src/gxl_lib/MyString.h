@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include <string>
-#include <fstream>
 #include <sstream>
 #include <mpi.h>
 #include <vector>

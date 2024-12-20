@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Define.h"
-#include "Mesh.h"
 #include "Field.h"
 #include "DParameter.cuh"
 #include "SST.cuh"

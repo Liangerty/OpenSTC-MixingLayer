@@ -5,7 +5,6 @@
 #include <string>
 #include <array>
 #include "Define.h"
-#include "gxl_lib/Array.hpp"
 #include <map>
 #include <variant>
 

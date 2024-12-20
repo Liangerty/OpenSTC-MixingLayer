@@ -1,6 +1,5 @@
 #include "InviscidScheme.cuh"
 #include "Constants.h"
-#include "Parallel.h"
 #include "DParameter.cuh"
 #include "Thermo.cuh"
 #include "Field.h"

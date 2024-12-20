@@ -1,6 +1,5 @@
 #include "SST.cuh"
 #include "Field.h"
-#include "Transport.cuh"
 #include "Constants.h"
 
 namespace cfd {

@@ -3,7 +3,6 @@
 #include <curand_kernel.h>
 #include "Define.h"
 #include "Parameter.h"
-#include "Mesh.h"
 #include "gxl_lib/Array.cuh"
 
 namespace cfd {

@@ -8,7 +8,6 @@
 #include "Thermo.cuh"
 #include "Constants.h"
 #include "Transport.cuh"
-#include "SST.cuh"
 #include "FlameletLib.cuh"
 
 namespace cfd {

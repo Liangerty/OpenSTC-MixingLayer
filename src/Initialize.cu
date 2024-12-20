@@ -2,6 +2,7 @@
 #include "MixtureFraction.h"
 #include "MixingLayer.cuh"
 #include "DParameter.cuh"
+#include <fstream>
 
 namespace cfd {
 void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<Field> &field, Species &species,

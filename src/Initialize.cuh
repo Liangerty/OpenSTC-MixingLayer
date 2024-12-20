@@ -9,6 +9,7 @@
 #include "gxl_lib/MyString.h"
 #include "TurbMethod.hpp"
 #include <vector>
+#include <fstream>
 
 namespace cfd {
 template<MixtureModel mix_model, class turb>

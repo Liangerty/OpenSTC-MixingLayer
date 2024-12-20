@@ -1,6 +1,7 @@
 #include "FlameletLib.cuh"
 #include "gxl_lib/MyString.h"
 #include "Field.h"
+#include <fstream>
 
 namespace cfd {
 FlameletLib::FlameletLib(const Parameter &parameter) : n_spec{parameter.get_int("n_spec")} {

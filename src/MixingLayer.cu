@@ -1,6 +1,5 @@
 #include "MixingLayer.cuh"
 #include "Parameter.h"
-#include "Thermo.cuh"
 #include "ChemData.h"
 #include "Constants.h"
 #include "Parallel.h"

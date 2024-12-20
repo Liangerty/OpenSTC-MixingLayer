@@ -7,7 +7,6 @@
 #include "Field.h"
 #include "BoundCond.cuh"
 #include "FlameletLib.cuh"
-//#include "StatisticsCollector.cuh"
 #include "SinglePointStat.cuh"
 
 namespace cfd {

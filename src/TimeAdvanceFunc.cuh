@@ -4,7 +4,6 @@
 #include "DParameter.cuh"
 #include "Field.h"
 #include "Constants.h"
-#include "Thermo.cuh"
 #include "TurbMethod.hpp"
 #include "FieldOperation.cuh"
 

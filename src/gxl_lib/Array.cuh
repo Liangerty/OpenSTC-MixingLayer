@@ -1,17 +1,16 @@
 #pragma once
 
+#include <cstdio>
 #include "Array.hpp"
 
 namespace ggxl {
-template<typename T>
+template<typename T=real>
 class Array1D {
-private:
   int dispt = 0;
   int sz = 0;
   T *val = nullptr;
 
 public:
-
   cudaError_t allocate_memory(int dim1, int n_ghost = 0);
 
   __device__ T &operator()(const int i) {
@@ -26,21 +25,21 @@ public:
 
   auto size() { return sz; }
 
-  cudaError_t deallocate_memory() {
-    cudaError_t err = cudaFree(val);
+  cudaError_t deallocate_memory() const {
+    const cudaError_t err = cudaFree(val);
     return err;
   }
 };
 
 template<typename T>
-inline cudaError_t Array1D<T>::allocate_memory(int dim1, int n_ghost) {
-  int ng = n_ghost;
-  int n1 = dim1;
+cudaError_t Array1D<T>::allocate_memory(int dim1, int n_ghost) {
+  const int ng = n_ghost;
+  const int n1 = dim1;
 
   dispt = ng;
   sz = n1 + 2 * ng;
 
-  cudaError_t err = cudaMalloc(&val, sz * sizeof(T));
+  const cudaError_t err = cudaMalloc(&val, sz * sizeof(T));
   cudaMemset(val, 0, sz * sizeof(T));
 
   return err;
@@ -48,13 +47,11 @@ inline cudaError_t Array1D<T>::allocate_memory(int dim1, int n_ghost) {
 
 template<typename T, Major major = Major::ColMajor>
 class Array3D {
-private:
   int disp1 = 0, disp2 = 0, dispt = 0;
   int sz = 0;
   T *val = nullptr;
 
 public:
-
   cudaError_t allocate_memory(int dim1, int dim2, int dim3, int n_ghost = 0);
 
   __device__ T &operator()(const int i, const int j, const int k) {
@@ -77,18 +74,18 @@ public:
 
   auto size() { return sz; }
 
-  cudaError_t deallocate_memory() {
-    cudaError_t err = cudaFree(val);
+  cudaError_t deallocate_memory() const {
+    const cudaError_t err = cudaFree(val);
     return err;
   }
 };
 
 template<typename T, Major major>
 inline cudaError_t Array3D<T, major>::allocate_memory(int dim1, int dim2, int dim3, int n_ghost) {
-  int ng = n_ghost;
-  int n1 = dim1;
-  int n2 = dim2;
-  int n3 = dim3;
+  const int ng = n_ghost;
+  const int n1 = dim1;
+  const int n2 = dim2;
+  const int n3 = dim3;
   if constexpr (major == Major::ColMajor) {
     disp2 = n1 + 2 * ng;
   } else {
@@ -97,7 +94,7 @@ inline cudaError_t Array3D<T, major>::allocate_memory(int dim1, int dim2, int di
   disp1 = (n2 + 2 * ng) * disp2;
   dispt = (disp1 + disp2 + 1) * ng;
   sz = (n1 + 2 * ng) * (n2 + 2 * ng) * (n3 + 2 * ng);
-  cudaError_t err = cudaMalloc(&val, sz * sizeof(T));
+  const cudaError_t err = cudaMalloc(&val, sz * sizeof(T));
   cudaMemset(val, 0, sz * sizeof(T));
   return err;
 }
@@ -112,7 +109,6 @@ private:
 //  int n1 = 0, n2 = 0, n3 = 0;
 
 public:
-
   cudaError_t allocate_memory(int dim1, int dim2, int dim3, int n_ghost = 0);
 
   T &operator()(const int i, const int j, const int k) {
@@ -138,10 +134,10 @@ public:
 
 template<typename T, Major major>
 inline cudaError_t Array3DHost<T, major>::allocate_memory(int dim1, int dim2, int dim3, int n_ghost) {
-  int ng = n_ghost;
-  int n1 = dim1;
-  int n2 = dim2;
-  int n3 = dim3;
+  const int ng = n_ghost;
+  const int n1 = dim1;
+  const int n2 = dim2;
+  const int n3 = dim3;
   if constexpr (major == Major::ColMajor) {
     disp2 = n1 + 2 * ng;
   } else {
@@ -150,11 +146,11 @@ inline cudaError_t Array3DHost<T, major>::allocate_memory(int dim1, int dim2, in
   disp1 = (n2 + 2 * ng) * disp2;
   dispt = (disp1 + disp2 + 1) * ng;
   sz = (n1 + 2 * ng) * (n2 + 2 * ng) * (n3 + 2 * ng);
-  cudaError_t err = cudaHostAlloc(&val, sz * sizeof(T), cudaHostAllocDefault);
+  const cudaError_t err = cudaHostAlloc(&val, sz * sizeof(T), cudaHostAllocDefault);
   if (err != cudaSuccess) {
     printf(
-        "The VectorField3DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
-    val = (real *) malloc(sz * sizeof(T));
+      "The VectorField3DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
+    val = static_cast<real *>(malloc(sz * sizeof(T)));
     memset(val, 0, sz * sizeof(T));
   } else {
     cudaMemset(val, 0, sz * sizeof(T));
@@ -165,13 +161,11 @@ inline cudaError_t Array3DHost<T, major>::allocate_memory(int dim1, int dim2, in
 
 template<typename T, Major major = Major::ColMajor>
 class VectorField3D {
-private:
   int disp1 = 0, disp2 = 0, n4 = 0, dispt = 0;
   int sz = 0;
   T *val = nullptr;
 
 public:
-
   cudaError_t allocate_memory(int dim1, int dim2, int dim3, int dim4, int n_ghost = 0);
 
   __device__ T &operator()(const int i, const int j, const int k, const int l) {
@@ -206,8 +200,8 @@ public:
 
   auto size() { return sz; }
 
-  cudaError_t deallocate_memory() {
-    cudaError_t err = cudaFree(val);
+  cudaError_t deallocate_memory() const {
+    const cudaError_t err = cudaFree(val);
     return err;
   }
 };
@@ -215,10 +209,10 @@ public:
 template<typename T, Major major>
 inline cudaError_t
 VectorField3D<T, major>::allocate_memory(int dim1, int dim2, int dim3, int dim4, int n_ghost) {
-  int ng = n_ghost;
-  int n1 = dim1;
-  int n2 = dim2;
-  int n3 = dim3;
+  const int ng = n_ghost;
+  const int n1 = dim1;
+  const int n2 = dim2;
+  const int n3 = dim3;
   n4 = dim4;
   if constexpr (major == Major::RowMajor) {
     disp2 = (n3 + 2 * ng) * n4;
@@ -230,20 +224,18 @@ VectorField3D<T, major>::allocate_memory(int dim1, int dim2, int dim3, int dim4,
     dispt = (disp1 + disp2 + 1) * ng;
   }
   sz = (n1 + 2 * ng) * (n2 + 2 * ng) * (n3 + 2 * ng);
-  cudaError_t err = cudaMalloc(&val, sz * n4 * sizeof(T));
+  const cudaError_t err = cudaMalloc(&val, sz * n4 * sizeof(T));
   cudaMemset(val, 0, sz * n4 * sizeof(T));
   return err;
 }
 
 template<typename T>
 class VectorField2D {
-private:
   int disp1 = 0, n3 = 0, dispt = 0;
   int sz = 0;
   T *val = nullptr;
 
 public:
-
   cudaError_t allocate_memory(int dim1, int dim2, int dim3, int n_ghost);
 
   __device__ T &operator()(const int i, const int j, const int l) {
@@ -266,23 +258,23 @@ public:
 
   auto size() { return sz; }
 
-  cudaError_t deallocate_memory() {
-    cudaError_t err = cudaFree(val);
+  cudaError_t deallocate_memory() const {
+    const cudaError_t err = cudaFree(val);
     return err;
   }
 };
 
 template<typename T>
-inline cudaError_t VectorField2D<T>::allocate_memory(int dim1, int dim2, int dim3, int n_ghost) {
-  int ng = n_ghost;
-  int n1 = dim1;
-  int n2 = dim2;
+cudaError_t VectorField2D<T>::allocate_memory(int dim1, int dim2, int dim3, int n_ghost) {
+  const int ng = n_ghost;
+  const int n1 = dim1;
+  const int n2 = dim2;
   n3 = dim3;
   // Column major
   disp1 = n1 + 2 * ng;
   dispt = (disp1 + 1) * ng;
   sz = (n1 + 2 * ng) * (n2 + 2 * ng);
-  cudaError_t err = cudaMalloc(&val, sz * n3 * sizeof(T));
+  const cudaError_t err = cudaMalloc(&val, sz * n3 * sizeof(T));
   cudaMemset(val, 0, sz * n3 * sizeof(T));
   return err;
 }
@@ -319,17 +311,17 @@ public:
 
   auto size() { return sz; }
 
-  cudaError_t deallocate_memory() {
-    cudaError_t err = cudaFreeHost(val);
+  cudaError_t deallocate_memory() const {
+    const cudaError_t err = cudaFreeHost(val);
     return err;
   }
 };
 
 template<typename T>
 inline cudaError_t VectorField2DHost<T>::allocate_memory(int dim1, int dim2, int dim3, int n_ghost) {
-  int ng = n_ghost;
-  int n1 = dim1;
-  int n2 = dim2;
+  const int ng = n_ghost;
+  const int n1 = dim1;
+  const int n2 = dim2;
   n3 = dim3;
   // Column major
   disp1 = n1 + 2 * ng;
@@ -337,11 +329,11 @@ inline cudaError_t VectorField2DHost<T>::allocate_memory(int dim1, int dim2, int
   sz = (n1 + 2 * ng) * (n2 + 2 * ng);
   if (val != nullptr)
     cudaFreeHost(val);
-  cudaError_t err = cudaHostAlloc(&val, sz * n3 * sizeof(T), cudaHostAllocDefault);
+  const cudaError_t err = cudaHostAlloc(&val, sz * n3 * sizeof(T), cudaHostAllocDefault);
   if (err != cudaSuccess) {
     printf(
-        "The VectorField2DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
-    val = (T*)malloc(sz * n3 * sizeof(T));
+      "The VectorField2DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
+    val = static_cast<T *>(malloc(sz * n3 * sizeof(T)));
     memset(val, 0, sz * n3 * sizeof(T));
   } else {
     cudaMemset(val, 0, sz * n3 * sizeof(T));
@@ -404,9 +396,9 @@ public:
 
   void resize(int ni, int nj, int nk, int nl, int ngg);
 
-  int n_var() const { return n4; }
+  [[nodiscard]] int n_var() const { return n4; }
 
-  cudaError_t deallocate_memory() {
+  cudaError_t deallocate_memory() const {
     auto err = cudaFreeHost(data_);
     return err;
   }
@@ -414,7 +406,7 @@ public:
 
 template<typename T, Major major>
 void VectorField3DHost<T, major>::resize(int ni, int nj, int nk, int nl, int ngg) {
-  int ng = ngg;
+  const int ng = ngg;
   int n1 = ni + 2 * ngg;
   int n2 = nj + 2 * ngg;
   int n3 = nk + 2 * ngg;
@@ -431,27 +423,22 @@ void VectorField3DHost<T, major>::resize(int ni, int nj, int nk, int nl, int ngg
   }
   if (data_ != nullptr)
     cudaFreeHost(data_);
-  cudaError_t err = cudaHostAlloc(&data_, sz * n4 * sizeof(T), cudaHostAllocDefault);
+  const cudaError_t err = cudaHostAlloc(&data_, sz * n4 * sizeof(T), cudaHostAllocDefault);
   if (err != cudaSuccess) {
     printf(
-        "The VectorField3DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
-    data_ = (real *) malloc(sz * n4 * sizeof(T));
+      "The VectorField3DHost isn't allocated by cudaHostAlloc, not enough page-locked memory. Use malloc instead\n");
+    data_ = static_cast<real *>(malloc(sz * n4 * sizeof(T)));
   }
   cudaMemset(data_, 0, sz * n4 * sizeof(T));
-  n1 = ni;
-  n2 = nj;
-  n3 = nk;
 }
 
 template<typename T>
 class VectorField1D {
-private:
   int n2 = 0, dispt = 0;
   int sz = 0;
   T *val = nullptr;
 
 public:
-
   cudaError_t allocate_memory(int dim1, int dim2, int n_ghost);
 
   __device__ T &operator()(const int i, const int l) {
@@ -474,23 +461,22 @@ public:
 
   auto size() { return sz; }
 
-  cudaError_t deallocate_memory() {
-    cudaError_t err = cudaFree(val);
+  cudaError_t deallocate_memory() const {
+    const cudaError_t err = cudaFree(val);
     return err;
   }
 };
 
 template<typename T>
 inline cudaError_t VectorField1D<T>::allocate_memory(int dim1, int dim2, int n_ghost) {
-  int ng = n_ghost;
-  int n1 = dim1;
+  const int ng = n_ghost;
+  const int n1 = dim1;
   n2 = dim2;
   // Column major
   dispt = ng;
   sz = n1 + 2 * ng;
-  cudaError_t err = cudaMalloc(&val, sz * n2 * sizeof(T));
+  const cudaError_t err = cudaMalloc(&val, sz * n2 * sizeof(T));
   cudaMemset(val, 0, sz * n2 * sizeof(T));
   return err;
 }
-
 }

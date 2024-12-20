@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <string_view>
 #include <vector>
 #include "../Parameter.h"
 #include "../Mesh.h"

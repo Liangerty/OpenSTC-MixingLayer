@@ -3,7 +3,6 @@
 #include "Define.h"
 #include "Parameter.h"
 #include "gxl_lib/Matrix.hpp"
-#include "gxl_lib/Array.hpp"
 
 namespace cfd {
 struct Species {

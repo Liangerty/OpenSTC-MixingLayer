@@ -1,7 +1,6 @@
 #pragma once
 
 #include <mpi.h>
-#include "../Define.h"
 #include "../Parameter.h"
 #include "../Mesh.h"
 #include "../Field.h"

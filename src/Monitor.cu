@@ -5,6 +5,7 @@
 #include "Field.h"
 #include "Mesh.h"
 #include "gxl_lib/MyAlgorithm.h"
+#include <fstream>
 
 namespace cfd {
 Monitor::Monitor(const Parameter &parameter, const Species &species, const Mesh &mesh_) : if_monitor{
