@@ -55,7 +55,6 @@ std::vector<int> cfd::read_tke_budget_file(Parameter &parameter, const Mesh &mes
     constexpr int ngg = TkeBudget::ngg;
     const auto &reyAveVar = TkeBudget::collect_name;
 
-    MPI_Offset offset_read;
     int nBlock = 0;
     MPI_File_read_at(fp_rey1, 0, &nBlock, 1, MPI_INT32_T, &status);
     if (nBlock != mesh.n_block_total) {
@@ -71,7 +70,7 @@ std::vector<int> cfd::read_tke_budget_file(Parameter &parameter, const Mesh &mes
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
     std::vector<std::string> rey1Var(n_read_rey1);
-    offset_read = 4 * 3;
+    MPI_Offset offset_read = 4 * 3;
     for (int l = 0; l < n_read_rey1; ++l) {
       rey1Var[l] = gxl::read_str_from_binary_MPI_ver(fp_rey1, offset_read);
     }

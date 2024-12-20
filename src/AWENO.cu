@@ -86,18 +86,18 @@ AWENO_interpolation<MixtureModel::Air>(const real *cv, real *pv_l, real *pv_r, i
     for (int l = 0; l < 5; ++l) {
       // We reconstruct each characteristic variable to reduce the memory to be used.
       // WENO5(L.data(), cv, n_var, idx_shared, l);
-      auto v2 = WENO5(LR.data(), cv, 5, idx_shared, l);
-      v_minus[l] = v2.x;
-      v_plus[l] = v2.y;
+      auto [vm, vp] = WENO5(LR.data(), cv, 5, idx_shared, l);
+      v_minus[l] = vm;
+      v_plus[l] = vp;
     }
   } else if (param->reconstruction == 5) {
     // WENO 7
     for (int l = 0; l < 5; ++l) {
       // We reconstruct each characteristic variable to reduce the memory to be used.
       // WENO5(L.data(), cv, n_var, idx_shared, l);
-      auto v2 = WENO7(LR.data(), cv, 5, idx_shared, l);
-      v_minus[l] = v2.x;
-      v_plus[l] = v2.y;
+      auto [vm, vp] = WENO7(LR.data(), cv, 5, idx_shared, l);
+      v_minus[l] = vm;
+      v_plus[l] = vp;
     }
   }
 

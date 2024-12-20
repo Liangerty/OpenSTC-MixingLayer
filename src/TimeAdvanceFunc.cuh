@@ -159,8 +159,8 @@ __global__ void cfd::limit_flow(DZone *zone, DParameter *param) {
     // Compute the average of the surrounding points
     if (kn > 0) {
       const real kn_inv{1.0 / kn};
-      for (int l = 0; l < n_flow_var; ++l) {
-        updated_var[l] *= kn_inv;
+      for (double & l : updated_var) {
+        l *= kn_inv;
       }
     } else {
       // The surrounding points are all "bad."

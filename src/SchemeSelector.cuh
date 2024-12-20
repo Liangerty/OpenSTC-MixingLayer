@@ -23,9 +23,8 @@ __global__ void viscous_flux_hv(DZone *zone, int max_extent, DParameter *param);
 
 template<MixtureModel mix_model, class turb_method>
 void
-compute_inviscid_flux(const Block &block, cfd::DZone *zone, DParameter *param, int n_var, const Parameter &parameter) {
-  const int inviscid_type = parameter.get_int("inviscid_type");
-  switch (inviscid_type) {
+compute_inviscid_flux(const Block &block, DZone *zone, DParameter *param, int n_var, const Parameter &parameter) {
+  switch (parameter.get_int("inviscid_type")) {
     case 0: // Compute the term with primitive reconstruction methods. (MUSCL/NND/1stOrder + LF/AUSM+/HLLC)
       compute_convective_term_pv<mix_model>(block, zone, param, n_var, parameter);
       break;
@@ -38,7 +37,7 @@ compute_inviscid_flux(const Block &block, cfd::DZone *zone, DParameter *param, i
     case 4:
       compute_convective_term_ep<mix_model>(block, zone, param, n_var);
       break;
-    case 2: // Roe scheme
+    case 2:  // Roe scheme
     default: // Roe scheme
       Roe_compute_inviscid_flux<mix_model>(block, zone, param, n_var, parameter);
       break;

@@ -9,7 +9,7 @@ void initialize_from_start(Parameter &parameter, const Mesh &mesh, std::vector<F
                            ggxl::VectorField3D<real> *profile_dPtr) {
   // We need to first find out the problem type.
   // For problem_type == 1, a mixing layer is required.
-  if (parameter.get_int("problem_type") == 1 && !(parameter.get_bool("compatible_mixing_layer"))) {
+  if (parameter.get_int("problem_type") == 1 && !parameter.get_bool("compatible_mixing_layer")) {
     initialize_mixing_layer(parameter, mesh, field, species);
   } else {
     // For other cases, we initialize by the usual way.

@@ -788,8 +788,7 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
   if (get_int("species") != 0) {
     const int ns = spec.n_spec;
     var_name.resize(nv + ns);
-    auto &names = spec.spec_list;
-    for (auto &[name, ind]: names) {
+    for (auto &names = spec.spec_list; auto &[name, ind]: names) {
       var_name[ind + nv] = name;
       auto nn = name;
       nn = gxl::to_upper(nn);
@@ -849,8 +848,7 @@ void cfd::Parameter::get_variable_names(const Species &spec) {
   }
 
   // Last, variables to be computed by choice.
-  auto ovs = struct_array["other_output_variables"];
-  if (ovs.find("laminar_viscosity") != ovs.end()) {
+  if (auto ovs = struct_array["other_output_variables"]; ovs.find("laminar_viscosity") != ovs.end()) {
     var_name.emplace_back("laminar_viscosity");
     update_parameter("output_mul", true);
     ++nv;
@@ -868,16 +866,15 @@ cfd::Parameter::identify_variable_labels(std::vector<std::string> &var_name, con
     auto NAME = gxl::to_upper(name);
 
     bool found = false;
-    for (const auto &kk: VNs) {
-      if (NAME == kk.first) {
-        l = kk.second;
+    for (const auto &[nm, lb]: VNs) {
+      if (NAME == nm) {
+        l = lb;
         found = true;
         break;
       }
     }
     if (!found && species.n_spec > 0) {
-      const auto &spec_name = species.spec_list;
-      for (const auto &[spec, sp_label]: spec_name) {
+      for (const auto &spec_name = species.spec_list; const auto &[spec, sp_label]: spec_name) {
         if (NAME == gxl::to_upper(spec)) {
           l = 1000 + sp_label;
           break;

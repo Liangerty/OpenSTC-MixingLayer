@@ -84,8 +84,7 @@ void get_mixing_layer_info(Parameter &parameter, const Species &species, std::ve
       u_fast = ma_c * (c_upper + c_lower) / (1 - vel_ratio);
       u_slow = u_fast * vel_ratio;
     }
-    bool upper_faster = parameter.get_bool("upper_faster");
-    if (upper_faster) {
+    if (parameter.get_bool("upper_faster")) {
       ma_upper = u_fast / c_upper;
       ma_lower = u_slow / c_lower;
     } else {

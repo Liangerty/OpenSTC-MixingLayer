@@ -5,7 +5,7 @@
 
 namespace cfd {
 FlameletLib::FlameletLib(const Parameter &parameter) : n_spec{parameter.get_int("n_spec")} {
-  if (n_spec == 0 || parameter.get_int("reaction") != 2) {
+  if (parameter.get_int("n_spec") == 0 || parameter.get_int("reaction") != 2) {
     return;
   }
   switch (parameter.get_int("flamelet_format")) {
@@ -168,7 +168,8 @@ compute_massFraction_from_MixtureFraction(DZone *zone, int i, int j, int k, DPar
       yk_ave[l] = yk_lib(l, 0, 0, 0);
     }
     return;
-  } else if (mixFrac_ave > 1 - 1e-6) {
+  }
+  if (mixFrac_ave > 1 - 1e-6) {
     // Pure fuel stream
     for (int l = 0; l < n_spec; ++l) {
       yk_ave[l] = yk_lib(l, 0, 0, mz_lib);
@@ -348,8 +349,7 @@ interpolate_scalar_dissipation_rate_with_given_z_zPrime(real chi_ave, int n_spec
       yk[l] = yk_lib(l, param->chi_max_j(i_zPrime, i_z), i_zPrime, i_z);
     }
   } else {
-    auto lr = find_chi_range(chi_ave_lib, chi_ave, i_z, i_zPrime, param->n_chi);
-    const auto left{lr.x}, right{lr.y};
+    const auto [left, right] = find_chi_range(chi_ave_lib, chi_ave, i_z, i_zPrime, param->n_chi);
     for (int l = 0; l < n_spec; ++l) {
       yk[l] = yk_lib(l, left, i_zPrime, i_z) +
               (yk_lib(l, right, i_zPrime, i_z) - yk_lib(l, left, i_zPrime, i_z)) /

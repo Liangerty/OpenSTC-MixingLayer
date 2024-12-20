@@ -1557,8 +1557,7 @@ void DBoundCond::apply_boundary_conditions(const Block &block, Field &field, DPa
   // 5-inflow
   for (size_t l = 0; l < n_inflow; l++) {
     const auto nb = inflow_info[l].n_boundary;
-    bool l_use_df = (df_label[l] > -1);
-    if (l_use_df) {
+    if (df_label[l] > -1) {
       // Here we assume only one face corresponds to the inflow boundary
       // nb should be 1, and the number of points should be my, mz of the corresponding block
       for (size_t i = 0; i < nb; i++) {

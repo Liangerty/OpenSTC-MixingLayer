@@ -875,9 +875,8 @@ int read_profile(const Boundary &boundary, const std::string &file, const Block 
     init_mixingLayer_prof_compatible_cpu(boundary, parameter, block, species, profile);
     return 1;
   }
-  auto dot = file.find_last_of('.');
-  auto suffix = file.substr(dot + 1, file.size());
-  if (suffix == "dat") {
+  const auto dot = file.find_last_of('.');
+  if (const auto suffix = file.substr(dot + 1, file.size()); suffix == "dat") {
     read_dat_profile(boundary, file, block, parameter, species, profile, profile_related_bc_name);
   } else if (suffix == "plt") {
     //    read_plt_profile();
@@ -1994,8 +1993,7 @@ DBoundCond::initialize_profile_and_rng(Parameter &parameter, Mesh &mesh, Species
 
   // Count the max number of rng needed
   auto size{0};
-  const auto need_rng = parameter.get_int_array("need_rng");
-  if (!need_rng.empty()) {
+  if (const auto need_rng = parameter.get_int_array("need_rng"); !need_rng.empty()) {
     for (int blk = 0; blk < mesh.n_block; ++blk) {
       auto &bs = mesh[blk].boundary;
       for (const auto &b: bs) {

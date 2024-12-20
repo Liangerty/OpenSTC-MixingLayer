@@ -12,8 +12,7 @@ namespace cfd {
 template<MixtureModel mix_model, class turb>
 void simulate(Driver<mix_model, turb> &driver) {
   auto &parameter{driver.parameter};
-  const auto steady{parameter.get_bool("steady")};
-  if (steady) {
+  if (const auto steady{parameter.get_bool("steady")}) {
     // The methods which use only bv do not need to save cv at all, which is the case in steady simulations.
     // In those methods, such as Roe, AUSM..., we do not store the cv variables.
     steady_simulation<mix_model, turb>(driver);
@@ -76,8 +75,7 @@ void simulate(Driver<mix_model, turb> &driver) {
       parameter.update_parameter("total_simulation_time", physical_time);
     }
 
-    const auto temporal_tag{parameter.get_int("temporal_scheme")};
-    switch (temporal_tag) {
+    switch (const auto temporal_tag{parameter.get_int("temporal_scheme")}) {
       case 2:
         dual_time_stepping<mix_model, turb>(driver);
         break;

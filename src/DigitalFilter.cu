@@ -585,8 +585,8 @@ perform_convolution_y(ggxl::VectorField2D<real> *random_numbers, ggxl::VectorFie
 __global__ void
 perform_convolution_z(ggxl::VectorField2D<real> *df_fy, ggxl::VectorField2D<real> *df_bz,
                       ggxl::VectorField2D<real> *velFluc, int iFace, int my, int mz, int ngg) {
-  int j = int(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
-  int k = int(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
+  const int j = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x) - ngg;
+  const int k = static_cast<int>(blockIdx.y * blockDim.y + threadIdx.y) - ngg;
   if (j >= my + ngg || k >= mz + ngg) {
     return;
   }
